@@ -1,0 +1,45 @@
+---
+title: "REST API Ingestion"
+description: "Ingest API responses, URLs, and documents over HTTP."
+---
+
+## API ingestion
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ingest/api \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.example.com/v1/products",
+    "title": "Products",
+    "method": "GET",
+    "output_dir": "files/output/api"
+  }'
+```
+
+## URL ingestion
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ingest/url \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com",
+    "mode": "full",
+    "output_dir": "files/output/web_crawled",
+    "max_depth": 3,
+    "max_pages": 200
+  }'
+```
+
+## Document ingestion
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "folder": "files/input",
+    "output_dir": "files/output/docs"
+  }'
+```
+
+All ingestion endpoints return counts, output paths, and error information for failed items.
+

@@ -1,0 +1,73 @@
+---
+title: "Parse Documents"
+description: "Convert local files into markdown for retrieval."
+---
+
+Use Ragrails when you have local documents that need to become searchable RAG
+content.
+
+## What you can parse
+
+```text
+.csv, .docx, .epub, .html, .htm, .ipynb, .json, .md, .msg,
+.pdf, .pptx, .rss, .tsv, .txt, .xls, .xlsx, .xml, .zip
+```
+
+## Usage
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    from ragrails import RagRails
+
+    rag = RagRails()
+
+    parsed = rag.parse(
+        folder="files/input",
+        output_dir="files/output/docs",
+    )
+
+    selected = rag.parse(
+        files=["guide.pdf", "pricing.csv"],
+        input_dir="files/input",
+        output_dir="files/output/docs",
+    )
+    ```
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    ragrails parse --folder files/input --output-dir files/output/docs
+    ```
+
+    ```bash
+    ragrails parse \
+      --files guide.pdf \
+      --files pricing.csv \
+      --input-dir files/input \
+      --output-dir files/output/docs
+    ```
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+      -H "Content-Type: application/json" \
+      -d '{
+        "folder": "files/input",
+        "output_dir": "files/output/docs"
+      }'
+    ```
+  </Tab>
+
+  <Tab title="MCP">
+    ```text
+    Use ragrails_parse_documents with folder files/input and output_dir files/output/docs.
+    ```
+  </Tab>
+</Tabs>
+
+## Notebook workflow
+
+Use `notebooks/01_ingestion.ipynb` to inspect parsed markdown outputs
+interactively before chunking.

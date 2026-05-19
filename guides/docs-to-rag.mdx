@@ -1,0 +1,29 @@
+---
+title: "Documents to RAG"
+description: "Build a RAG collection from local files."
+---
+
+Put source files in `files/input`, then run parse -> chunk -> store.
+
+Install provider dependencies and start Qdrant:
+
+```bash
+pip install "ragrails[voyage,qdrant]"
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+parsed = rag.parse(folder="files/input", output_dir="files/output/docs")
+chunks = rag.chunk(input_dir=parsed.output_dir, output_dir="files/output/chunks/docs")
+rag.store(
+    input_dir=chunks.output_dir,
+    vector_db="qdrant",
+    collection="doc_chunks",
+    url="http://localhost:6333",
+)
+```
+
+Use this flow for PDFs, DOCX files, spreadsheets, and other supported local documents.

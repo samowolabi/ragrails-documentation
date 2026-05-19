@@ -1,0 +1,33 @@
+---
+title: "Hosted REST API"
+description: "Run Ragrails as a hosted HTTP service."
+---
+
+Run locally:
+
+```bash
+ragrails-api --host 0.0.0.0 --port 8000
+```
+
+For hosted deployments, provide provider credentials as environment variables, mount or provision persistent storage for input/output files, and put the service behind your normal API gateway or reverse proxy.
+
+Health check:
+
+```text
+GET /v1/health
+```
+
+OpenAPI:
+
+```text
+GET /v1/openapi.json
+```
+
+Swagger UI:
+
+```text
+GET /docs
+```
+
+Use Swagger UI during development to test requests from the browser. Use the
+OpenAPI JSON schema when generating clients or integrating with API tooling.

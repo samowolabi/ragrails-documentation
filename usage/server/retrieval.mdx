@@ -1,0 +1,24 @@
+---
+title: "REST API Retrieval"
+description: "Retrieve stored chunks over HTTP."
+---
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I configure Ragrails?",
+    "vector_db": "qdrant",
+    "collection": "rag_chunks",
+    "top_k": 10,
+    "embedder": "voyage",
+    "model": "voyage-3",
+    "rerank": true,
+    "reranker": "voyage",
+    "reranker_model": "rerank-2-lite",
+    "rerank_top_k": 5
+  }'
+```
+
+The response includes the query, provider metadata, and ranked result chunks.
+

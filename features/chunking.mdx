@@ -1,0 +1,93 @@
+---
+title: "Chunking"
+description: "Split markdown into retrieval-ready JSON chunks."
+---
+
+Chunking reads markdown output from ingestion and writes JSON chunk files for embedding and storage.
+
+## Capabilities
+
+- Split markdown using heading-aware structure.
+- Preserve heading paths as chunk metadata.
+- Generate stable chunk IDs from chunk content.
+- Keep code blocks atomic so code is not split mid-block.
+- Handle markdown tables as atomic or row-aware chunks.
+- Repair links that would otherwise be split across chunk boundaries.
+- Remove scraping navigation boilerplate when detected.
+- Preview chunks for a single markdown file before running a full directory job.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    from ragrails import RagRails
+
+    chunks = RagRails().chunk(
+        input_dir="files/output/docs",
+        output_dir="files/output/chunks",
+        chunk_size=2000,
+        chunk_overlap=200,
+        min_chunk_length=100,
+    )
+    ```
+
+    Preview one file:
+
+    ```python
+    preview = RagRails().chunk_file("files/output/docs/guide.md")
+    ```
+
+    Deep dive: [SDK chunking](/usage/sdk/chunking).
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    ragrails chunk \
+      --input-dir files/output/docs \
+      --output-dir files/output/chunks \
+      --chunk-size 2000 \
+      --chunk-overlap 200 \
+      --min-chunk-length 100
+    ```
+
+    Preview one file:
+
+    ```bash
+    ragrails chunk-file files/output/docs/guide.md
+    ```
+
+    Deep dive: [CLI chunking](/usage/cli/chunking).
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://127.0.0.1:8000/v1/chunk \
+      -H "Content-Type: application/json" \
+      -d '{
+        "input_dir": "files/output/docs",
+        "output_dir": "files/output/chunks",
+        "chunk_size": 2000,
+        "chunk_overlap": 200,
+        "min_chunk_length": 100
+      }'
+    ```
+
+    Deep dive: [REST API chunking](/usage/server/chunking).
+  </Tab>
+
+  <Tab title="MCP">
+    Ask your MCP client to use:
+
+    ```text
+    ragrails_chunk_directory
+    ragrails_chunk_file
+    ```
+
+    Example prompt:
+
+    ```text
+    Use ragrails_chunk_directory with input_dir files/output/docs and output_dir files/output/chunks.
+    ```
+
+    Deep dive: [MCP chunking](/usage/mcp/chunking).
+  </Tab>
+</Tabs>

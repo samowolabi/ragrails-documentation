@@ -1,0 +1,38 @@
+---
+title: "SDK Overview"
+description: "Use Ragrails from Python."
+---
+
+The SDK is the best surface for Python developers who want RAG stages inside an application, notebook, worker, or test suite.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+```
+
+## Jupyter notebooks
+
+The repository includes notebooks that walk through the same SDK pipeline stage
+by stage:
+
+| Notebook | Stage |
+| --- | --- |
+| `notebooks/01_ingestion.ipynb` | Ingestion |
+| `notebooks/02_chunking.ipynb` | Chunking |
+| `notebooks/03_embedding.ipynb` | Embedding |
+| `notebooks/03_store.ipynb` | Storing |
+| `notebooks/04_retrieval.ipynb` | Retrieval |
+
+Use them when you want an interactive workflow for inspecting markdown outputs,
+chunk JSON files, stored vectors, and retrieval results.
+
+## Stages
+
+| Stage | Method | Details |
+| --- | --- | --- |
+| Ingestion | `setup_url`, `scrape`, `retry_scrape`, `parse`, `fetch` | [Ingestion](/usage/sdk/ingestion) |
+| Chunking | `chunk`, `chunk_file` | [Chunking](/usage/sdk/chunking) |
+| Embedding | `embed` | [Embedding](/usage/sdk/embedding) |
+| Storing | `store` | [Storing](/usage/sdk/storing) |
+| Retrieval | `retrieve` | [Retrieval](/usage/sdk/retrieval) |

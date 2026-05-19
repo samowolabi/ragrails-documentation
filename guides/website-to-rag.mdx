@@ -1,0 +1,39 @@
+---
+title: "Website to RAG"
+description: "Build a RAG collection from a website."
+---
+
+Install URL scraping and provider dependencies:
+
+```bash
+pip install "ragrails[url,voyage,qdrant]"
+```
+
+Run URL setup once, then scrape -> chunk -> store.
+
+Start Qdrant locally:
+
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+rag.setup_url()
+site = rag.scrape(
+    url="https://example.com",
+    mode="full",
+    output_dir="files/output/web_crawled",
+    max_depth=3,
+    max_pages=200,
+)
+chunks = rag.chunk(input_dir=site.output_dir, output_dir="files/output/chunks/web")
+rag.store(
+    input_dir=chunks.output_dir,
+    vector_db="qdrant",
+    collection="website_chunks",
+    url="http://localhost:6333",
+)
+```

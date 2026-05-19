@@ -1,0 +1,26 @@
+---
+title: "CLI Chunking"
+description: "Chunk markdown files from the terminal."
+---
+
+Chunk a directory:
+
+```bash
+ragrails chunk \
+  --input-dir files/output/docs \
+  --output-dir files/output/chunks \
+  --chunk-size 2000 \
+  --chunk-overlap 200 \
+  --min-chunk-length 100
+```
+
+Preview one markdown file:
+
+```bash
+ragrails chunk-file files/output/docs/guide.md --chunk-size 2000 --chunk-overlap 200
+```
+
+| Command | Output |
+| --- | --- |
+| `ragrails chunk` | JSON chunk files in `--output-dir`. |
+| `ragrails chunk-file` | Chunk preview printed to stdout. |

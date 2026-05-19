@@ -1,0 +1,16 @@
+---
+title: "Result Types"
+description: "Common Ragrails result shapes."
+---
+
+Ragrails result objects are stage-specific but follow a consistent pattern: counts, input/output locations, provider metadata, and failure details.
+
+| Stage | Common fields |
+| --- | --- |
+| Ingestion | `output_dir`, source counts, `failed`, written `files`, optional `dlq_path` |
+| Chunking | `input_dir`, `output_dir`, `files`, `chunks`, `failed` |
+| Embedding | `input_dir`, `files`, `chunks`, `provider`, `collection` |
+| Storing | `input_dir`, `files`, `chunks`, `provider`, `collection` |
+| Retrieval | `query`, `results`; each result includes `id`, `score`, `text`, `metadata`, and optional `rerank_score` |
+
+Use `print(result)` or inspect `result.__dict__` while developing against a new version.

@@ -1,0 +1,20 @@
+---
+title: "SDK Reference"
+description: "RagRails SDK methods."
+---
+
+| Method | Stage | Summary |
+| --- | --- | --- |
+| `setup_url(browser="chromium")` | Ingestion | Install URL browser support. |
+| `scrape(...)` | Ingestion | Scrape URLs into markdown. |
+| `retry_scrape(...)` | Ingestion | Retry URL ingestion failures. |
+| `parse(...)` | Ingestion | Parse local documents into markdown. |
+| `fetch(...)` | Ingestion | Fetch REST API responses into markdown. |
+| `chunk(...)` | Chunking | Chunk markdown directories. |
+| `chunk_file(...)` | Chunking | Preview chunks for one file. |
+| `embed(...)` | Embedding | Embed and write chunks to a vector database. |
+| `store(...)` | Storing | Explicit storage stage for chunks. |
+| `retrieve(...)` | Retrieval | Search stored chunks. |
+
+See the SDK stage pages for examples and parameters.
+

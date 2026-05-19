@@ -1,0 +1,21 @@
+---
+title: "REST API Embedding"
+description: "Embed chunk files over HTTP."
+---
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/embed \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_dir": "files/output/chunks",
+    "vector_db": "qdrant",
+    "collection": "rag_chunks",
+    "url": "http://localhost:6333",
+    "batch_size": 64,
+    "embedder": "voyage",
+    "model": "voyage-3"
+  }'
+```
+
+Use `files` to embed a subset of chunk JSON files.
+

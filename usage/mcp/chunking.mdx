@@ -1,0 +1,16 @@
+---
+title: "MCP Chunking"
+description: "Use MCP tools to chunk markdown files."
+---
+
+| Tool | Purpose |
+| --- | --- |
+| `ragrails_chunk_directory` | Chunk a directory of markdown files and write JSON chunks. |
+| `ragrails_chunk_file` | Preview chunks for one markdown file. |
+
+Example agent request:
+
+```text
+Use ragrails_chunk_directory with input_dir files/output/docs, output_dir files/output/chunks, chunk_size 2000, chunk_overlap 200, and min_chunk_length 100.
+```
+

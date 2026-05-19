@@ -1,0 +1,48 @@
+---
+title: "Core Features"
+description: "What Ragrails can do across ingestion, chunking, embedding, storing, and retrieval."
+---
+
+Ragrails is organized around five RAG workflow stages. Each stage is exposed
+through the SDK, CLI, REST API server, and local MCP server.
+
+## Feature map
+
+| Stage | Capabilities | Page |
+| --- | --- | --- |
+| Ingestion | Website scraping, full-site crawling, local document parsing, REST API fetching, metadata output, and URL retry support. | [Ingestion](/features/ingestion) |
+| Chunking | Markdown-aware splitting, heading metadata, stable chunk IDs, table handling, code block preservation, link repair, and navigation filtering. | [Chunking](/features/chunking) |
+| Embedding | Batch embedding, provider/model selection, selected-file embedding, and vector-store writes. | [Embedding](/features/embedding) |
+| Storing | Explicit vector database write stage for Qdrant, Pinecone, and Weaviate. | [Storing](/features/storing) |
+| Retrieval | Query embedding, vector search, top-k results, metadata-rich chunks, and optional reranking. | [Retrieval](/features/retrieval) |
+
+## Source types
+
+Ragrails can ingest:
+
+- Websites and exact URLs
+- Local documents such as PDF, DOCX, CSV, XLS/XLSX, Markdown, HTML, JSON, XML, TXT, ZIP, and other supported file types
+- REST API responses with headers, params, JSON bodies, pagination, and method selection
+
+## Output path
+
+The pipeline moves data through predictable local artifacts:
+
+```text
+source content
+  -> markdown files
+  -> JSON chunk files
+  -> embedded vectors in a vector database
+  -> retrieved chunks for an application or agent
+```
+
+## Interfaces
+
+Use the same stages through the interface that fits your workflow:
+
+| Interface | Use it when |
+| --- | --- |
+| SDK | You are building in Python. |
+| CLI | You want terminal commands or shell automation. |
+| REST API | You need a language-agnostic hosted service. |
+| MCP | You want AI clients to call Ragrails tools locally. |

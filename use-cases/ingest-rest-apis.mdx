@@ -1,0 +1,74 @@
+---
+title: "Ingest REST APIs"
+description: "Fetch API responses and save them as markdown."
+---
+
+Use Ragrails when source knowledge lives behind an HTTP API instead of a
+website or document folder.
+
+## What you can do
+
+- Fetch GET, POST, PUT, PATCH, and DELETE endpoints.
+- Pass request headers and query parameters.
+- Send JSON request bodies.
+- Configure pagination and max page limits.
+- Save each response page as markdown with metadata.
+
+## Usage
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    from ragrails import RagRails
+
+    result = RagRails().fetch(
+        url="https://api.example.com/v1/products",
+        title="Products",
+        method="GET",
+        headers={"Authorization": "Bearer TOKEN"},
+        params={"limit": 100},
+        output_dir="files/output/api",
+        max_pages=10,
+    )
+    ```
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    ragrails fetch https://api.example.com/v1/products \
+      --title Products \
+      --header "Authorization:Bearer TOKEN" \
+      --param limit:100 \
+      --output-dir files/output/api \
+      --max-pages 10
+    ```
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://127.0.0.1:8000/v1/ingest/api \
+      -H "Content-Type: application/json" \
+      -d '{
+        "url": "https://api.example.com/v1/products",
+        "title": "Products",
+        "method": "GET",
+        "headers": {
+          "Authorization": "Bearer TOKEN"
+        },
+        "params": {
+          "limit": 100
+        },
+        "output_dir": "files/output/api",
+        "max_pages": 10
+      }'
+    ```
+
+    Use Swagger UI at `http://127.0.0.1:8000/docs` to inspect the request schema.
+  </Tab>
+
+  <Tab title="MCP">
+    ```text
+    Use ragrails_fetch_api for https://api.example.com/v1/products with title Products, Authorization header Bearer TOKEN, limit 100, output_dir files/output/api, and max_pages 10.
+    ```
+  </Tab>
+</Tabs>

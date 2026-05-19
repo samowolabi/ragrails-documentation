@@ -1,0 +1,88 @@
+---
+title: "Retrieval"
+description: "Search stored chunks and optionally rerank results."
+---
+
+Retrieval embeds a query, searches the configured vector database, and can rerank candidate chunks.
+
+## Capabilities
+
+- Embed a query with the configured embedding provider.
+- Search Qdrant, Pinecone, or Weaviate collections.
+- Control candidate count with `top_k`.
+- Return chunk text, score, ID, source metadata, and optional rerank score.
+- Rerank vector-search candidates with a reranker provider and model.
+- Use the same retrieval behavior through SDK, CLI, REST API, or MCP.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    from ragrails import RagRails
+
+    results = RagRails().retrieve(
+        query="How do I configure Ragrails?",
+        vector_db="qdrant",
+        collection="rag_chunks",
+        top_k=10,
+        embedder="voyage",
+        model="voyage-3",
+        rerank=True,
+        reranker="voyage",
+        reranker_model="rerank-2-lite",
+        rerank_top_k=5,
+    )
+    ```
+
+    Deep dive: [SDK retrieval](/usage/sdk/retrieval).
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    ragrails retrieve "How do I configure Ragrails?" \
+      --vector-db qdrant \
+      --collection rag_chunks \
+      --top-k 10 \
+      --rerank \
+      --reranker voyage \
+      --reranker-model rerank-2-lite \
+      --rerank-top-k 5
+    ```
+
+    Deep dive: [CLI retrieval](/usage/cli/retrieval).
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://127.0.0.1:8000/v1/retrieve \
+      -H "Content-Type: application/json" \
+      -d '{
+        "query": "How do I configure Ragrails?",
+        "vector_db": "qdrant",
+        "collection": "rag_chunks",
+        "top_k": 10,
+        "rerank": true,
+        "reranker": "voyage",
+        "reranker_model": "rerank-2-lite",
+        "rerank_top_k": 5
+      }'
+    ```
+
+    Deep dive: [REST API retrieval](/usage/server/retrieval).
+  </Tab>
+
+  <Tab title="MCP">
+    Ask your MCP client to use:
+
+    ```text
+    ragrails_retrieve
+    ```
+
+    Example prompt:
+
+    ```text
+    Use ragrails_retrieve for "How do I configure Ragrails?" against qdrant collection rag_chunks with top_k 10 and reranking enabled.
+    ```
+
+    Deep dive: [MCP retrieval](/usage/mcp/retrieval).
+  </Tab>
+</Tabs>

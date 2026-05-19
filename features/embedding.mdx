@@ -1,0 +1,87 @@
+---
+title: "Embedding"
+description: "Generate vectors from chunk files."
+---
+
+Embedding reads JSON chunk files, calls an embedding provider, and writes vectors to the configured vector database.
+
+## Capabilities
+
+- Read chunk JSON files produced by the chunking stage.
+- Embed all chunk files in a directory or a selected subset of files.
+- Batch embeddings to reduce provider calls and control cost.
+- Select an embedding provider and model.
+- Write embedded vectors to the configured vector database.
+- Return counts, provider metadata, collection name, and per-file errors.
+
+## Current provider path
+
+The default embedder is Voyage AI with `model="voyage-3"`. Vector storage
+examples use Qdrant, but Pinecone and Weaviate are also supported through the
+same arguments.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    from ragrails import RagRails
+
+    embedded = RagRails().embed(
+        input_dir="files/output/chunks",
+        vector_db="qdrant",
+        collection="rag_chunks",
+        batch_size=64,
+        embedder="voyage",
+        model="voyage-3",
+    )
+    ```
+
+    Deep dive: [SDK embedding](/usage/sdk/embedding).
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    ragrails embed \
+      --input-dir files/output/chunks \
+      --vector-db qdrant \
+      --collection rag_chunks \
+      --batch-size 64 \
+      --embedder voyage \
+      --model voyage-3
+    ```
+
+    Deep dive: [CLI embedding](/usage/cli/embedding).
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://127.0.0.1:8000/v1/embed \
+      -H "Content-Type: application/json" \
+      -d '{
+        "input_dir": "files/output/chunks",
+        "vector_db": "qdrant",
+        "collection": "rag_chunks",
+        "batch_size": 64,
+        "embedder": "voyage",
+        "model": "voyage-3"
+      }'
+    ```
+
+    Deep dive: [REST API embedding](/usage/server/embedding).
+  </Tab>
+
+  <Tab title="MCP">
+    Ask your MCP client to use:
+
+    ```text
+    ragrails_embed_chunks
+    ```
+
+    Example prompt:
+
+    ```text
+    Use ragrails_embed_chunks with input_dir files/output/chunks, vector_db qdrant, collection rag_chunks, embedder voyage, and model voyage-3.
+    ```
+
+    Deep dive: [MCP embedding](/usage/mcp/embedding).
+  </Tab>
+</Tabs>

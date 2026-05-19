@@ -1,0 +1,20 @@
+---
+title: "REST API Storing"
+description: "Store chunks in a vector database over HTTP."
+---
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/store \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_dir": "files/output/chunks",
+    "vector_db": "qdrant",
+    "collection": "rag_chunks",
+    "batch_size": 64,
+    "embedder": "voyage",
+    "model": "voyage-3"
+  }'
+```
+
+`/v1/store` is the explicit storage endpoint. It uses the same provider arguments as `/v1/embed`.
+

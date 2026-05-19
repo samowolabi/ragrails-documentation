@@ -1,0 +1,75 @@
+---
+title: "SDK Ingestion"
+description: "Convert URLs, documents, and API responses into markdown."
+---
+
+Ingestion writes markdown files that chunking can consume.
+
+## URL ingestion
+
+```bash
+pip install "ragrails[url]"
+```
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+rag.setup_url(browser="chromium")
+
+result = rag.scrape(
+    url="https://example.com",
+    mode="full",
+    output_dir="files/output/web_crawled",
+    max_depth=3,
+    max_pages=200,
+)
+```
+
+Retry failed URL entries from the dead-letter queue:
+
+```python
+result = rag.retry_scrape("files/output/web_crawled/dlq.json")
+```
+
+## Document ingestion
+
+```python
+result = RagRails().parse(
+    folder="files/input",
+    output_dir="files/output/docs",
+)
+```
+
+Or parse specific files:
+
+```python
+result = RagRails().parse(
+    files=["guide.pdf", "pricing.csv"],
+    input_dir="files/input",
+    output_dir="files/output/docs",
+)
+```
+
+## API ingestion
+
+```python
+result = RagRails().fetch(
+    url="https://api.example.com/v1/products",
+    title="Products",
+    method="GET",
+    headers={"Authorization": "Bearer TOKEN"},
+    output_dir="files/output/api",
+)
+```
+
+## Key parameters
+
+| Method | Parameters |
+| --- | --- |
+| `setup_url` | `browser` |
+| `scrape` | `url`, `mode`, `output_dir`, `frontmatter`, `dlq_path`, `max_depth`, `max_pages` |
+| `retry_scrape` | `dlq_path`, `mode`, `max_depth`, `max_pages`, `max_attempts` |
+| `parse` | `files`, `folder`, `input_dir`, `output_dir`, `frontmatter` |
+| `fetch` | `url`, `title`, `description`, `method`, `headers`, `params`, `body`, `pagination`, `max_pages`, `output_dir`, `frontmatter` |
+

@@ -1,0 +1,29 @@
+---
+title: "Testing"
+description: "Run the Ragrails test suite."
+---
+
+Run all repository checks:
+
+```bash
+scripts/test.sh
+```
+
+The script runs:
+
+```text
+scripts/smoke-test.sh
+scripts/test-cli.sh
+scripts/test-mcp.sh
+scripts/check-changelog.sh
+```
+
+Run focused checks while working:
+
+```bash
+scripts/test-cli.sh
+scripts/test-mcp.sh
+```
+
+Docs validation is available through `scripts/docs-check.sh`, but it is not wired into `scripts/test.sh` until the Mintlify site is stable.
+

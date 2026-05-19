@@ -1,0 +1,82 @@
+---
+title: "Quickstart"
+description: "Run your first Ragrails pipeline."
+---
+
+This example parses local documents, chunks them, embeds them, stores them in Qdrant, and retrieves results.
+
+```bash
+pip install "ragrails[voyage,qdrant]"
+```
+
+Start Qdrant locally before storing vectors:
+
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+
+parsed = rag.parse(
+    folder="files/input",
+    output_dir="files/output/docs",
+)
+
+chunks = rag.chunk(
+    input_dir=parsed.output_dir,
+    output_dir="files/output/chunks/docs",
+)
+
+stored = rag.store(
+    input_dir=chunks.output_dir,
+    vector_db="qdrant",
+    collection="rag_chunks",
+    url="http://localhost:6333",
+)
+
+results = rag.retrieve(
+    query="What does the documentation say about pricing?",
+    vector_db="qdrant",
+    collection="rag_chunks",
+    url="http://localhost:6333",
+    top_k=5,
+)
+
+print(results.results)
+```
+
+For URL ingestion, install `ragrails[url]` and run browser setup once:
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+rag.setup_url()
+```
+
+Then use `rag.scrape(...)` before chunking.
+
+For the same workflow through CLI, REST API, or MCP, use the tabs on the stage pages:
+
+- [Ingestion](/features/ingestion)
+- [Chunking](/features/chunking)
+- [Storing](/features/storing)
+- [Retrieval](/features/retrieval)
+
+## Notebook examples
+
+The repository includes Jupyter notebooks for each pipeline stage:
+
+| Notebook | Stage |
+| --- | --- |
+| `notebooks/01_ingestion.ipynb` | Ingestion |
+| `notebooks/02_chunking.ipynb` | Chunking |
+| `notebooks/03_embedding.ipynb` | Embedding |
+| `notebooks/03_store.ipynb` | Storing |
+| `notebooks/04_retrieval.ipynb` | Retrieval |
+
+Use the notebooks when you want to inspect intermediate files and results while
+learning the pipeline.

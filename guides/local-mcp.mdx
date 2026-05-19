@@ -1,0 +1,24 @@
+---
+title: "Local MCP"
+description: "Use Ragrails from a local AI client through MCP."
+---
+
+Install:
+
+```bash
+pip install ragrails
+```
+
+Client configuration:
+
+```json
+{
+  "mcpServers": {
+    "ragrails": {
+      "command": "ragrails-mcp"
+    }
+  }
+}
+```
+
+After reloading the client, ask it to call Ragrails tools for ingestion, chunking, embedding, storing, and retrieval. For local development, use the `uv run --directory ... ragrails-mcp` configuration from [MCP setup](/usage/mcp/setup).

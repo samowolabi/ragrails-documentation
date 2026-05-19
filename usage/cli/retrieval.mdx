@@ -1,0 +1,28 @@
+---
+title: "CLI Retrieval"
+description: "Search stored chunks from the terminal."
+---
+
+```bash
+ragrails retrieve "How do I configure Ragrails?" \
+  --vector-db qdrant \
+  --collection rag_chunks \
+  --top-k 10 \
+  --embedder voyage \
+  --model voyage-3
+```
+
+Enable reranking:
+
+```bash
+ragrails retrieve "How do I configure Ragrails?" \
+  --vector-db qdrant \
+  --collection rag_chunks \
+  --rerank \
+  --reranker voyage \
+  --reranker-model rerank-2-lite \
+  --rerank-top-k 5
+```
+
+Retrieval prints result count, score, id, title/path metadata when present, and a text preview.
+

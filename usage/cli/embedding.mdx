@@ -1,0 +1,28 @@
+---
+title: "CLI Embedding"
+description: "Embed chunk files from the terminal."
+---
+
+```bash
+pip install "ragrails[voyage,qdrant]"
+```
+
+```bash
+ragrails embed \
+  --input-dir files/output/chunks \
+  --vector-db qdrant \
+  --collection rag_chunks \
+  --url http://localhost:6333 \
+  --batch-size 64 \
+  --embedder voyage \
+  --model voyage-3
+```
+
+Embed selected files:
+
+```bash
+ragrails embed --input-dir files/output/chunks --files guide.json --vector-db qdrant --collection rag_chunks
+```
+
+Use `--vector-db pinecone` or `--vector-db weaviate` with the matching provider extra and credentials.
+

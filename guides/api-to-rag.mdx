@@ -1,0 +1,30 @@
+---
+title: "API to RAG"
+description: "Build a RAG collection from a REST API."
+---
+
+1. Ingest the API response with `fetch`, `ragrails fetch`, or `POST /v1/ingest/api`.
+2. Chunk the generated markdown.
+3. Store the chunks in your vector database.
+4. Retrieve against the collection.
+
+SDK example:
+
+```bash
+pip install "ragrails[voyage,qdrant]"
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+api = rag.fetch(url="https://api.example.com/v1/products", title="Products", output_dir="files/output/api")
+chunks = rag.chunk(input_dir=api.output_dir, output_dir="files/output/chunks/api")
+rag.store(
+    input_dir=chunks.output_dir,
+    vector_db="qdrant",
+    collection="api_docs",
+    url="http://localhost:6333",
+)
+```

@@ -1,0 +1,19 @@
+---
+title: "REST API Chunking"
+description: "Chunk markdown files over HTTP."
+---
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/chunk \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_dir": "files/output/docs",
+    "output_dir": "files/output/chunks",
+    "chunk_size": 2000,
+    "chunk_overlap": 200,
+    "min_chunk_length": 100
+  }'
+```
+
+The response includes file counts, chunk counts, failures, and written chunk file paths.
+

@@ -1,0 +1,72 @@
+---
+title: "Retrieve Context"
+description: "Search stored chunks and return context for applications or agents."
+---
+
+Use Ragrails retrieval when you already have chunks stored in a vector database
+and need relevant context for a query.
+
+## What you can do
+
+- Embed a user query.
+- Search Qdrant, Pinecone, or Weaviate.
+- Control candidate count with `top_k`.
+- Return text, score, ID, and source metadata.
+- Optionally rerank candidates before returning final results.
+
+## Usage
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    from ragrails import RagRails
+
+    result = RagRails().retrieve(
+        query="How do refunds work?",
+        vector_db="qdrant",
+        collection="docs",
+        url="http://localhost:6333",
+        top_k=10,
+        rerank=True,
+        rerank_top_k=5,
+    )
+
+    for item in result.results:
+        print(item.score, item.metadata.get("title"), item.text[:300])
+    ```
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    ragrails retrieve "How do refunds work?" \
+      --vector-db qdrant \
+      --collection docs \
+      --url http://localhost:6333 \
+      --top-k 10 \
+      --rerank \
+      --rerank-top-k 5
+    ```
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://127.0.0.1:8000/v1/retrieve \
+      -H "Content-Type: application/json" \
+      -d '{
+        "query": "How do refunds work?",
+        "vector_db": "qdrant",
+        "collection": "docs",
+        "url": "http://localhost:6333",
+        "top_k": 10,
+        "rerank": true,
+        "rerank_top_k": 5
+      }'
+    ```
+  </Tab>
+
+  <Tab title="MCP">
+    ```text
+    Use ragrails_retrieve for the query "How do refunds work?" against qdrant collection docs at http://localhost:6333 with top_k 10, rerank enabled, and rerank_top_k 5.
+    ```
+  </Tab>
+</Tabs>

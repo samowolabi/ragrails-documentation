@@ -1,0 +1,29 @@
+---
+title: "REST API Reference"
+description: "Ragrails HTTP endpoint reference."
+---
+
+Base path: `/v1`.
+
+| Method | Path | Stage |
+| --- | --- | --- |
+| `GET` | `/health` | Health |
+| `POST` | `/ingest/api` | Ingestion |
+| `POST` | `/ingest/url` | Ingestion |
+| `POST` | `/ingest/docs` | Ingestion |
+| `POST` | `/chunk` | Chunking |
+| `POST` | `/embed` | Embedding |
+| `POST` | `/store` | Storing |
+| `POST` | `/retrieve` | Retrieval |
+
+Run `ragrails-api` and open the generated Swagger UI:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+Use the OpenAPI schema for code generation, API clients, and automated tooling:
+
+```text
+http://127.0.0.1:8000/v1/openapi.json
+```

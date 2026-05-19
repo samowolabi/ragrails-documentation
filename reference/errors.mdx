@@ -1,0 +1,14 @@
+---
+title: "Errors"
+description: "Common Ragrails errors and fixes."
+---
+
+| Error | Likely cause | Fix |
+| --- | --- | --- |
+| Missing optional dependency | A provider or URL scraping extra is not installed. | Install the matching extra such as `ragrails[url]`, `ragrails[voyage]`, or `ragrails[store-qdrant]`. |
+| Provider authentication failed | Missing API key or invalid credentials. | Set provider environment variables. |
+| Collection is required | Vector database needs a collection, index, or class. | Pass `collection`. |
+| Input path not found | Stage cannot find source files. | Check `input_dir`, `folder`, or file names. |
+| URL scraping setup missing | Browser support is not installed. | Run `setup_url`, `ragrails setup-url`, or `ragrails_setup_url`. |
+
+The REST API maps validation issues and runtime failures to JSON error responses.

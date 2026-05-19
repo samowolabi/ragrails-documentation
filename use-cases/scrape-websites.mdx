@@ -1,0 +1,83 @@
+---
+title: "Scrape Websites"
+description: "Crawl websites and turn pages into markdown for RAG."
+---
+
+Use Ragrails when you need to turn public or internal website content into
+structured markdown that can be chunked, embedded, and searched.
+
+## What you can do
+
+- Scrape one exact URL.
+- Scrape multiple exact URLs.
+- Crawl a full site from a starting URL.
+- Control crawl depth and maximum page count.
+- Add source metadata as frontmatter.
+- Retry failed pages from the dead-letter queue.
+
+## Requirements
+
+URL scraping uses browser/crawler dependencies:
+
+```bash
+pip install "ragrails[url]"
+```
+
+Run browser setup once:
+
+```bash
+ragrails setup-url
+```
+
+## Usage
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    from ragrails import RagRails
+
+    rag = RagRails()
+
+    site = rag.scrape(
+        url="https://example.com",
+        mode="full",
+        output_dir="files/output/web_crawled",
+        max_depth=3,
+        max_pages=200,
+    )
+
+    retry = rag.retry_scrape("files/output/web_crawled/dlq.json")
+    ```
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    ragrails scrape https://example.com \
+      --mode full \
+      --output-dir files/output/web_crawled \
+      --max-depth 3 \
+      --max-pages 200
+    ```
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://127.0.0.1:8000/v1/ingest/url \
+      -H "Content-Type: application/json" \
+      -d '{
+        "url": "https://example.com",
+        "mode": "full",
+        "output_dir": "files/output/web_crawled",
+        "max_depth": 3,
+        "max_pages": 200
+      }'
+    ```
+
+    Use Swagger UI at `http://127.0.0.1:8000/docs` to inspect the request schema.
+  </Tab>
+</Tabs>
+
+## Next step
+
+Chunk the scraped markdown with [chunking](/features/chunking), then store it in
+a vector database with [storing](/features/storing).

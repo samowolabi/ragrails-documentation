@@ -1,0 +1,25 @@
+---
+title: "CLI Storing"
+description: "Store chunks in a vector database from the terminal."
+---
+
+The `store` command is the explicit storage stage. It embeds chunks and writes them to the configured vector database.
+
+```bash
+ragrails store \
+  --input-dir files/output/chunks \
+  --vector-db qdrant \
+  --collection rag_chunks \
+  --batch-size 64 \
+  --embedder voyage \
+  --model voyage-3
+```
+
+Install the storage extra for your provider:
+
+| Provider | Install |
+| --- | --- |
+| Qdrant | `pip install "ragrails[store-qdrant]"` |
+| Pinecone | `pip install "ragrails[store-pinecone]"` |
+| Weaviate | `pip install "ragrails[store-weaviate]"` |
+

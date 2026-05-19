@@ -1,0 +1,86 @@
+---
+title: "Storing"
+description: "Store chunks in a vector database."
+---
+
+Storing is the explicit vector database write stage. It uses the same provider arguments as embedding.
+
+## Capabilities
+
+- Use a storage-oriented `store` method, command, endpoint, or MCP tool.
+- Embed chunk files and write vectors to a vector database in one stage.
+- Store in Qdrant, Pinecone, or Weaviate.
+- Validate provider-specific collection/index/class naming rules.
+- Process selected chunk JSON files or every JSON file in a chunk directory.
+
+## Relationship to embedding
+
+`store` uses the same underlying embedding-and-upsert path as `embed`. Use
+`store` when you want the pipeline to read clearly as ingestion -> chunking ->
+storing -> retrieval.
+
+<Tabs>
+  <Tab title="SDK">
+    ```python
+    from ragrails import RagRails
+
+    stored = RagRails().store(
+        input_dir="files/output/chunks",
+        vector_db="qdrant",
+        collection="rag_chunks",
+        batch_size=64,
+        embedder="voyage",
+        model="voyage-3",
+    )
+    ```
+
+    Deep dive: [SDK storing](/usage/sdk/storing).
+  </Tab>
+
+  <Tab title="CLI">
+    ```bash
+    ragrails store \
+      --input-dir files/output/chunks \
+      --vector-db qdrant \
+      --collection rag_chunks \
+      --batch-size 64 \
+      --embedder voyage \
+      --model voyage-3
+    ```
+
+    Deep dive: [CLI storing](/usage/cli/storing).
+  </Tab>
+
+  <Tab title="REST API">
+    ```bash
+    curl -X POST http://127.0.0.1:8000/v1/store \
+      -H "Content-Type: application/json" \
+      -d '{
+        "input_dir": "files/output/chunks",
+        "vector_db": "qdrant",
+        "collection": "rag_chunks",
+        "batch_size": 64,
+        "embedder": "voyage",
+        "model": "voyage-3"
+      }'
+    ```
+
+    Deep dive: [REST API storing](/usage/server/storing).
+  </Tab>
+
+  <Tab title="MCP">
+    Ask your MCP client to use:
+
+    ```text
+    ragrails_store_chunks
+    ```
+
+    Example prompt:
+
+    ```text
+    Use ragrails_store_chunks with input_dir files/output/chunks, vector_db qdrant, collection rag_chunks, batch_size 64, embedder voyage, and model voyage-3.
+    ```
+
+    Deep dive: [MCP storing](/usage/mcp/storing).
+  </Tab>
+</Tabs>

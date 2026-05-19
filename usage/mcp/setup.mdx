@@ -1,0 +1,70 @@
+---
+title: "MCP Setup"
+description: "Configure Ragrails as a local stdio MCP server."
+---
+
+Run the server:
+
+```bash
+ragrails-mcp
+```
+
+## Published package configuration
+
+Use this after installing Ragrails into the same environment your MCP client can access:
+
+```json
+{
+  "mcpServers": {
+    "ragrails": {
+      "command": "ragrails-mcp"
+    }
+  }
+}
+```
+
+## Local repository development configuration
+
+Use this while developing from a local checkout:
+
+```json
+{
+  "mcpServers": {
+    "ragrails": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/path/to/agent-rag-v2",
+        "ragrails-mcp"
+      ]
+    }
+  }
+}
+```
+
+## Client notes
+
+Cursor, Claude Desktop, Claude Code, VS Code, and Windsurf all use the same core shape: add a server named `ragrails`, set `command` to `ragrails-mcp`, and restart or reload the client. Use the local `uv run --directory ... ragrails-mcp` form when the package is not installed globally.
+
+## Environment variables
+
+The MCP server calls the SDK internally, so provider variables are the same as the SDK:
+
+```bash
+VOYAGE_API_KEY=...
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=...
+PINECONE_API_KEY=...
+WEAVIATE_URL=...
+WEAVIATE_API_KEY=...
+```
+
+## Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| Client cannot find `ragrails-mcp` | Install `pip install ragrails` in the environment used by the client, or use the `uv run --directory` config. |
+| URL scraping tools fail | Install `ragrails[url]` and run `ragrails_setup_url`. |
+| Embedding or storage tools fail | Install the relevant provider extras and set provider credentials. |
+| Hosted MCP expected | Ragrails v1 docs cover local stdio MCP only. Hosted or HTTP MCP is future work. |

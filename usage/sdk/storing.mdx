@@ -1,0 +1,32 @@
+---
+title: "SDK Storing"
+description: "Store chunks in a vector database."
+---
+
+`store` is the explicit storage stage. In the current implementation it uses the same embedding-and-storage path as `embed`, so it is useful when you want pipeline code to read as ingestion -> chunking -> storing.
+
+```python
+from ragrails import RagRails
+
+result = RagRails().store(
+    input_dir="files/output/chunks",
+    vector_db="qdrant",
+    collection="rag_chunks",
+    batch_size=64,
+    embedder="voyage",
+    model="voyage-3",
+)
+```
+
+Install the matching vector-store extra:
+
+```bash
+pip install "ragrails[store-qdrant]"
+```
+
+| Provider | Extra |
+| --- | --- |
+| Qdrant | `ragrails[store-qdrant]` |
+| Pinecone | `ragrails[store-pinecone]` |
+| Weaviate | `ragrails[store-weaviate]` |
+

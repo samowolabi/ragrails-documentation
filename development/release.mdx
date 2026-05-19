@@ -1,0 +1,20 @@
+---
+title: "Release"
+description: "Build and publish Ragrails."
+---
+
+Before releasing, update `CHANGELOG.md` under `Unreleased`, run tests, then build.
+
+```bash
+scripts/test.sh
+scripts/build.sh
+```
+
+Publishing uses:
+
+```bash
+scripts/publish.sh
+```
+
+`scripts/build.sh` and `scripts/publish.sh` run `scripts/test.sh` before build or publish.
+

@@ -1,0 +1,27 @@
+---
+title: "Architecture"
+description: "How Ragrails is organized."
+---
+
+Ragrails organizes usage surfaces under `ragrails/usage/`.
+
+```text
+ragrails/usage/
+  sdk/
+  cli/
+  server/
+  mcp/
+```
+
+Each surface is grouped by the same pipeline stages:
+
+```text
+ingestion/
+chunking/
+embedding/
+storing/
+retrieval/
+```
+
+The SDK owns the Python-facing methods. CLI commands, REST routes, and MCP tools delegate into the same stage behavior so that examples map cleanly across surfaces.
+

@@ -1,0 +1,68 @@
+---
+title: "Host a Language-Agnostic API"
+description: "Expose Ragrails over HTTP for non-Python applications."
+---
+
+Use the REST API server when you want JavaScript, TypeScript, Go, Java, mobile,
+or other non-Python clients to call Ragrails over HTTP.
+
+## What you can do
+
+- Ingest APIs, URLs, and local document folders over HTTP.
+- Chunk markdown folders over HTTP.
+- Embed and store chunk files over HTTP.
+- Retrieve context over HTTP.
+- Inspect and test every endpoint through Swagger UI.
+- Generate clients from the OpenAPI schema.
+
+## Usage
+
+<Tabs>
+  <Tab title="REST API">
+    Start the server:
+
+    ```bash
+    ragrails-api --host 0.0.0.0 --port 8000
+    ```
+
+    Health check:
+
+    ```bash
+    curl http://127.0.0.1:8000/v1/health
+    ```
+
+    Developer docs:
+
+    ```text
+    Swagger UI: http://127.0.0.1:8000/docs
+    OpenAPI:    http://127.0.0.1:8000/v1/openapi.json
+    ```
+  </Tab>
+
+  <Tab title="SDK">
+    Use the SDK when your host is Python and you do not need an HTTP boundary:
+
+    ```python
+    from ragrails import RagRails
+
+    rag = RagRails()
+    parsed = rag.parse(folder="files/input", output_dir="files/output/docs")
+    chunks = rag.chunk(input_dir=parsed.output_dir, output_dir="files/output/chunks/docs")
+    ```
+  </Tab>
+
+  <Tab title="CLI">
+    Use the CLI when your host can run shell commands:
+
+    ```bash
+    ragrails parse --folder files/input --output-dir files/output/docs
+    ragrails chunk --input-dir files/output/docs --output-dir files/output/chunks/docs
+    ```
+  </Tab>
+</Tabs>
+
+## Production notes
+
+For hosted deployments, provide provider credentials as environment variables,
+provision persistent file storage for input/output folders, and put the API
+behind your normal gateway, auth layer, and rate limits.

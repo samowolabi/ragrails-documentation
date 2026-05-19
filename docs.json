@@ -1,0 +1,133 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Ragrails",
+  "theme": "maple",
+  "logo": {
+    "light": "/images/logo/ragrails-logo-black.png",
+    "dark": "/images/logo/ragrails-logo-white.png",
+    "href": "/"
+  },
+  "favicon": "/images/logo/ragrails-logo-icon.png",
+  "colors": {
+    "primary": "#7856FF",
+    "light": "#7856FF",
+    "dark": "#7856FF"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start Here",
+        "pages": [
+          "index",
+          "getting-started/installation",
+          "getting-started/quickstart",
+          "getting-started/concepts",
+          "getting-started/configuration"
+        ]
+      },
+      {
+        "group": "Core Workflow",
+        "pages": [
+          "features/overview",
+          "features/ingestion",
+          "features/chunking",
+          "features/embedding",
+          "features/storing",
+          "features/retrieval"
+        ]
+      },
+      {
+        "group": "Usage Surfaces",
+        "pages": [
+          {
+            "group": "SDK",
+            "pages": [
+              "usage/sdk/overview",
+              "usage/sdk/ingestion",
+              "usage/sdk/chunking",
+              "usage/sdk/embedding",
+              "usage/sdk/storing",
+              "usage/sdk/retrieval"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "usage/cli/overview",
+              "usage/cli/ingestion",
+              "usage/cli/chunking",
+              "usage/cli/embedding",
+              "usage/cli/storing",
+              "usage/cli/retrieval"
+            ]
+          },
+          {
+            "group": "REST API",
+            "pages": [
+              "usage/server/overview",
+              "usage/server/ingestion",
+              "usage/server/chunking",
+              "usage/server/embedding",
+              "usage/server/storing",
+              "usage/server/retrieval"
+            ]
+          },
+          {
+            "group": "MCP",
+            "pages": [
+              "usage/mcp/overview",
+              "usage/mcp/setup",
+              "usage/mcp/ingestion",
+              "usage/mcp/chunking",
+              "usage/mcp/embedding",
+              "usage/mcp/storing",
+              "usage/mcp/retrieval"
+            ]
+          }
+        ]
+      },
+      {
+        "group": "Use Cases",
+        "pages": [
+          "use-cases/scrape-websites",
+          "use-cases/parse-documents",
+          "use-cases/ingest-rest-apis",
+          "use-cases/build-vector-knowledge-base",
+          "use-cases/retrieve-context",
+          "use-cases/use-with-ai-clients",
+          "use-cases/host-language-agnostic-api"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/api-to-rag",
+          "guides/docs-to-rag",
+          "guides/website-to-rag",
+          "guides/local-mcp",
+          "guides/hosted-rest-api"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/sdk",
+          "reference/cli",
+          "reference/rest-api",
+          "reference/mcp-tools",
+          "reference/result-types",
+          "reference/errors"
+        ]
+      },
+      {
+        "group": "Development",
+        "pages": [
+          "development/architecture",
+          "development/testing",
+          "development/release",
+          "development/changelog"
+        ]
+      }
+    ]
+  }
+}

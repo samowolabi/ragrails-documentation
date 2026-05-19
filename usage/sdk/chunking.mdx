@@ -1,0 +1,33 @@
+---
+title: "SDK Chunking"
+description: "Split markdown files into retrieval-ready JSON chunks."
+---
+
+Chunk a directory of markdown files:
+
+```python
+from ragrails import RagRails
+
+result = RagRails().chunk(
+    input_dir="files/output/docs",
+    output_dir="files/output/chunks/docs",
+    chunk_size=2000,
+    chunk_overlap=200,
+    min_chunk_length=100,
+)
+```
+
+Preview chunks for one file without writing a full directory run:
+
+```python
+chunks = RagRails().chunk_file(
+    path="files/output/docs/guide.md",
+    chunk_size=2000,
+    chunk_overlap=200,
+)
+```
+
+| Method | Parameters |
+| --- | --- |
+| `chunk` | `input_dir`, `output_dir`, `chunk_size`, `chunk_overlap`, `min_chunk_length` |
+| `chunk_file` | `path`, `chunk_size`, `chunk_overlap`, `min_chunk_length` |
