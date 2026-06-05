@@ -16,8 +16,11 @@ Ragrails reads credentials from environment variables. Use a `.env` file at the 
 
 | Provider | Variable | Models |
 | --- | --- | --- |
-| OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo`, `o1-mini`, `o1` |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, `claude-opus-4-7` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-5.5`, `gpt-5.4-mini`, `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`, and more |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5`, and more |
+| Google | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | `gemini-3-pro`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, and more |
+
+<Note>Google Gemini models don't support tool calling yet, so they can't be used with the interactive CLI's [agentic tools](/advanced/agentic-tools).</Note>
 
 ## Reranker providers
 

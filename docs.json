@@ -161,6 +161,7 @@
               "reference/sdk",
               "reference/cli",
               "reference/rest-api",
+              "reference/models",
               "reference/result-types",
               "reference/errors"
             ]

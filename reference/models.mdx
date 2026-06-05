@@ -1,0 +1,97 @@
+---
+title: "Models"
+icon: "table"
+description: "Every model Ragrails recognizes, with pricing and tool support."
+---
+
+These are the built-in models. Pass any model name to `rag.llm(model=...)`; the provider is inferred from the name. Pricing is USD per 1M tokens.
+
+<Note>Models marked **Tools = —** don't support tool calling, so they can't be used with the interactive CLI's [agentic tools](/advanced/agentic-tools). This includes all Google Gemini models and the OpenAI `o`-series reasoning models.</Note>
+
+## OpenAI
+
+Set `OPENAI_API_KEY`. Install with `pip install "ragrails[openai]"`.
+
+| Model | Input / 1M | Output / 1M | Tools |
+| --- | --- | --- | --- |
+| `gpt-5.5` | $5 | $30 | ✓ |
+| `gpt-5.5-pro` | $30 | $180 | ✓ |
+| `gpt-5.4` | $2.5 | $15 | ✓ |
+| `gpt-5.4-mini` | $0.75 | $4.5 | ✓ |
+| `gpt-5.4-nano` | $0.2 | $1.25 | ✓ |
+| `gpt-5.4-pro` | $30 | $180 | ✓ |
+| `chat-latest` | $5 | $30 | ✓ |
+| `gpt-5.3-codex` | $1.75 | $14 | ✓ |
+| `gpt-5.2` | $1.75 | $14 | ✓ |
+| `gpt-5.2-chat-latest` | $1.75 | $14 | ✓ |
+| `gpt-5.2-pro` | $21 | $168 | ✓ |
+| `gpt-5.1` | $1.25 | $10 | ✓ |
+| `gpt-5.1-chat-latest` | $1.25 | $10 | ✓ |
+| `gpt-5` | $1.25 | $10 | ✓ |
+| `gpt-5-chat-latest` | $1.25 | $10 | ✓ |
+| `gpt-5-mini` | $0.25 | $2 | ✓ |
+| `gpt-5-nano` | $0.05 | $0.4 | ✓ |
+| `gpt-5-pro` | $15 | $120 | ✓ |
+| `gpt-4.1` | $2 | $8 | ✓ |
+| `gpt-4.1-mini` | $0.4 | $1.6 | ✓ |
+| `gpt-4.1-nano` | $0.1 | $0.4 | ✓ |
+| `gpt-4o` | $2.5 | $10 | ✓ |
+| `gpt-4o-mini` | $0.15 | $0.6 | ✓ |
+| `gpt-4-turbo` | $10 | $30 | ✓ |
+| `o3` | $2 | $8 | — |
+| `o4-mini` | $1.1 | $4.4 | — |
+| `o1` | $15 | $60 | — |
+| `o1-mini` | $1.1 | $4.4 | — |
+
+## Anthropic
+
+Set `ANTHROPIC_API_KEY`. Install with `pip install "ragrails[anthropic]"`.
+
+| Model | Input / 1M | Output / 1M | Tools |
+| --- | --- | --- | --- |
+| `claude-opus-4-8` | $5 | $25 | ✓ |
+| `claude-opus-4-7` | $5 | $25 | ✓ |
+| `claude-opus-4-6` | $5 | $25 | ✓ |
+| `claude-opus-4-5` | $5 | $25 | ✓ |
+| `claude-opus-4-1-20250805` | $15 | $75 | ✓ |
+| `claude-opus-4-20250514` | $15 | $75 | ✓ |
+| `claude-sonnet-4-6` | $3 | $15 | ✓ |
+| `claude-sonnet-4-5` | $3 | $15 | ✓ |
+| `claude-sonnet-4-5-20250929` | $3 | $15 | ✓ |
+| `claude-sonnet-4-20250514` | $3 | $15 | ✓ |
+| `claude-haiku-4-5` | $1 | $5 | ✓ |
+| `claude-haiku-4-5-20251001` | $1 | $5 | ✓ |
+| `claude-3-7-sonnet-20250219` | $3 | $15 | ✓ |
+| `claude-3-5-sonnet-20241022` | $3 | $15 | ✓ |
+| `claude-3-5-haiku-20241022` | $0.8 | $4 | ✓ |
+
+## Google Gemini
+
+Set `GEMINI_API_KEY` or `GOOGLE_API_KEY`. Install with `pip install "ragrails[google]"`.
+
+| Model | Input / 1M | Output / 1M | Tools |
+| --- | --- | --- | --- |
+| `gemini-3-pro` | $2 | $12 | — |
+| `gemini-3-pro-preview` | $2 | $12 | — |
+| `gemini-2.5-pro` | $1.25 | $10 | — |
+| `gemini-2.5-flash` | $0.3 | $2.5 | — |
+| `gemini-2.5-flash-lite` | $0.1 | $0.4 | — |
+| `gemini-2.0-flash` | $0.1 | $0.4 | — |
+| `gemini-2.0-flash-lite` | $0.075 | $0.3 | — |
+
+## Embedding models
+
+Set `VOYAGE_API_KEY`. Install with `pip install "ragrails[voyage]"`.
+
+| Provider | Models |
+| --- | --- |
+| `voyage` | `voyage-3` (default), `voyage-3-lite`, `voyage-3-large` |
+
+## Reranker models
+
+| Provider | Models | Notes |
+| --- | --- | --- |
+| `voyage` | `rerank-2-lite` (default), `rerank-2` | API, set `VOYAGE_API_KEY` |
+| `bm25` | `bm25` | Local, no API key |
+
+<Note>Add your own models with `register_embedder()` / `register_reranker()`. See [extending providers](/reference/sdk#extending-providers).</Note>

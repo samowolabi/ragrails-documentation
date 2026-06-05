@@ -12,9 +12,11 @@ The biggest lever. Pricing per 1M tokens (input / output):
 
 | Model | Input | Output | Use for |
 | --- | --- | --- | --- |
-| `gpt-4o-mini` | $0.15 | $0.60 | Default, for generation, rewriting, summarization |
+| `gpt-4o-mini` | $0.15 | $0.60 | Cheap generation, rewriting, summarization |
+| `gemini-2.5-flash-lite` | $0.10 | $0.40 | Lowest-cost option |
+| `gemini-2.5-flash` | $0.30 | $2.50 | Fast, cost-efficient |
 | `gpt-4o` | $2.50 | $10.00 | Complex reasoning, tool use |
-| `claude-haiku-4-5-20251001` | $0.80 | $4.00 | Lightweight tasks |
+| `claude-haiku-4-5` | $1.00 | $5.00 | Lightweight tasks |
 | `claude-sonnet-4-6` | $3.00 | $15.00 | Balanced |
 
 <Tip>Default to `gpt-4o-mini`. Reserve `gpt-4o` / `claude-sonnet` for turns that genuinely need stronger reasoning.</Tip>
@@ -37,14 +39,3 @@ The biggest lever. Pricing per 1M tokens (input / output):
 ## Reranking cost
 
 - Use **BM25** (`provider="bm25"`) for a free, local reranker instead of an API call - good when exact-term matching is enough. See [reranking](/advanced/reranking).
-
-## Monitor spend
-
-The interactive CLI logs every LLM call (with cost) and summarizes it:
-
-```bash
-ragrails chat
-> /usage
-```
-
-Usage is appended to `files/output/token_usage.jsonl`, with per-call cost computed from the model pricing above.
