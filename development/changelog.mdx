@@ -1,15 +1,36 @@
 ---
 title: "Changelog"
+icon: "history"
 description: "How changelog entries are maintained."
 ---
 
-Keep meaningful user-facing changes in `CHANGELOG.md` under `Unreleased`.
+Notable changes are recorded in `CHANGELOG.md` at the repository root, following [Keep a Changelog](https://keepachangelog.com/) conventions.
 
-Use:
+## Sections to update
 
-```bash
-scripts/check-changelog.sh
+Record changes under `[Unreleased]` during development. Move them under a version heading at release time.
+
+Update the changelog when you ship:
+
+- New or removed SDK methods, parameters, or result fields
+- New or removed CLI commands or options
+- New or removed REST API endpoints or request/response fields
+- Breaking changes to any public interface
+- Notable bug fixes that affect developer workflows
+
+Docs structure changes, test improvements, and internal refactors do not need changelog entries.
+
+## Format
+
+```markdown
+## [Unreleased]
+
+### Added
+- Description of new capability.
+
+### Changed
+- Description of what changed and why.
+
+### Removed
+- Description of what was removed.
 ```
-
-Docs structure changes, public command changes, REST API changes, and MCP tool changes should be recorded because they affect developer workflows.
-

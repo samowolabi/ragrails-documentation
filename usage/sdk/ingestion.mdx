@@ -1,75 +1,259 @@
 ---
 title: "SDK Ingestion"
-description: "Convert URLs, documents, and API responses into markdown."
+icon: "file-input"
+description: "Convert URLs, documents, and API responses into document dicts."
 ---
 
-Ingestion writes markdown files that chunking can consume.
+All ingestors return normalized document dicts with `id`, `text`, `source`, and `metadata` fields.
 
-## URL ingestion
+## URL ingestion: `scrape()`
 
 ```bash
 pip install "ragrails[url]"
 ```
 
-```python
+<CodeGroup>
+```python Request
 from ragrails import RagRails
 
 rag = RagRails()
-rag.setup_url(browser="chromium")
+rag.setup_url()  # run once per environment
 
+# Single URL
+result = rag.scrape("https://example.com/docs")
+
+# Full site crawl
+result = rag.scrape("https://example.com", mode="full", max_depth=2, max_pages=50)
+
+# Multiple URLs with per-URL config
+result = rag.scrape([
+    "https://example.com/docs",
+    {"url": "https://example.com/blog", "mode": "full", "max_depth": 1},
+])
+
+result.pages    # pages scraped
+result.outputs  # list of document dicts
+result.errors   # list of error dicts
+```
+
+```python Response
+result.pages       # 1
+result.outputs[0]  # {
+                   #   "id": "url_a1b2c3",
+                   #   "title": "Docs",
+                   #   "text": "# Docs\n\nWelcome to the documentation...",
+                   #   "source": "https://example.com/docs",
+                   #   "metadata": {"source_kind": "url", "file_type": "web"},
+                   # }
+```
+</CodeGroup>
+
+### Dead-letter queue (DLQ)
+
+Capture failed pages and retry them later:
+
+```python
+from ragrails import DLQ
+
+# Collect failures in memory
+result = rag.scrape("https://example.com", mode="full", dlq=DLQ())
+result.dlq.items  # list of retry input dicts
+
+# Collect and save to file
+result = rag.scrape("https://example.com", mode="full", dlq=DLQ("files/dlq/web.json"))
+
+# Retry from a previous result
+result = rag.scrape(dlq=result.dlq)
+
+# Retry from a saved file
+result = rag.scrape(dlq="files/dlq/web.json")
+
+# Filter before retrying
+result.dlq.items = [i for i in result.dlq.items if "docs" in i["url"]]
+result = rag.scrape(dlq=result.dlq)
+```
+
+### Saving to disk
+
+```python
 result = rag.scrape(
-    url="https://example.com",
-    mode="full",
-    output_dir="files/output/web_crawled",
-    max_depth=3,
-    max_pages=200,
+    "https://example.com/docs",
+    output_format="json",
+    output_dest="file",
+    output_dir="files/output/web/",
 )
+result.outputs[0]["output_path"]  # path of saved file
 ```
 
-Retry failed URL entries from the dead-letter queue:
+### Parameters
 
-```python
-result = rag.retry_scrape("files/output/web_crawled/dlq.json")
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `url` | required | URL, list of URLs, or list of dicts with `url` key |
+| `mode` | `"each"` | `"each"` scrapes exact URLs; `"full"` crawls the entire site |
+| `max_depth` | `3` | Max crawl depth (used with `mode="full"`) |
+| `max_pages` | `200` | Max pages per URL |
+| `verbose` | `False` | Enable crawler logging |
+| `frontmatter` | `False` | Prepend YAML frontmatter to markdown output |
+| `output_format` | `"markdown"` | `"markdown"` or `"json"` |
+| `output_dest` | `"response"` | `"response"` (in-memory) or `"file"` (save to disk) |
+| `output_dir` | `None` | Required when `output_dest="file"` |
+| `dlq` | `None` | `DLQ()`, `DLQ("path")`, `result.dlq`, or a file path string |
+
+---
+
+## Document ingestion: `parse()`
+
+Supports PDF, DOCX, PPTX, XLSX, HTML, Markdown, TXT, CSV, and more.
+
+### Input forms
+
+`files` accepts four forms. Mix them freely in one list:
+
+| Form | Example | Use when |
+| --- | --- | --- |
+| Local path | `"docs/report.pdf"` | The file is on disk |
+| File URL | `"https://example.com/report.pdf"` | The file is remote; Ragrails downloads it |
+| Path dict | `{"path": "report.pdf", "title": "Report"}` | You want to set `title`/`description` |
+| Bytes dict | `{"content": b"...", "filename": "report.pdf"}` | You already hold the file in memory (uploads, S3) |
+
+<CodeGroup>
+```python Request
+# Local paths
+result = rag.parse(files=["files/guide.pdf", "files/pricing.csv"])
+
+# A folder (all supported files inside)
+result = rag.parse(folder="files/docs/")
+
+# A direct file URL, downloaded automatically
+result = rag.parse(files="https://example.com/whitepaper.pdf")
+
+# Raw bytes, no disk write needed
+with open("files/guide.pdf", "rb") as f:
+    data = f.read()
+result = rag.parse(files=[{"content": data, "filename": "guide.pdf", "title": "Guide"}])
+
+# Mixed in one call
+result = rag.parse(files=[
+    "files/local.pdf",
+    "https://example.com/remote.pdf",
+    {"content": data, "filename": "upload.pdf"},
+])
+
+result.documents  # documents parsed
+result.outputs    # list of document dicts
+result.errors     # list of error dicts
 ```
 
-## Document ingestion
+```python Response
+result.documents   # 1
+result.outputs[0]  # {
+                   #   "id": "doc_9f8e7d",
+                   #   "title": "Guide",
+                   #   "text": "# Guide\n\nRagrails builds modular RAG workflows...",
+                   #   "source": "files/guide.pdf",
+                   #   "metadata": {"source_kind": "file", "file_type": "pdf"},
+                   # }
+```
+</CodeGroup>
 
-```python
-result = RagRails().parse(
-    folder="files/input",
-    output_dir="files/output/docs",
+<Note>**Bytes ingestion** is the path for web uploads or object storage. Pass the file content directly instead of writing a temp file first. `filename` is required so Ragrails can detect the file type.</Note>
+
+<Warning>File URLs must end in a supported extension (e.g. `.pdf`). Ragrails reads the type from the URL path before downloading.</Warning>
+
+### Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `files` | `None` | A path, file URL, path dict, or bytes dict, or a list of them. Mutually exclusive with `folder` |
+| `folder` | `None` | Directory to parse. Mutually exclusive with `files` |
+| `frontmatter` | `False` | Prepend YAML frontmatter |
+| `output_format` | `"markdown"` | `"markdown"` or `"json"` |
+| `output_dest` | `"response"` | `"response"` or `"file"` |
+| `output_dir` | `None` | Required when `output_dest="file"` |
+
+#### Dict fields
+
+| Field | For | Description |
+| --- | --- | --- |
+| `path` | Path dict | Local path or file URL |
+| `content` | Bytes dict | Raw file bytes |
+| `filename` | Bytes dict | File name with extension (required for type detection) |
+| `title` | Both | Optional document title |
+| `description` | Both | Optional description metadata |
+
+---
+
+## API ingestion: `fetch()`
+
+<CodeGroup>
+```python Request
+# Single endpoint
+result = rag.fetch(
+    url="https://api.example.com/posts",
+    title="Blog posts",
+    headers={"Authorization": "Bearer token"},
+    pagination={"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+    max_pages=10,
 )
+
+# Multiple endpoints
+result = rag.fetch(apis=[
+    {"url": "https://api.example.com/posts", "title": "Posts"},
+    {"url": "https://api.example.com/comments", "title": "Comments"},
+])
+
+result.documents  # documents fetched
+result.outputs    # list of document dicts
 ```
 
-Or parse specific files:
-
-```python
-result = RagRails().parse(
-    files=["guide.pdf", "pricing.csv"],
-    input_dir="files/input",
-    output_dir="files/output/docs",
-)
+```python Response
+result.documents   # 1
+result.outputs[0]  # {
+                   #   "id": "api_4c5d6e",
+                   #   "title": "Blog posts",
+                   #   "text": "[{ \"id\": 1, \"title\": \"Hello\" }, ...]",
+                   #   "source": "https://api.example.com/posts",
+                   #   "metadata": {"source_kind": "api", "pages": 3},
+                   # }
 ```
+</CodeGroup>
 
-## API ingestion
+### Pagination
 
-```python
-result = RagRails().fetch(
-    url="https://api.example.com/v1/products",
-    title="Products",
-    method="GET",
-    headers={"Authorization": "Bearer TOKEN"},
-    output_dir="files/output/api",
-)
-```
+`fetch()` walks paginated APIs automatically. Omit `pagination` for a single request. Otherwise set `type` to one of three strategies:
 
-## Key parameters
+| Strategy | When to use | Example |
+| --- | --- | --- |
+| `page` | API uses page numbers (`?page=2`) | `{"type": "page", "param": "page", "size_param": "per_page", "size": 100}` |
+| `offset` | API uses row offsets (`?offset=100`) | `{"type": "offset", "param": "offset", "size_param": "limit", "size": 100}` |
+| `cursor` | API returns a next-page token | `{"type": "cursor", "param": "cursor", "cursor_path": "meta.next_cursor"}` |
 
-| Method | Parameters |
+| Key | Description |
 | --- | --- |
-| `setup_url` | `browser` |
-| `scrape` | `url`, `mode`, `output_dir`, `frontmatter`, `dlq_path`, `max_depth`, `max_pages` |
-| `retry_scrape` | `dlq_path`, `mode`, `max_depth`, `max_pages`, `max_attempts` |
-| `parse` | `files`, `folder`, `input_dir`, `output_dir`, `frontmatter` |
-| `fetch` | `url`, `title`, `description`, `method`, `headers`, `params`, `body`, `pagination`, `max_pages`, `output_dir`, `frontmatter` |
+| `type` | `"page"`, `"offset"`, or `"cursor"`. Omit for a single fetch |
+| `param` | Query-param name carrying the page number, offset, or cursor |
+| `size_param` | Query-param name for page size (optional) |
+| `size` | Page size value (optional) |
+| `cursor_path` | Dot-path into the response JSON to the next cursor (cursor type only) |
 
+<Tip>Always set `max_pages` as a safety cap. It stops pagination even if the API keeps returning a next page.</Tip>
+
+### Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `url` | `None` | Single endpoint. Mutually exclusive with `apis` |
+| `title` | `None` | Document title |
+| `description` | `""` | Description added to the document |
+| `method` | `"GET"` | HTTP method |
+| `headers` | `None` | Request headers dict |
+| `params` | `None` | Query parameters dict |
+| `body` | `None` | Request body dict |
+| `pagination` | `None` | `{"type": "page", "param": "page", "size_param": "per_page", "size": 100}` |
+| `max_pages` | `100` | Max paginated requests |
+| `timeout` | `None` | Request timeout in seconds |
+| `apis` | `None` | List of endpoint configs. Mutually exclusive with `url` |
+| `output_format` | `"markdown"` | `"markdown"` or `"json"` |
+| `output_dest` | `"response"` | `"response"` or `"file"` |
+| `output_dir` | `None` | Required when `output_dest="file"` |

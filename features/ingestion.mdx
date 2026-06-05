@@ -1,121 +1,62 @@
 ---
 title: "Ingestion"
-description: "Convert URLs, documents, and REST API responses into markdown."
+icon: "file-input"
+description: "Pull content from URLs, documents, and APIs."
 ---
 
-Ingestion creates markdown files with source metadata. Chunking consumes these markdown files in the next stage.
+Ingestion is stage one: it pulls raw content and normalizes it into clean documents the rest of the pipeline can use.
 
-## Capabilities
+Three sources:
 
-- Scrape one or more exact URLs.
-- Crawl full websites with depth and page limits.
-- Retry failed URL ingestion from a dead-letter queue.
-- Parse local documents into markdown.
-- Fetch REST API responses with methods, headers, query params, JSON bodies, pagination, and max page limits.
-- Write markdown with source metadata for downstream chunking.
+| Method | Source | Needs |
+| --- | --- | --- |
+| `scrape()` | Websites (one URL or a full crawl) | `ragrails[url]` + `setup_url()` |
+| `parse()` | Files: local paths, file URLs, or raw bytes (PDF, DOCX, XLSX, HTML, MD, CSV…) | none |
+| `fetch()` | REST API responses | none |
 
-## Supported document types
+All three return document dicts with `id`, `text`, `source`, and `metadata`.
 
-Folder-based document ingestion supports common document and data formats:
-
-```text
-.csv, .docx, .epub, .html, .htm, .ipynb, .json, .md, .msg,
-.pdf, .pptx, .rss, .tsv, .txt, .xls, .xlsx, .xml, .zip
-```
+<Note>**`parse()` takes more than file paths.** Pass a local path, a file URL (downloaded automatically), or raw bytes, which is ideal for web uploads and object storage where the file never touches disk. See [input forms](/usage/sdk/ingestion#input-forms).</Note>
 
 <Tabs>
   <Tab title="SDK">
     ```python
     from ragrails import RagRails
-
     rag = RagRails()
 
-    docs = rag.parse(
-        folder="files/input",
-        output_dir="files/output/docs",
-    )
+    docs = rag.parse(folder="files/docs/")
+    api  = rag.fetch(url="https://api.example.com/products", title="Products")
 
-    api = rag.fetch(
-        url="https://api.example.com/v1/products",
-        title="Products",
-        output_dir="files/output/api",
-    )
+    rag.setup_url()  # one-time browser install
+    site = rag.scrape("https://example.com", mode="full", max_pages=50)
     ```
-
-    URL ingestion needs the URL extra and one-time browser setup:
-
-    ```bash
-    pip install "ragrails[url]"
-    ```
-
-    ```python
-    rag.setup_url()
-    site = rag.scrape(
-        url="https://example.com",
-        mode="full",
-        output_dir="files/output/web_crawled",
-    )
-    ```
-
-    Deep dive: [SDK ingestion](/usage/sdk/ingestion).
   </Tab>
-
   <Tab title="CLI">
     ```bash
-    ragrails parse --folder files/input --output-dir files/output/docs
+    ragrails parse --folder files/docs/ --output-dir files/output/docs/
+    ragrails fetch https://api.example.com/products --title Products --output-dir files/output/api/
 
-    ragrails fetch https://api.example.com/v1/products \
-      --title Products \
-      --output-dir files/output/api
-    ```
-
-    URL ingestion:
-
-    ```bash
-    pip install "ragrails[url]"
     ragrails setup-url
-    ragrails scrape https://example.com --mode full --output-dir files/output/web_crawled
+    ragrails scrape https://example.com --mode full --max-pages 50 --output-dir files/output/web/
     ```
-
-    Deep dive: [CLI ingestion](/usage/cli/ingestion).
   </Tab>
-
   <Tab title="REST API">
     ```bash
-    curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
-      -H "Content-Type: application/json" \
-      -d '{"folder":"files/input","output_dir":"files/output/docs"}'
-
-    curl -X POST http://127.0.0.1:8000/v1/ingest/api \
-      -H "Content-Type: application/json" \
-      -d '{"url":"https://api.example.com/v1/products","title":"Products","output_dir":"files/output/api"}'
+    curl -X POST http://127.0.0.1:8000/v1/ingest/docs -H "Content-Type: application/json" \
+      -d '{"folder": "files/docs/"}'
     ```
-
-    URL ingestion endpoint:
-
-    ```text
-    POST /v1/ingest/url
-    ```
-
-    Deep dive: [REST API ingestion](/usage/server/ingestion).
-  </Tab>
-
-  <Tab title="MCP">
-    Ask your MCP client to use:
-
-    ```text
-    ragrails_parse_documents
-    ragrails_fetch_api
-    ragrails_setup_url
-    ragrails_scrape_url
-    ```
-
-    Example prompt:
-
-    ```text
-    Use ragrails_parse_documents with folder files/input and output_dir files/output/docs.
-    ```
-
-    Deep dive: [MCP ingestion](/usage/mcp/ingestion).
   </Tab>
 </Tabs>
+
+## Crawling websites
+
+- `mode="each"` - scrape only the exact URLs you pass.
+- `mode="full"` - crawl the whole site from a starting URL.
+
+<Warning>Always cap `max_pages` on a full crawl. Sites can be huge, and every page costs a fetch.</Warning>
+
+<Note>**Dead-letter queue:** in a large crawl, some pages fail (timeouts, rate limits). Pass `dlq=DLQ("file.json")` to record failures, then retry only those with `scrape(dlq="file.json")`. See [DLQ](/usage/sdk/ingestion#dead-letter-queue-dlq).</Note>
+
+## Reference
+
+Full parameters: [SDK ingestion](/usage/sdk/ingestion) · [CLI](/usage/cli/ingestion) · [REST](/usage/server/ingestion).

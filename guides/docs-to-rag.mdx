@@ -1,29 +1,40 @@
 ---
 title: "Documents to RAG"
-description: "Build a RAG collection from local files."
+icon: "file-text"
+description: "Build a RAG collection from local files, end to end."
 ---
 
-Put source files in `files/input`, then run parse -> chunk -> store.
-
-Install provider dependencies and start Qdrant:
+## 1. Install and set up
 
 ```bash
 pip install "ragrails[voyage,qdrant]"
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
+## 2. Ingest a folder
+
 ```python
 from ragrails import RagRails
 
 rag = RagRails()
-parsed = rag.parse(folder="files/input", output_dir="files/output/docs")
-chunks = rag.chunk(input_dir=parsed.output_dir, output_dir="files/output/chunks/docs")
-rag.store(
-    input_dir=chunks.output_dir,
-    vector_db="qdrant",
-    collection="doc_chunks",
-    url="http://localhost:6333",
+
+result = rag.ingest(
+    docs={"folder": "files/docs/"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
 )
+
+print(f"Stored {result.stored} chunks from {result.sources} documents")
 ```
 
-Use this flow for PDFs, DOCX files, spreadsheets, and other supported local documents.
+Works for PDFs, DOCX, spreadsheets, HTML, Markdown, and other supported formats.
+
+## 3. Query
+
+```python
+result = rag.query(
+    "What does the guide cover?",
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    retrieval={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 5},
+)
+```

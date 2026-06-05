@@ -1,26 +1,35 @@
 ---
 title: "CLI Chunking"
-description: "Chunk markdown files from the terminal."
+icon: "scissors"
+description: "Chunk ingestion output JSON files from the terminal."
 ---
 
-Chunk a directory:
+`chunk` reads JSON files from `--input-dir` (ingestion output) and writes a `chunks.json` file to `--output-dir`.
 
-```bash
+<CodeGroup>
+```bash Command
 ragrails chunk \
-  --input-dir files/output/docs \
-  --output-dir files/output/chunks \
+  --input-dir files/output/docs/ \
+  --output-dir files/chunks/ \
   --chunk-size 2000 \
   --chunk-overlap 200 \
   --min-chunk-length 100
 ```
 
-Preview one markdown file:
-
-```bash
-ragrails chunk-file files/output/docs/guide.md --chunk-size 2000 --chunk-overlap 200
+```text Output
+Documents : 12
+Chunks    : 87
+Failed    : 0
+Saved to  : files/chunks/chunks.json
 ```
+</CodeGroup>
 
-| Command | Output |
-| --- | --- |
-| `ragrails chunk` | JSON chunk files in `--output-dir`. |
-| `ragrails chunk-file` | Chunk preview printed to stdout. |
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input-dir` | required | Folder containing ingestion output JSON files |
+| `--output-dir` | required | Folder to write `chunks.json` to |
+| `--chunk-size` | `2000` | Max characters per chunk |
+| `--chunk-overlap` | `200` | Character overlap between chunks |
+| `--min-chunk-length` | `100` | Minimum chunk length to keep |

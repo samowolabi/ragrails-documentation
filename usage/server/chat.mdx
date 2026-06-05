@@ -1,0 +1,56 @@
+---
+title: "REST Chat"
+icon: "messages-square"
+description: "RAG chat over HTTP."
+---
+
+## POST /v1/chat
+
+```json
+{
+  "query": "How do I authenticate?",
+  "llm_provider": "openai",
+  "llm_model": "gpt-4o-mini",
+  "embedder_provider": "voyage",
+  "embedder_model": "voyage-3",
+  "vector_db": "qdrant",
+  "collection": "docs",
+  "url": "http://localhost:6333",
+  "history": []
+}
+```
+
+Multi-turn: pass the `history` from the previous response:
+
+<CodeGroup>
+```json Request
+{
+  "query": "What about the second step?",
+  "llm_provider": "openai",
+  "llm_model": "gpt-4o-mini",
+  "embedder_provider": "voyage",
+  "embedder_model": "voyage-3",
+  "vector_db": "qdrant",
+  "collection": "docs",
+  "url": "http://localhost:6333",
+  "history": [
+    {"role": "user", "content": "How do I authenticate?"},
+    {"role": "assistant", "content": "To authenticate, you need to..."}
+  ],
+  "query_rewrite": {"enabled": true}
+}
+```
+
+```json Response
+{
+  "answer": "To complete the second step, you need to...",
+  "sources": [{"id": "chunk-id", "title": "Auth Guide", "text": "..."}],
+  "history": [...],
+  "intent": "rag",
+  "answer_confidence": {...},
+  "retrieval_quality": {...},
+  "compacted": false,
+  "errors": []
+}
+```
+</CodeGroup>

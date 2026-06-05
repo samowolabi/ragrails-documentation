@@ -1,33 +1,29 @@
 ---
 title: "Hosted REST API"
+icon: "server"
 description: "Run Ragrails as a hosted HTTP service."
 ---
 
-Run locally:
+## Run the server
 
 ```bash
-ragrails-api --host 0.0.0.0 --port 8000
+pip install "ragrails[server-qdrant]"
+ragrails-api
 ```
 
-For hosted deployments, provide provider credentials as environment variables, mount or provision persistent storage for input/output files, and put the service behind your normal API gateway or reverse proxy.
+The server listens on `http://127.0.0.1:8000`.
 
-Health check:
+| Resource | URL |
+| --- | --- |
+| Health check | `GET /v1/health` |
+| Swagger UI | `GET /docs` |
+| OpenAPI schema | `GET /v1/openapi.json` |
 
-```text
-GET /v1/health
-```
+## Production checklist
 
-OpenAPI:
+- Provide provider credentials (`VOYAGE_API_KEY`, `OPENAI_API_KEY`, vector DB keys) as environment variables
+- Put the service behind your API gateway, auth layer, and rate limiting
+- Use a managed vector database (Qdrant Cloud, Pinecone, or Weaviate Cloud) for persistence
+- Generate typed clients from `/v1/openapi.json`
 
-```text
-GET /v1/openapi.json
-```
-
-Swagger UI:
-
-```text
-GET /docs
-```
-
-Use Swagger UI during development to test requests from the browser. Use the
-OpenAPI JSON schema when generating clients or integrating with API tooling.
+See the [REST API reference](/reference/rest-api) for the full endpoint list.

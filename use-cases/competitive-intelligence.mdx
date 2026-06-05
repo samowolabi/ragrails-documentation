@@ -1,0 +1,38 @@
+---
+title: "Competitive Intelligence"
+icon: "telescope"
+description: "Track competitor sites and news, then query what changed."
+---
+
+## The problem
+
+Competitors update pricing, features, and positioning constantly. Manually checking their sites doesn't scale, and the info goes stale fast.
+
+## How Ragrails solves it
+
+Crawl competitor sites and news on a schedule, recover failures automatically, and keep the index fresh.
+
+1. **Full-crawl** competitor sites with a [dead-letter queue](/advanced/resilient-ingestion) so partial failures are recoverable.
+2. **Refresh** on a schedule: re-ingest, and `delete()` pages that disappeared.
+3. **Query or chat** to compare and summarize.
+
+```python
+from ragrails import RagRails, DLQ
+
+rag = RagRails()
+rag.setup_url()
+
+result = rag.scrape(
+    ["https://competitor-a.com", "https://competitor-b.com"],
+    mode="full", max_pages=200,
+    dlq=DLQ("files/dlq/competitors.json"),   # capture failures
+)
+# later: retry just the failures
+rag.scrape(dlq="files/dlq/competitors.json")
+```
+
+<Tip>Schedule the crawl (cron, a worker) and use [`edit()`/`delete()`](/guides/manage-stored-data) so answers always reflect the latest competitor state.</Tip>
+
+## Features used
+
+[URL ingestion](/usage/sdk/ingestion#url-ingestion-scrape) · [Resilient ingestion](/advanced/resilient-ingestion) · [Keeping your index current](/guides/manage-stored-data)

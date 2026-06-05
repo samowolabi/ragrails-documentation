@@ -1,0 +1,43 @@
+---
+title: "AI Search Engine"
+icon: "search"
+description: "Semantic search that understands meaning, not just keywords."
+---
+
+## The problem
+
+Keyword search misses results that use different words for the same idea. *"How do I get my money back"* won't match a page titled *"Refund policy."*
+
+## How Ragrails solves it
+
+Embeddings match by meaning. Add reranking to push the most relevant results to the top.
+
+1. **Ingest** your corpus.
+2. **Retrieve** by meaning, retrieving wide.
+3. **Rerank** down to the few best results.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+reranker = rag.reranker(provider="voyage", model="rerank-2-lite")
+
+result = rag.retrieve(
+    "how do I get my money back",
+    embedder=embedder,
+    vector_db="qdrant", collection="docs", url="http://localhost:6333",
+    top_k=20,
+    use_rerank=True,
+    reranker=reranker,
+    rerank_top_k=5,
+)
+for hit in result.items:
+    print(hit.score, hit.metadata.get("title"), hit.text[:120])
+```
+
+<Tip>No answer generation and no LLM cost; this is pure retrieval. Add [chat](/features/chat) on top if you want generated answers.</Tip>
+
+## Features used
+
+[Retrieval](/features/retrieval) · [Reranking](/advanced/reranking) · [Embedding](/features/embedding)

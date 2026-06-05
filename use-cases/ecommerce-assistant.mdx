@@ -1,0 +1,47 @@
+---
+title: "E-commerce Assistant"
+icon: "shopping-cart"
+description: "Natural-language product discovery over your catalog."
+---
+
+## The problem
+
+Shoppers describe what they want in their own words, like *"a waterproof jacket for hiking under $200"*, but keyword filters can't parse intent.
+
+## How Ragrails solves it
+
+Pull your product catalog from its API, embed the product descriptions, and let shoppers search or chat in natural language.
+
+1. **Fetch** the catalog API (paginated) into a collection.
+2. **Retrieve or chat** over product descriptions and attributes.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+
+rag.ingest(
+    api={
+        "url": "https://api.shop.example.com/products",
+        "title": "Products",
+        "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+        "max_pages": 50,
+    },
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "products", "url": "http://localhost:6333"},
+)
+
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+hits = rag.retrieve(
+    "waterproof hiking jacket under $200",
+    embedder=embedder,
+    vector_db="qdrant", collection="products", url="http://localhost:6333",
+    top_k=10,
+)
+```
+
+<Tip>Refresh the catalog regularly with [`edit()`/`delete()`](/guides/manage-stored-data) so discontinued products drop out of results.</Tip>
+
+## Features used
+
+[API ingestion](/usage/sdk/ingestion#api-ingestion-fetch) · [Pagination](/advanced/resilient-ingestion#api-pagination) · [Retrieval](/features/retrieval)

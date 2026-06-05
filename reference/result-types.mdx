@@ -1,16 +1,177 @@
 ---
 title: "Result Types"
-description: "Common Ragrails result shapes."
+icon: "table"
+description: "Typed result objects returned by the SDK."
 ---
 
-Ragrails result objects are stage-specific but follow a consistent pattern: counts, input/output locations, provider metadata, and failure details.
+All result objects are frozen dataclasses. All are exported from `ragrails`.
 
-| Stage | Common fields |
+## ScrapeResult
+
+Returned by `rag.scrape()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `pages` | `int` | Pages scraped |
+| `failed` | `int` | Pages that failed |
+| `outputs` | `list[dict]` | Document dicts |
+| `errors` | `list[dict]` | Error dicts |
+| `dlq` | `DLQ \| None` | Dead-letter queue (only when `dlq=` param was set) |
+
+## ParseResult
+
+Returned by `rag.parse()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `documents` | `int` | Documents parsed |
+| `failed` | `int` | Documents that failed |
+| `outputs` | `list[dict]` | Document dicts |
+| `errors` | `list[dict]` | Error dicts |
+
+## ApiIngestResult
+
+Returned by `rag.fetch()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `documents` | `int` | Documents fetched |
+| `failed` | `int` | Endpoints that failed |
+| `outputs` | `list[dict]` | Document dicts |
+| `errors` | `list[dict]` | Error dicts |
+
+## ChunkResult
+
+Returned by `rag.chunk()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `inputs` | `int` | Documents passed in |
+| `chunks` | `int` | Chunks produced |
+| `items` | `list[dict]` | Chunk dicts; each has `id`, `text`, `source`, `metadata` |
+| `failed` | `int` | Documents that failed |
+| `errors` | `list` | Error list |
+
+## EmbedResult
+
+Returned by `rag.embed()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `inputs` | `int` | Chunks passed in |
+| `embedded` | `int` | Chunks successfully embedded |
+| `items` | `list[dict]` | Chunk dicts with an added `embedding` vector field |
+| `failed` | `int` | Chunks that failed |
+| `errors` | `list[dict]` | Error dicts |
+
+## StoreResult
+
+Returned by `rag.store()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `inputs` | `int` | Chunks passed in |
+| `stored` | `int` | Chunks upserted |
+| `items` | `list[dict]` | Stored chunk dicts |
+| `failed` | `int` | Chunks that failed |
+| `provider` | `str` | Vector DB provider |
+| `collection` | `str` | Collection name |
+| `errors` | `list[dict]` | Error dicts |
+
+## EditResult
+
+Returned by `rag.edit()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `requested` | `int` | Chunks submitted |
+| `edited` | `int` | Chunks updated |
+| `items` | `list[dict]` | Updated chunk dicts |
+| `failed` | `int` | Chunks that failed |
+| `provider` | `str` | Vector DB provider |
+| `collection` | `str` | Collection name |
+| `errors` | `list[dict]` | Error dicts |
+
+## DeleteResult
+
+Returned by `rag.delete()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `requested` | `int` | IDs submitted |
+| `deleted` | `int` | IDs deleted |
+| `items` | `list[dict]` | Deleted item dicts |
+| `failed` | `int` | IDs that failed |
+| `provider` | `str` | Vector DB provider |
+| `collection` | `str` | Collection name |
+| `errors` | `list[dict]` | Error dicts |
+
+## RetrieveResult
+
+Returned by `rag.retrieve()` and `rag.query()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `query` | `str` | Original query |
+| `search_query` | `str` | Query used for vector search (may differ if rewritten) |
+| `retrieved` | `int` | Number of results |
+| `items` | `list[RetrievedChunk]` | Retrieved chunks |
+| `failed` | `int` | Retrieval failures |
+| `errors` | `list[dict]` | Error dicts |
+
+### RetrievedChunk fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `id` | `str` | Chunk ID |
+| `score` | `float` | Vector similarity score |
+| `text` | `str` | Chunk text |
+| `metadata` | `dict` | Chunk metadata |
+| `rerank_score` | `float \| None` | Reranker score (only when reranking was enabled) |
+
+## IngestPipelineResult
+
+Returned by `rag.ingest()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `sources` | `int` | Source documents ingested |
+| `chunks` | `int` | Chunks produced |
+| `embedded` | `int` | Chunks embedded |
+| `stored` | `int` | Chunks stored |
+| `failed` | `int` | Total failures |
+| `source_results` | `dict` | Per-source ingestor results |
+| `chunk_result` | `ChunkResult` | Chunking result |
+| `embed_result` | `EmbedResult` | Embedding result |
+| `store_result` | `StoreResult` | Storage result |
+| `errors` | `list[dict]` | Error dicts |
+
+## ChatResult
+
+Returned by `rag.chat()`.
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `answer` | `str` | LLM answer |
+| `sources` | `list[dict]` | Source chunks used |
+| `history` | `list[dict]` | Updated history; pass to the next turn |
+| `retrieval` | `dict` | Retrieval metadata |
+| `llm` | `dict` | LLM usage metadata |
+| `retrieval_quality` | `dict` | Quality assessment |
+| `answer_confidence` | `dict` | Confidence assessment |
+| `compacted` | `bool` | Whether history was summarised this turn |
+| `intent` | `str` | `"rag"` or `"direct"` |
+| `errors` | `list[dict]` | Error dicts |
+
+## Error dict shape
+
+All `errors` lists contain dicts with these fields:
+
+| Field | Description |
 | --- | --- |
-| Ingestion | `output_dir`, source counts, `failed`, written `files`, optional `dlq_path` |
-| Chunking | `input_dir`, `output_dir`, `files`, `chunks`, `failed` |
-| Embedding | `input_dir`, `files`, `chunks`, `provider`, `collection` |
-| Storing | `input_dir`, `files`, `chunks`, `provider`, `collection` |
-| Retrieval | `query`, `results`; each result includes `id`, `score`, `text`, `metadata`, and optional `rerank_score` |
-
-Use `print(result)` or inspect `result.__dict__` while developing against a new version.
+| `source` | Source identifier (URL, file path, chunk ID) |
+| `source_kind` | `"url"`, `"file"`, `"chunk"`, etc. |
+| `stage` | Pipeline stage where the error occurred |
+| `error` | Error message string |
+| `isRetryable` | Whether the error is safe to retry |
+| `attempts` | Number of attempts made |

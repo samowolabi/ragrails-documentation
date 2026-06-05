@@ -1,0 +1,122 @@
+---
+title: "SDK Pipeline"
+icon: "workflow"
+description: "Run the full ingest and query pipeline in one call."
+---
+
+Pipeline helpers wrap multiple SDK stages into a single call. Use them for quick setup or when you don't need to inspect intermediate results.
+
+## `ingest()`
+
+Runs ingestion → chunking → embedding → storing.
+
+<CodeGroup>
+```python Request
+from ragrails import RagRails
+
+result = RagRails().ingest(
+    docs=["files/guide.pdf"],
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={
+        "vector_db": "qdrant",
+        "collection": "docs",
+        "url": "http://localhost:6333",
+    },
+)
+
+result.sources   # source documents ingested
+result.chunks    # chunks produced
+result.embedded  # chunks embedded
+result.stored    # chunks stored
+result.failed    # total failures
+result.errors    # list of error dicts
+```
+
+```python Response
+result.sources   # 1
+result.chunks    # 12
+result.embedded  # 12
+result.stored    # 12
+result.failed    # 0
+```
+</CodeGroup>
+
+All four sources can be combined:
+
+```python
+result = RagRails().ingest(
+    docs=["files/guide.pdf"],
+    urls=["https://example.com/docs"],
+    api={"url": "https://api.example.com/posts", "title": "Posts"},
+    markdown="# Inline note\n\nSome additional context.",
+    chunking={"chunk_size": 1000, "chunk_overlap": 100},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
+)
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `docs` | `str \| list \| dict` | Document files or folder, passed to `parse()` |
+| `urls` | `str \| list \| dict` | URLs to scrape, passed to `scrape()` |
+| `api` | `str \| list \| dict` | API endpoints, passed to `fetch()` |
+| `markdown` | `str \| list` | Raw markdown documents |
+| `ingestion` | `dict` | Ingestor config overrides |
+| `chunking` | `dict` | Chunking config e.g. `{"chunk_size": 1000}` |
+| `embedding` | `dict` | Embedding config e.g. `{"provider": "voyage", "model": "voyage-3"}` |
+| `storage` | `dict` | Storage config e.g. `{"vector_db": "qdrant", "collection": "docs", "url": "..."}` |
+
+---
+
+## `query()`
+
+Runs query embedding → retrieval.
+
+<CodeGroup>
+```python Request
+result = RagRails().query(
+    "What does the guide cover?",
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    retrieval={
+        "vector_db": "qdrant",
+        "collection": "docs",
+        "url": "http://localhost:6333",
+        "top_k": 5,
+    },
+)
+
+for chunk in result.items:
+    print(chunk.score, chunk.text)
+```
+
+```python Response
+result.retrieved  # 5
+result.items[0]   # RetrievedChunk(id="guide-7", score=0.83, text="The guide covers setup, auth, and usage...", metadata={...}, rerank_score=None)
+```
+</CodeGroup>
+
+With reranking:
+
+```python
+result = RagRails().query(
+    "What does the guide cover?",
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    retrieval={
+        "vector_db": "qdrant",
+        "collection": "docs",
+        "url": "http://localhost:6333",
+        "top_k": 20,
+        "rerank": {"enabled": True, "provider": "voyage", "model": "rerank-2-lite", "top_k": 5},
+    },
+)
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `query` | `str` | Search query |
+| `embedding` | `dict` | Embedding config; all `embedder()` params |
+| `retrieval` | `dict` | Retrieval config; all `retrieve()` params, plus `query_rewrite` and `rerank` sub-dicts |

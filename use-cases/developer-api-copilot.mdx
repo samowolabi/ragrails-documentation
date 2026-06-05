@@ -1,0 +1,42 @@
+---
+title: "Developer / API Copilot"
+icon: "code"
+description: "Answer questions about your API, and act on them."
+---
+
+## The problem
+
+Developers ask the same integration questions, and they want more than an answer. They want to try the call.
+
+## How Ragrails solves it
+
+Build a knowledge base from your API and SDK docs, then run an interactive assistant that can fetch live pages and make real API calls.
+
+1. **Fetch** API reference + **scrape** SDK docs into a collection.
+2. Run the **interactive chat** with agentic tools enabled.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+rag.setup_url()
+
+rag.ingest(
+    api={"url": "https://api.example.com/openapi.json", "title": "API Reference"},
+    urls="https://docs.example.com/sdk",
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "devdocs", "url": "http://localhost:6333"},
+)
+```
+
+```bash
+ragrails chat --vector-db qdrant --collection devdocs --url http://localhost:6333
+> How do I create a customer? Then call the endpoint with my test key.
+  → answers from devdocs, then uses api_call to run the request
+```
+
+<Warning>Agentic tools (`web_fetch`, `api_call`) run in the **interactive CLI** and confirm before each call. See [agentic tools](/advanced/agentic-tools).</Warning>
+
+## Features used
+
+[API ingestion](/usage/sdk/ingestion#api-ingestion-fetch) · [Agentic tools](/advanced/agentic-tools) · [Chat](/features/chat)

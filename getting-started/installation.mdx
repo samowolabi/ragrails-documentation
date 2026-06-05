@@ -1,68 +1,40 @@
 ---
 title: "Installation"
-description: "Install Ragrails and optional extras for each pipeline surface."
+icon: "download"
+description: "Install Ragrails and optional extras."
 ---
 
-Ragrails requires Python 3.10 or newer. Python 3.12 or 3.13 is recommended for
-embedding and vector database provider extras while upstream providers finish
-Python 3.14 support.
+Ragrails requires Python 3.10 or newer. Python 3.12 or 3.13 is recommended when installing provider extras.
 
 ```bash
 pip install ragrails
 ```
 
-Base installation includes the SDK, CLI, chunking, REST API server, MCP server,
-document ingestion, and API ingestion.
+The base install includes the SDK, CLI, REST API server, document ingestion, API ingestion, chunking, embedding orchestration, vector storage orchestration, retrieval, chat, and pipeline helpers.
 
-## Why optional installs exist
+## Extras
 
-Optional installs are for integrations that pull in heavier dependencies,
-provider SDKs, browser runtimes, or packages with narrower Python support. They
-keep the base install predictable while still letting you opt into the services
-you actually use.
-
-Use extras when you need:
-
-- URL scraping, because it uses browser/crawling dependencies.
-- A specific vector database client such as Qdrant, Pinecone, or Weaviate.
-- An embedding provider SDK such as Voyage.
-- Reranking dependencies, which can be much heavier than the core package.
-
-You do not need extras for chunking, the CLI, REST API server, MCP server,
-document ingestion, or API ingestion.
+Optional installs cover integrations that pull in heavier dependencies, provider SDKs, or browser runtimes. Install only what you need.
 
 | Need | Install |
 | --- | --- |
 | URL ingestion | `pip install "ragrails[url]"` |
-| Qdrant storage | `pip install "ragrails[store-qdrant]"` |
-| Pinecone storage | `pip install "ragrails[store-pinecone]"` |
-| Weaviate storage | `pip install "ragrails[store-weaviate]"` |
-| Everything | `pip install "ragrails[all]"` |
-
-Provider extras are also available:
-
-| Provider | Install |
-| --- | --- |
 | Voyage embeddings | `pip install "ragrails[voyage]"` |
+| OpenAI | `pip install "ragrails[openai]"` |
+| Anthropic | `pip install "ragrails[anthropic]"` |
 | Qdrant | `pip install "ragrails[qdrant]"` |
 | Pinecone | `pip install "ragrails[pinecone]"` |
 | Weaviate | `pip install "ragrails[weaviate]"` |
-| OpenAI | `pip install "ragrails[openai]"` |
-| Anthropic | `pip install "ragrails[anthropic]"` |
 | Reranking | `pip install "ragrails[rerank]"` |
+| SDK + Qdrant stack | `pip install "ragrails[store-qdrant]"` |
+| REST API + Qdrant stack | `pip install "ragrails[server-qdrant]"` |
+| REST API + Pinecone stack | `pip install "ragrails[server-pinecone]"` |
+| REST API + Weaviate stack | `pip install "ragrails[server-weaviate]"` |
+| Everything | `pip install "ragrails[all]"` |
 
-## Verify commands
+## Verify
 
 ```bash
 ragrails --help
 ragrails-api --help
-ragrails-mcp --help
 ```
-
-## Python 3.14 note
-
-The base package can target newer Python versions, but some provider packages
-may lag behind the latest Python release. For example, the Voyage AI package
-currently blocks Python 3.14 installs, which affects extras that include Voyage.
-Use Python 3.12 or 3.13 when installing embedding/storage extras that depend on
-provider packages with narrower Python support.

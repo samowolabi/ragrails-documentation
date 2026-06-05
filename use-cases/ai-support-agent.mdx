@@ -1,0 +1,50 @@
+---
+title: "AI Support Agent"
+icon: "headset"
+description: "A support bot that answers from your help docs and refuses when it shouldn't guess."
+---
+
+## The problem
+
+Support teams field the same questions over and over. Generic chatbots make it worse. They hallucinate answers that aren't in your policies, creating wrong expectations and more tickets.
+
+## How Ragrails solves it
+
+Ground the bot in your real help content, and make it honest when it doesn't know.
+
+1. **Ingest** your help center and policy docs into one collection.
+2. **Chat** with retrieval-quality guardrails so weak matches get a careful answer or a refusal, never a hallucination.
+3. **Rewrite** follow-up questions so multi-turn conversations stay on track.
+
+```python
+from ragrails import RagRails, ChatRetrievalQualityConfig, QueryRewriteConfig
+
+rag = RagRails()
+rag.setup_url()
+
+# Build the support knowledge base
+rag.ingest(
+    urls="https://help.example.com",            # scrape the help center
+    docs={"folder": "files/policies/"},          # parse policy PDFs
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"},
+)
+
+# Answer a ticket, refusing rather than guessing on weak matches
+llm = rag.llm(provider="openai", model="gpt-4o-mini")
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+
+result = rag.chat(
+    "Can I get a refund after 30 days?",
+    llm=llm, embedder=embedder,
+    vector_db="qdrant", collection="support", url="http://localhost:6333",
+    history=[],
+    query_rewrite=QueryRewriteConfig(enabled=True),
+    retrieval_quality=ChatRetrievalQualityConfig(low_confidence_mode="refuse_grounded_answer"),
+)
+print(result.answer, result.answer_confidence)
+```
+
+## Features used
+
+[Ingestion](/features/ingestion) · [Chat](/features/chat) · [Answer quality](/advanced/chat-tuning#answer-quality) · [Query rewriting](/advanced/query-rewriting)

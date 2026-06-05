@@ -1,0 +1,62 @@
+---
+title: "Chat Tuning"
+icon: "sliders-horizontal"
+description: "Manage conversation flow and guard answer quality."
+---
+
+`chat()` takes config objects that control how it handles conversation flow and low-quality retrieval. Each targets a specific failure mode.
+
+## Conversation management
+
+### History compaction
+
+Long conversations overflow the LLM's context window and cost more on every turn. Compaction summarizes older messages into a short recap and keeps recent turns verbatim.
+
+```python
+from ragrails import HistoryCompactionConfig
+
+rag.chat(..., history_compaction=HistoryCompactionConfig(
+    enabled=True,
+    history_limit=15,   # summarize once history passes this many turns
+    keep_recent=5,      # keep the last 5 turns verbatim
+))
+```
+
+<Note>Compaction is also a **cost lever**: fewer tokens per turn means lower spend on long chats. See [cost optimization](/advanced/cost-optimization).</Note>
+
+### Intent routing
+
+Not every message needs a database lookup. *"Thanks!"* or *"who are you?"* should get a direct reply. Intent routing detects these and skips retrieval, which is faster, cheaper, and avoids irrelevant context.
+
+```python
+from ragrails import IntentRoutingConfig
+
+rag.chat(..., intent_routing=IntentRoutingConfig(enabled=True))  # on by default
+```
+
+`result.intent` is `"rag"` (retrieval ran) or `"direct"` (answered without retrieval).
+
+## Answer quality
+
+Sometimes your index simply doesn't contain the answer. Rather than hallucinate, Ragrails scores the retrieved context and acts on low confidence.
+
+```python
+from ragrails import ChatRetrievalQualityConfig
+
+rag.chat(..., retrieval_quality=ChatRetrievalQualityConfig(
+    min_retrieval_score=0.35,
+    min_rerank_score=0.50,
+    low_confidence_mode="answer_with_caution",
+    max_context_chunks=None,
+))
+```
+
+| `low_confidence_mode` | Behaviour when context is weak |
+| --- | --- |
+| `answer_with_caution` | Answers, but flags the uncertainty (default) |
+| `ask_clarifying_question` | Asks the user to refine the question instead of answering |
+| `refuse_grounded_answer` | Declines to answer rather than risk a wrong one |
+
+Every response carries `result.answer_confidence` and `result.retrieval_quality`. Surface them in your UI to flag shaky answers.
+
+Reference: [SDK chat](/usage/sdk/chat).

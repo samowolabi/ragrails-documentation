@@ -1,27 +1,43 @@
 ---
 title: "Architecture"
+icon: "network"
 description: "How Ragrails is organized."
 ---
 
-Ragrails organizes usage surfaces under `ragrails/usage/`.
+Ragrails is built in layers:
 
-```text
-ragrails/usage/
-  sdk/
-  cli/
-  server/
-  mcp/
+```
+core → SDK → CLI / REST API
 ```
 
-Each surface is grouped by the same pipeline stages:
+## Package layout
 
-```text
-ingestion/
-chunking/
-embedding/
-storing/
-retrieval/
+```
+ragrails/
+  core/
+    stg_01_ingestors/
+    stg_02_chunker/
+    stg_03_embedder/
+    stg_04_storing/
+    stg_05_retriever/
+    stg_06_chat/
+  interfaces/
+    sdk/
+    cli/
+    server/
 ```
 
-The SDK owns the Python-facing methods. CLI commands, REST routes, and MCP tools delegate into the same stage behavior so that examples map cleanly across surfaces.
+## Layers
 
+| Layer | Responsibility |
+| --- | --- |
+| **core** | Pipeline logic, provider models, and vector store adapters. Not part of the public API. |
+| **SDK** | The `RagRails` class, the Python-facing interface that wraps the core. |
+| **CLI** | Terminal commands. A thin layer that translates shell input into SDK calls. |
+| **REST API** | FastAPI server. Route services call the SDK, never the core directly. |
+
+## Design principles
+
+- **SDK-first** - the CLI and REST API are both built on the SDK. Behavior lives in the SDK and core, not in the interface layers.
+- **In-memory SDK** - SDK methods accept and return Python objects. The CLI bridges file I/O to the in-memory SDK.
+- **Typed results** - every SDK method returns a frozen dataclass result with consistent count, item, and error fields.

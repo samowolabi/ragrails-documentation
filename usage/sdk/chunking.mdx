@@ -1,33 +1,74 @@
 ---
 title: "SDK Chunking"
-description: "Split markdown files into retrieval-ready JSON chunks."
+icon: "scissors"
+description: "Split documents into retrieval-ready chunks."
 ---
 
-Chunk a directory of markdown files:
+`chunk()` splits markdown documents into stable, embedding-ready pieces.
 
-```python
+<CodeGroup>
+```python Request
 from ragrails import RagRails
 
-result = RagRails().chunk(
-    input_dir="files/output/docs",
-    output_dir="files/output/chunks/docs",
+rag = RagRails()
+
+# From ingestion output
+result = rag.chunk(
+    markdown=ingest_result.outputs,  # list of dicts with a "text" key
     chunk_size=2000,
     chunk_overlap=200,
     min_chunk_length=100,
 )
+
+result.inputs  # documents passed in
+result.chunks  # total chunks produced
+result.items   # list of chunk dicts
+result.failed  # documents that failed
+result.errors  # list of error strings
 ```
 
-Preview chunks for one file without writing a full directory run:
+```python Response
+result.chunks    # 3
+result.items[0]  # {
+                 #   "id": "guide-0",
+                 #   "text": "Ragrails builds modular RAG workflows...",
+                 #   "source": "files/guide.pdf",
+                 #   "metadata": {"title": "Guide", "chunk_index": 0},
+                 # }
+```
+</CodeGroup>
+
+Each chunk dict has:
+
+| Field | Description |
+| --- | --- |
+| `id` | Stable unique chunk ID |
+| `text` | Chunk text |
+| `source` | Source URL or file path |
+| `metadata` | Dict with `title`, `chunk_index`, and other fields |
+
+## Input formats
+
+`markdown` accepts:
 
 ```python
-chunks = RagRails().chunk_file(
-    path="files/output/docs/guide.md",
-    chunk_size=2000,
-    chunk_overlap=200,
-)
+# Plain string
+rag.chunk(markdown="# Guide\n\nContent here.")
+
+# List of strings
+rag.chunk(markdown=["# Doc 1\n\nContent.", "# Doc 2\n\nMore content."])
+
+# List of dicts (ingestion output; uses the "text" key)
+rag.chunk(markdown=ingestion_result.outputs)
 ```
 
-| Method | Parameters |
-| --- | --- |
-| `chunk` | `input_dir`, `output_dir`, `chunk_size`, `chunk_overlap`, `min_chunk_length` |
-| `chunk_file` | `path`, `chunk_size`, `chunk_overlap`, `min_chunk_length` |
+## Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `markdown` | required | Markdown string, list of strings, or list of dicts with a `text` key |
+| `title` | `""` | Document title (used when `markdown` is a plain string) |
+| `source` | `""` | Source URL or path (used when `markdown` is a plain string) |
+| `chunk_size` | `2000` | Max characters per chunk |
+| `chunk_overlap` | `200` | Character overlap between adjacent chunks |
+| `min_chunk_length` | `100` | Chunks shorter than this are dropped |

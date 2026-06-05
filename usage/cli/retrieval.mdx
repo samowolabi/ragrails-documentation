@@ -1,28 +1,70 @@
 ---
 title: "CLI Retrieval"
+icon: "search"
 description: "Search stored chunks from the terminal."
 ---
 
-```bash
-ragrails retrieve "How do I configure Ragrails?" \
+<CodeGroup>
+```bash Command
+ragrails retrieve "How do I authenticate?" \
   --vector-db qdrant \
-  --collection rag_chunks \
-  --top-k 10 \
-  --embedder voyage \
-  --model voyage-3
+  --collection docs \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --top-k 10
 ```
 
-Enable reranking:
+```text Output
+Query  : How do I authenticate?
+Results: 10
 
-```bash
-ragrails retrieve "How do I configure Ragrails?" \
+[1] score=0.8700 id=guide-3
+    title: Authentication
+    text : To authenticate, create an API key in settings...
+```
+</CodeGroup>
+
+With reranking:
+
+<CodeGroup>
+```bash Command
+ragrails retrieve "How do I authenticate?" \
   --vector-db qdrant \
-  --collection rag_chunks \
+  --collection docs \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
   --rerank \
   --reranker voyage \
   --reranker-model rerank-2-lite \
   --rerank-top-k 5
 ```
 
-Retrieval prints result count, score, id, title/path metadata when present, and a text preview.
+```text Output
+Query  : How do I authenticate?
+Results: 5
 
+[1] score=0.8100 rerank=0.9300 id=guide-3
+    title: Authentication
+    text : To authenticate, create an API key in settings...
+```
+</CodeGroup>
+
+Output prints result count, score, ID, title/path metadata, and a text preview for each result.
+
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `QUERY` | required | Search query (positional) |
+| `--vector-db` | `qdrant` | `qdrant`, `pinecone`, or `weaviate` |
+| `--collection` | `None` | Collection name |
+| `--url` | `None` | Vector DB URL |
+| `--top-k` | `10` | Results to retrieve |
+| `--provider` | `voyage` | Query embedding provider |
+| `--model` | `voyage-3` | Query embedding model |
+| `--rerank` | off | Enable reranking |
+| `--reranker` | `voyage` | Reranker provider |
+| `--reranker-model` | `rerank-2-lite` | Reranker model |
+| `--rerank-top-k` | `5` | Results to keep after reranking |

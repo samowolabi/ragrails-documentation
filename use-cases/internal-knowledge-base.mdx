@@ -1,0 +1,39 @@
+---
+title: "Internal Knowledge Base"
+icon: "building"
+description: "Private Q&A over scattered company files."
+---
+
+## The problem
+
+Company knowledge lives in PDFs, decks, spreadsheets, and wikis nobody can search across. New hires ask the same questions in Slack for months.
+
+## How Ragrails solves it
+
+Parse everything into one private, self-hosted collection. No documents leave your infrastructure.
+
+1. **Parse** folders of mixed file types, or accept **uploads as bytes** (no disk write).
+2. **Store** in a vector database you host.
+3. **Retrieve or chat** privately.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+
+# Parse a shared drive of mixed documents
+rag.ingest(
+    docs={"folder": "files/company/"},   # PDF, DOCX, XLSX, PPTX, MD, CSV...
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "wiki", "url": "http://localhost:6333"},
+)
+
+# Ingest an upload straight from memory (e.g. a web app)
+rag.parse(files=[{"content": uploaded_bytes, "filename": "handbook.pdf"}])
+```
+
+<Note>Uploads can be ingested as raw bytes. See [parse input forms](/usage/sdk/ingestion#input-forms). Everything runs against your own vector database, so data stays in-house.</Note>
+
+## Features used
+
+[Document ingestion](/usage/sdk/ingestion#document-ingestion-parse) · [Storing](/features/storing) · [Chat](/features/chat)

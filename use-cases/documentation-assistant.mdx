@@ -1,0 +1,50 @@
+---
+title: "Documentation Assistant"
+icon: "book"
+description: "Let users ask your docs in plain language."
+---
+
+## The problem
+
+Documentation grows faster than anyone can navigate it. Users give up on search and file a ticket, or leave.
+
+## How Ragrails solves it
+
+Crawl the whole docs site once, then answer questions grounded in the actual pages.
+
+1. **Full-crawl** the docs site into a collection.
+2. **Chat** over it, embedded as a widget, Slack bot, or CLI.
+3. Cite `result.sources` so users can click through to the real page.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+rag.setup_url()
+
+rag.ingest(
+    urls="https://docs.example.com",
+    ingestion={"mode": "full", "max_pages": 500},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
+)
+
+llm = rag.llm(provider="openai", model="gpt-4o-mini")
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+
+result = rag.chat(
+    "How do I rotate an API key?",
+    llm=llm, embedder=embedder,
+    vector_db="qdrant", collection="docs", url="http://localhost:6333",
+    history=[],
+)
+print(result.answer)
+for s in result.sources:
+    print("·", s.get("title"))
+```
+
+<Tip>Re-crawl on a schedule and use [`edit()`/`delete()`](/guides/manage-stored-data) to keep the index in sync as docs change.</Tip>
+
+## Features used
+
+[Ingestion](/features/ingestion) · [Chat](/features/chat) · [Keeping your index current](/guides/manage-stored-data)

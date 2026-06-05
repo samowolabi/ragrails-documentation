@@ -1,93 +1,38 @@
 ---
 title: "Chunking"
-description: "Split markdown into retrieval-ready JSON chunks."
+icon: "scissors"
+description: "Split content into searchable passages."
 ---
 
-Chunking reads markdown output from ingestion and writes JSON chunk files for embedding and storage.
+Chunking splits documents into small passages before embedding.
 
-## Capabilities
+<Note>**Why:** search works best on focused passages, not whole files. Chunking lets a query match the one paragraph that answers it, not a 50-page document.</Note>
 
-- Split markdown using heading-aware structure.
-- Preserve heading paths as chunk metadata.
-- Generate stable chunk IDs from chunk content.
-- Keep code blocks atomic so code is not split mid-block.
-- Handle markdown tables as atomic or row-aware chunks.
-- Repair links that would otherwise be split across chunk boundaries.
-- Remove scraping navigation boilerplate when detected.
-- Preview chunks for a single markdown file before running a full directory job.
+```python
+result = rag.chunk(
+    markdown=docs.outputs,   # ingestion output, or plain strings
+    chunk_size=2000,
+    chunk_overlap=200,
+    min_chunk_length=100,
+)
+result.items  # list of chunk dicts
+```
 
-<Tabs>
-  <Tab title="SDK">
-    ```python
-    from ragrails import RagRails
+## Choosing chunk size
 
-    chunks = RagRails().chunk(
-        input_dir="files/output/docs",
-        output_dir="files/output/chunks",
-        chunk_size=2000,
-        chunk_overlap=200,
-        min_chunk_length=100,
-    )
-    ```
+`chunk_size` is the main lever. It's a tradeoff:
 
-    Preview one file:
+| Too small | Too large |
+| --- | --- |
+| Loses surrounding context | Retrieves noise around the answer |
+| More chunks, higher cost | Weaker similarity matching |
 
-    ```python
-    preview = RagRails().chunk_file("files/output/docs/guide.md")
-    ```
+<Tip>Start at `chunk_size=2000`, `chunk_overlap=200`. Lower the size for dense, factual content (specs, FAQs); raise it for narrative content where context matters.</Tip>
 
-    Deep dive: [SDK chunking](/usage/sdk/chunking).
-  </Tab>
+**Overlap** repeats a little text between adjacent chunks so a sentence split across a boundary isn't lost. Keep it ~10% of `chunk_size`.
 
-  <Tab title="CLI">
-    ```bash
-    ragrails chunk \
-      --input-dir files/output/docs \
-      --output-dir files/output/chunks \
-      --chunk-size 2000 \
-      --chunk-overlap 200 \
-      --min-chunk-length 100
-    ```
+**`min_chunk_length`** drops tiny fragments (stray headings, footers) that add noise.
 
-    Preview one file:
+## Reference
 
-    ```bash
-    ragrails chunk-file files/output/docs/guide.md
-    ```
-
-    Deep dive: [CLI chunking](/usage/cli/chunking).
-  </Tab>
-
-  <Tab title="REST API">
-    ```bash
-    curl -X POST http://127.0.0.1:8000/v1/chunk \
-      -H "Content-Type: application/json" \
-      -d '{
-        "input_dir": "files/output/docs",
-        "output_dir": "files/output/chunks",
-        "chunk_size": 2000,
-        "chunk_overlap": 200,
-        "min_chunk_length": 100
-      }'
-    ```
-
-    Deep dive: [REST API chunking](/usage/server/chunking).
-  </Tab>
-
-  <Tab title="MCP">
-    Ask your MCP client to use:
-
-    ```text
-    ragrails_chunk_directory
-    ragrails_chunk_file
-    ```
-
-    Example prompt:
-
-    ```text
-    Use ragrails_chunk_directory with input_dir files/output/docs and output_dir files/output/chunks.
-    ```
-
-    Deep dive: [MCP chunking](/usage/mcp/chunking).
-  </Tab>
-</Tabs>
+Full parameters: [SDK chunking](/usage/sdk/chunking) · [CLI](/usage/cli/chunking) · [REST](/usage/server/chunking).

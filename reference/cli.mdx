@@ -1,19 +1,57 @@
 ---
 title: "CLI Reference"
-description: "Ragrails command reference."
+icon: "terminal"
+description: "All ragrails commands."
 ---
 
-Run `ragrails --help` for the installed version.
+```bash
+ragrails --help
+```
 
-| Command | Stage |
+## Ingestion
+
+| Command | Description |
 | --- | --- |
-| `ragrails setup-url` | Ingestion |
-| `ragrails scrape` | Ingestion |
-| `ragrails parse` | Ingestion |
-| `ragrails fetch` | Ingestion |
-| `ragrails chunk` | Chunking |
-| `ragrails chunk-file` | Chunking |
-| `ragrails embed` | Embedding |
-| `ragrails store` | Storing |
-| `ragrails retrieve` | Retrieval |
+| `ragrails setup-url [--browser]` | Install Playwright browser for URL ingestion |
+| `ragrails scrape URL... [options]` | Scrape one or more URLs |
+| `ragrails parse [--folder] [--files] [options]` | Parse local documents |
+| `ragrails fetch URL [options]` | Fetch a REST API endpoint |
 
+## Chunking
+
+| Command | Description |
+| --- | --- |
+| `ragrails chunk --input-dir --output-dir [options]` | Chunk ingestion output JSON files |
+
+## Embedding
+
+| Command | Description |
+| --- | --- |
+| `ragrails embed --input-dir --output-dir [options]` | Embed chunk JSON files |
+
+## Storing
+
+| Command | Description |
+| --- | --- |
+| `ragrails store --input-dir --vector-db --collection [options]` | Store embedded chunks |
+| `ragrails edit --input-dir --vector-db --collection [options]` | Re-embed and replace stored chunks |
+| `ragrails delete --id --vector-db --collection [options]` | Delete stored chunks by ID |
+
+## Retrieval
+
+| Command | Description |
+| --- | --- |
+| `ragrails retrieve QUERY --vector-db --collection [options]` | Retrieve relevant chunks |
+
+## Pipeline
+
+| Command | Description |
+| --- | --- |
+| `ragrails ingest [--docs] [--folder] [--source-url] [options]` | Full ingest pipeline |
+| `ragrails query QUERY --vector-db --collection [options]` | Query pipeline |
+
+## Chat
+
+| Command | Description |
+| --- | --- |
+| `ragrails chat [QUERY] [options]` | One-shot chat turn, or interactive REPL if no query given |

@@ -1,0 +1,84 @@
+---
+title: "CLI Quickstart"
+icon: "zap"
+description: "Build a knowledge base and chat from the terminal."
+---
+
+## 1. Install
+
+```bash
+pip install "ragrails[voyage,openai,qdrant]"
+```
+
+```bash
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+## 2. Build the index
+
+One command runs the whole pipeline:
+
+<CodeGroup>
+```bash Command
+ragrails ingest \
+  --docs files/guide.pdf \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+```
+
+```text Output
+Sources  : 1
+Chunks   : 12
+Embedded : 12
+Stored   : 12
+Failed   : 0
+```
+</CodeGroup>
+
+<Tip>Prefer control over each step? Run the stages separately and pass JSON between them. See the [CLI Overview](/usage/cli/overview#stage-based-workflow).</Tip>
+
+## 3. Query
+
+<CodeGroup>
+```bash Command
+ragrails query "What does the guide cover?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+```
+
+```text Output
+Query  : What does the guide cover?
+Results: 10
+
+[1] score=0.8300 id=guide-7
+    text : The guide covers setup, authentication, and usage...
+```
+</CodeGroup>
+
+## 4. Chat
+
+<CodeGroup>
+```bash Command
+ragrails chat "What does the guide cover?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```text Output
+The guide covers setup, authentication, and everyday usage.
+
+Sources:
+[1] Guide
+```
+</CodeGroup>
+
+Run `ragrails chat` with no question to start the interactive session (history, streaming, tools).
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="CLI Overview" icon="list" href="/usage/cli/overview">Every command.</Card>
+  <Card title="Interactive chat" icon="terminal" href="/usage/cli/chat">Slash commands and agentic tools.</Card>
+</CardGroup>

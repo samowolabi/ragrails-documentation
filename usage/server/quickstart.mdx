@@ -1,0 +1,109 @@
+---
+title: "REST API Quickstart"
+icon: "zap"
+description: "Build a knowledge base and chat over HTTP."
+---
+
+## 1. Install and run
+
+```bash
+pip install "ragrails[server-qdrant]"
+```
+
+```bash
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
+docker run -p 6333:6333 qdrant/qdrant
+ragrails-api
+```
+
+The server starts on `http://127.0.0.1:8000`. Explore it at `/docs`.
+
+## 2. Build the index
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"folder": "files/docs/"},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"}
+  }'
+```
+
+```json Response
+{ "sources": 3, "chunks": 24, "embedded": 24, "stored": 24, "failed": 0, "errors": [] }
+```
+</CodeGroup>
+
+## 3. Query
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What does the guide cover?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 5}
+  }'
+```
+
+```json Response
+{
+  "query": "What does the guide cover?",
+  "search_query": "What does the guide cover?",
+  "retrieved": 5,
+  "items": [
+    { "id": "guide-7", "score": 0.83, "text": "The guide covers setup, authentication, and usage...", "metadata": {"title": "Guide"}, "rerank_score": null }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## 4. Chat
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What does the guide cover?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+
+```json Response
+{
+  "answer": "The guide covers setup, authentication, and everyday usage.",
+  "sources": [{ "id": "guide-7", "title": "Guide", "text": "..." }],
+  "history": [
+    { "role": "user", "content": "What does the guide cover?" },
+    { "role": "assistant", "content": "The guide covers setup, authentication, and everyday usage." }
+  ],
+  "intent": "rag",
+  "answer_confidence": { "level": "high", "score": 0.86 },
+  "compacted": false,
+  "errors": []
+}
+```
+</CodeGroup>
+
+Pass the returned `history` back on the next request to keep context.
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="REST Overview" icon="list" href="/usage/server/overview">Every endpoint.</Card>
+  <Card title="Generate a client" icon="code" href="/usage/server/overview">Use the OpenAPI schema at /v1/openapi.json.</Card>
+</CardGroup>

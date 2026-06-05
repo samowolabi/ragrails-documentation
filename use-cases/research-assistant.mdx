@@ -1,0 +1,46 @@
+---
+title: "Research Assistant"
+icon: "microscope"
+description: "Synthesize answers across long documents and reports."
+---
+
+## The problem
+
+The answer is spread across dozens of long PDFs, papers, or reports. Reading them all to answer one question doesn't scale.
+
+## How Ragrails solves it
+
+Ingest the documents from local files, URLs, or bytes, then ask questions that pull from across the whole set.
+
+1. **Parse** papers and reports (mix local paths, file URLs, and bytes).
+2. **Chat** to synthesize, with sources for every claim.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+
+rag.ingest(
+    docs=[
+        "files/reports/q1.pdf",
+        "https://example.com/research/whitepaper.pdf",   # remote file URL
+    ],
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "research", "url": "http://localhost:6333"},
+)
+
+llm = rag.llm(provider="openai", model="gpt-4o")   # stronger model for synthesis
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+
+result = rag.chat(
+    "What do these reports agree on about retention?",
+    llm=llm, embedder=embedder,
+    vector_db="qdrant", collection="research", url="http://localhost:6333",
+    history=[],
+)
+print(result.answer)
+```
+
+## Features used
+
+[Document ingestion](/usage/sdk/ingestion#document-ingestion-parse) · [Chat](/features/chat) · [Reranking](/advanced/reranking)

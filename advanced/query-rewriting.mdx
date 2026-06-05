@@ -1,0 +1,37 @@
+---
+title: "Query Rewriting"
+icon: "wand-sparkles"
+description: "Turn conversational follow-ups into standalone search queries."
+---
+
+In a conversation, people ask follow-ups like *"what about the second one?"*, which is meaningless to a search engine on its own. Query rewriting uses the chat history and context to expand it into a standalone question like *"what is the second step of authentication?"* before retrieval runs.
+
+<Note>**Use it when** you're building chat or multi-turn search. Skip it for one-shot, self-contained queries, since it adds an LLM call.</Note>
+
+## In retrieval
+
+```python
+rewrite_llm = rag.llm(provider="openai", model="gpt-4o-mini")
+
+result = rag.retrieve(
+    "What about the second step?",
+    embedder=embedder,
+    vector_db="qdrant", collection="docs", url="http://localhost:6333",
+    use_query_rewrite=True,
+    rewrite_llm=rewrite_llm,
+    session_context="User is asking about the onboarding flow.",
+)
+result.search_query   # the rewritten query actually searched
+```
+
+## In chat
+
+```python
+from ragrails import QueryRewriteConfig
+
+rag.chat(..., query_rewrite=QueryRewriteConfig(enabled=True, session_context="Onboarding flow"))
+```
+
+<Tip>Rewriting runs an extra LLM call. Use a small, cheap model (`gpt-4o-mini`) via `rewrite_llm`, since it's a short, mechanical task. See [cost optimization](/advanced/cost-optimization).</Tip>
+
+Reference: [SDK retrieval](/usage/sdk/retrieval) · [SDK chat](/usage/sdk/chat).

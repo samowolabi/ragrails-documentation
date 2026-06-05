@@ -1,0 +1,166 @@
+---
+title: "SDK Chat"
+icon: "messages-square"
+description: "RAG chat with stateless history management."
+---
+
+Chat is stateless. Pass `history` in on each turn and persist the returned `result.history` in your application.
+
+```bash
+pip install "ragrails[voyage,openai,qdrant]"
+```
+
+<CodeGroup>
+```python Request
+from ragrails import RagRails
+
+rag = RagRails()
+llm = rag.llm(provider="openai", model="gpt-4o-mini")
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+
+history = []
+
+result = rag.chat(
+    "How do I authenticate?",
+    llm=llm,
+    embedder=embedder,
+    vector_db="qdrant",
+    collection="docs",
+    url="http://localhost:6333",
+    history=history,
+)
+
+print(result.answer)
+history = result.history  # pass to the next turn
+```
+
+```python Response
+result.answer    # "To authenticate, create an API key in your account settings..."
+result.intent    # "rag"
+result.sources   # [{"id": "guide-3", "title": "Authentication", "text": "..."}]
+result.answer_confidence  # {"level": "high", "score": 0.86}
+result.compacted # False
+```
+</CodeGroup>
+
+## Result fields
+
+| Field | Description |
+| --- | --- |
+| `result.answer` | LLM answer string |
+| `result.sources` | Source chunk dicts used for the answer |
+| `result.history` | Updated history list; pass to the next turn |
+| `result.intent` | `"rag"` (retrieved context used) or `"direct"` (LLM answered directly) |
+| `result.answer_confidence` | Confidence assessment dict |
+| `result.retrieval_quality` | Retrieval quality assessment dict |
+| `result.compacted` | `True` if history was summarised this turn |
+| `result.errors` | List of error dicts |
+
+## Config objects
+
+### `QueryRewriteConfig`
+
+Rewrites follow-up questions into self-contained queries before retrieval.
+
+```python
+from ragrails import QueryRewriteConfig
+
+result = rag.chat(
+    "What about the second step?",
+    ...,
+    query_rewrite=QueryRewriteConfig(
+        enabled=True,
+        session_context="User is asking about the onboarding flow.",
+    ),
+)
+```
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `enabled` | `False` | Enable query rewriting |
+| `session_context` | `""` | Context hint for the rewriter |
+| `llm` | `None` | Separate LLM for rewriting (falls back to the chat LLM) |
+
+### `HistoryCompactionConfig`
+
+Automatically summarises old history turns to stay within context limits.
+
+```python
+from ragrails import HistoryCompactionConfig
+
+result = rag.chat(
+    ...,
+    history_compaction=HistoryCompactionConfig(enabled=True, history_limit=15, keep_recent=5),
+)
+```
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `enabled` | `True` | Enable automatic history summarisation |
+| `history_limit` | `15` | Summarise when history exceeds this many turns |
+| `keep_recent` | `5` | Recent turns to keep verbatim after summarisation |
+
+### `IntentRoutingConfig`
+
+Routes small-talk and direct questions to the LLM without retrieval.
+
+```python
+from ragrails import IntentRoutingConfig
+
+result = rag.chat(..., intent_routing=IntentRoutingConfig(enabled=True))
+```
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `enabled` | `True` | Route non-RAG queries directly to the LLM |
+
+### `ChatRetrievalQualityConfig`
+
+Controls confidence thresholds for retrieved context.
+
+```python
+from ragrails import ChatRetrievalQualityConfig
+
+result = rag.chat(
+    ...,
+    retrieval_quality=ChatRetrievalQualityConfig(
+        min_retrieval_score=0.35,
+        min_rerank_score=0.50,
+        low_confidence_mode="answer_with_caution",
+    ),
+)
+```
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `min_retrieval_score` | `0.35` | Below this, retrieval is considered low quality |
+| `min_rerank_score` | `0.50` | Below this, reranked results are low quality |
+| `low_confidence_mode` | `"answer_with_caution"` | `"answer_with_caution"`, `"ask_clarifying_question"`, or `"refuse_grounded_answer"` |
+| `max_context_chunks` | `None` | Cap chunks sent to the LLM |
+
+## `llm()` parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `provider` | `""` | `"openai"` or `"anthropic"` |
+| `model` | required | Model name, e.g. `"gpt-4o-mini"`, `"claude-sonnet-4-6"` |
+| `max_tokens` | `1024` | Max output tokens |
+
+## `chat()` parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `query` | required | User message |
+| `llm` | required | LLM object from `rag.llm()` |
+| `embedder` | required | Embedder object from `rag.embedder()` with `input_type="query"` |
+| `vector_db` | `"qdrant"` | Vector DB provider |
+| `collection` | `None` | Collection name |
+| `url` | `None` | Vector DB URL |
+| `reranker` | `None` | Reranker object from `rag.reranker()` |
+| `history` | `None` | Previous turns list |
+| `history_compaction` | `None` | `HistoryCompactionConfig` |
+| `query_rewrite` | `None` | `QueryRewriteConfig` |
+| `intent_routing` | `None` | `IntentRoutingConfig` |
+| `retrieval_quality` | `None` | `ChatRetrievalQualityConfig` |
+| `persona` | `""` | System persona injected into the prompt |
+| `options` | `None` | Provider-specific options dict |

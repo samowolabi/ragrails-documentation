@@ -1,29 +1,66 @@
 ---
 title: "REST API Reference"
-description: "Ragrails HTTP endpoint reference."
+icon: "server"
+description: "All HTTP endpoints."
 ---
 
-Base path: `/v1`.
+Start the server:
 
-| Method | Path | Stage |
+```bash
+pip install "ragrails[server-qdrant]"
+ragrails-api
+```
+
+Base URL: `http://127.0.0.1:8000`
+
+Interactive docs: `http://127.0.0.1:8000/docs`
+
+## Health
+
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Health |
-| `POST` | `/ingest/api` | Ingestion |
-| `POST` | `/ingest/url` | Ingestion |
-| `POST` | `/ingest/docs` | Ingestion |
-| `POST` | `/chunk` | Chunking |
-| `POST` | `/embed` | Embedding |
-| `POST` | `/store` | Storing |
-| `POST` | `/retrieve` | Retrieval |
+| GET | `/v1/health` | Returns `{"status": "ok"}` |
 
-Run `ragrails-api` and open the generated Swagger UI:
+## Ingestion
 
-```text
-http://127.0.0.1:8000/docs
-```
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/v1/ingest/url` | Scrape URLs |
+| POST | `/v1/ingest/docs` | Parse documents |
+| POST | `/v1/ingest/api` | Fetch REST APIs |
 
-Use the OpenAPI schema for code generation, API clients, and automated tooling:
+## Processing
 
-```text
-http://127.0.0.1:8000/v1/openapi.json
-```
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/v1/chunk` | Chunk documents |
+| POST | `/v1/embed` | Embed chunks |
+
+## Storage
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/v1/store` | Store embedded chunks |
+| POST | `/v1/edit` | Re-embed and replace stored chunks |
+| POST | `/v1/delete` | Delete stored chunks |
+
+## Retrieval
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/v1/retrieve` | Retrieve relevant chunks |
+
+## Pipeline
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/v1/pipelines/ingest` | Full ingest pipeline |
+| POST | `/v1/pipelines/query` | Query pipeline |
+
+## Chat
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/v1/chat` | Stateless RAG chat turn |
+
+See the Swagger UI at `/docs` for full request and response schemas.

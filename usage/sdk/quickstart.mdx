@@ -1,0 +1,71 @@
+---
+title: "SDK Quickstart"
+icon: "zap"
+description: "Build a knowledge base and chat from Python in a few lines."
+---
+
+## 1. Install
+
+```bash
+pip install "ragrails[voyage,openai,qdrant]"
+```
+
+```bash
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+## 2. Build the index
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+
+rag.ingest(
+    docs=["files/guide.pdf"],
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
+)
+```
+
+`ingest()` runs ingest → chunk → embed → store in one call.
+
+## 3. Query
+
+```python
+result = rag.query(
+    "What does the guide cover?",
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    retrieval={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 5},
+)
+
+for chunk in result.items:
+    print(chunk.score, chunk.text[:200])
+```
+
+## 4. Chat
+
+```python
+llm = rag.llm(provider="openai", model="gpt-4o-mini")
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+
+result = rag.chat(
+    "What does the guide cover?",
+    llm=llm,
+    embedder=embedder,
+    vector_db="qdrant", collection="docs", url="http://localhost:6333",
+    history=[],
+)
+print(result.answer)
+```
+
+<Tip>Chat is stateless. Save `result.history` and pass it to the next turn.</Tip>
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="SDK Overview" icon="list" href="/usage/sdk/overview">Every method.</Card>
+  <Card title="Run stages individually" icon="layers" href="/usage/sdk/ingestion">Ingest → chunk → embed → store, step by step.</Card>
+</CardGroup>

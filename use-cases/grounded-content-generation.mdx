@@ -1,0 +1,40 @@
+---
+title: "Grounded Content Generation"
+icon: "pen-tool"
+description: "Generate content backed by your real sources, not the model's guesses."
+---
+
+## The problem
+
+Ask an LLM to write about your product and it invents features, prices, and policies. Ungrounded content is a liability.
+
+## How Ragrails solves it
+
+Retrieve the relevant facts first, then pass them to your generation prompt as context.
+
+1. **Retrieve** the supporting chunks for the topic.
+2. **Generate** with those chunks as grounding, using your LLM and your prompt.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+
+hits = rag.retrieve(
+    "enterprise plan features and limits",
+    embedder=embedder,
+    vector_db="qdrant", collection="docs", url="http://localhost:6333",
+    top_k=8,
+)
+
+context = "\n\n".join(h.text for h in hits.items)
+prompt = f"Write a product brief using ONLY these facts:\n\n{context}"
+# → pass `prompt` to your LLM of choice
+```
+
+<Tip>Or use [`chat()`](/features/chat) directly if you want Ragrails to handle generation with grounding and citations built in.</Tip>
+
+## Features used
+
+[Retrieval](/features/retrieval) · [Reranking](/advanced/reranking) · [Chat](/features/chat)

@@ -1,9 +1,8 @@
 ---
 title: "SDK Overview"
+icon: "list"
 description: "Use Ragrails from Python."
 ---
-
-The SDK is the best surface for Python developers who want RAG stages inside an application, notebook, worker, or test suite.
 
 ```python
 from ragrails import RagRails
@@ -11,28 +10,37 @@ from ragrails import RagRails
 rag = RagRails()
 ```
 
-## Jupyter notebooks
+The SDK is the primary interface for Python developers. All methods are in-memory: pass Python objects in, get typed result objects back.
 
-The repository includes notebooks that walk through the same SDK pipeline stage
-by stage:
+## Methods
 
-| Notebook | Stage |
-| --- | --- |
-| `notebooks/01_ingestion.ipynb` | Ingestion |
-| `notebooks/02_chunking.ipynb` | Chunking |
-| `notebooks/03_embedding.ipynb` | Embedding |
-| `notebooks/03_store.ipynb` | Storing |
-| `notebooks/04_retrieval.ipynb` | Retrieval |
-
-Use them when you want an interactive workflow for inspecting markdown outputs,
-chunk JSON files, stored vectors, and retrieval results.
-
-## Stages
-
-| Stage | Method | Details |
+| Method | Stage | Description |
 | --- | --- | --- |
-| Ingestion | `setup_url`, `scrape`, `retry_scrape`, `parse`, `fetch` | [Ingestion](/usage/sdk/ingestion) |
-| Chunking | `chunk`, `chunk_file` | [Chunking](/usage/sdk/chunking) |
-| Embedding | `embed` | [Embedding](/usage/sdk/embedding) |
-| Storing | `store` | [Storing](/usage/sdk/storing) |
-| Retrieval | `retrieve` | [Retrieval](/usage/sdk/retrieval) |
+| `setup_url(browser)` | Ingestion | Install Playwright browser for URL ingestion |
+| `scrape(url, ...)` | Ingestion | Scrape URLs into document dicts |
+| `parse(files, folder, ...)` | Ingestion | Parse local documents into document dicts |
+| `fetch(url, apis, ...)` | Ingestion | Fetch REST API responses into document dicts |
+| `chunk(markdown, ...)` | Chunking | Split documents into chunk dicts |
+| `embedder(provider, model, ...)` | Embedding | Create an embedder object |
+| `embed(chunks, embedder, ...)` | Embedding | Generate embedding vectors for chunks |
+| `store(embedded_chunks, ...)` | Storing | Upsert embedded chunks into a vector DB |
+| `edit(chunks, embedder, ...)` | Storing | Re-embed and replace chunks by ID |
+| `delete(ids, ...)` | Storing | Delete chunks by ID |
+| `reranker(provider, model, ...)` | Retrieval | Create a reranker object |
+| `retrieve(query, embedder, ...)` | Retrieval | Embed a query and retrieve relevant chunks |
+| `llm(provider, model, ...)` | Chat | Create an LLM object |
+| `chat(query, llm, embedder, ...)` | Chat | Run a stateless RAG chat turn |
+| `ingest(docs, urls, ...)` | Pipeline | Run ingestion → chunk → embed → store |
+| `query(query, embedding, ...)` | Pipeline | Run embed query → retrieve |
+
+## Pages
+
+<CardGroup cols={2}>
+  <Card title="Ingestion" href="/usage/sdk/ingestion">scrape, parse, fetch</Card>
+  <Card title="Chunking" href="/usage/sdk/chunking">chunk</Card>
+  <Card title="Embedding" href="/usage/sdk/embedding">embedder, embed</Card>
+  <Card title="Storing" href="/usage/sdk/storing">store, edit, delete</Card>
+  <Card title="Retrieval" href="/usage/sdk/retrieval">reranker, retrieve</Card>
+  <Card title="Chat" href="/usage/sdk/chat">llm, chat</Card>
+  <Card title="Pipeline" href="/usage/sdk/pipeline">ingest, query</Card>
+</CardGroup>

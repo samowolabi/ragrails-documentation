@@ -1,25 +1,104 @@
 ---
 title: "CLI Storing"
-description: "Store chunks in a vector database from the terminal."
+icon: "database"
+description: "Store, edit, and delete chunks in a vector database from the terminal."
 ---
 
-The `store` command is the explicit storage stage. It embeds chunks and writes them to the configured vector database.
+## Store (`store`)
 
-```bash
+Reads embedded chunk JSON files from `--input-dir` and upserts them into a vector database.
+
+<CodeGroup>
+```bash Command
 ragrails store \
-  --input-dir files/output/chunks \
+  --input-dir files/embedded/ \
   --vector-db qdrant \
-  --collection rag_chunks \
-  --batch-size 64 \
-  --embedder voyage \
+  --collection docs \
+  --url http://localhost:6333 \
+  --batch-size 64
+```
+
+```text Output
+Inputs     : 12
+Stored     : 12
+Failed     : 0
+Provider   : qdrant
+Collection : docs
+```
+</CodeGroup>
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input-dir` | required | Folder containing embedded chunk JSON files |
+| `--vector-db` | `qdrant` | `qdrant`, `pinecone`, or `weaviate` |
+| `--collection` | `None` | Collection, index, or class name |
+| `--url` | `None` | Vector DB URL |
+| `--batch-size` | `64` | Chunks per upsert batch |
+
+---
+
+## Edit (`edit`)
+
+Re-embeds and replaces stored chunks from JSON files. Each file must contain chunk dicts with matching IDs.
+
+<CodeGroup>
+```bash Command
+ragrails edit \
+  --input-dir files/updated/ \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --provider voyage \
   --model voyage-3
 ```
 
-Install the storage extra for your provider:
+```text Output
+Requested  : 1
+Edited     : 1
+Failed     : 0
+Provider   : qdrant
+Collection : docs
+```
+</CodeGroup>
 
-| Provider | Install |
-| --- | --- |
-| Qdrant | `pip install "ragrails[store-qdrant]"` |
-| Pinecone | `pip install "ragrails[store-pinecone]"` |
-| Weaviate | `pip install "ragrails[store-weaviate]"` |
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input-dir` | required | Folder containing updated chunk JSON files |
+| `--vector-db` | `qdrant` | Vector DB provider |
+| `--collection` | `None` | Collection name |
+| `--url` | `None` | Vector DB URL |
+| `--provider` | `voyage` | Embedding provider |
+| `--model` | `voyage-3` | Embedding model |
+| `--batch-size` | `64` | Chunks per request |
 
+---
+
+## Delete (`delete`)
+
+Deletes chunks by ID.
+
+<CodeGroup>
+```bash Command
+ragrails delete \
+  --id chunk-id-1 \
+  --id chunk-id-2 \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+```
+
+```text Output
+Requested  : 2
+Deleted    : 2
+Failed     : 0
+Provider   : qdrant
+Collection : docs
+```
+</CodeGroup>
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--id` | required | Chunk ID to delete (repeatable) |
+| `--vector-db` | `qdrant` | Vector DB provider |
+| `--collection` | `None` | Collection name |
+| `--url` | `None` | Vector DB URL |

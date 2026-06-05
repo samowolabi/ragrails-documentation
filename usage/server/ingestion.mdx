@@ -1,45 +1,72 @@
 ---
-title: "REST API Ingestion"
-description: "Ingest API responses, URLs, and documents over HTTP."
+title: "REST Ingestion"
+icon: "file-input"
+description: "Ingest URLs, documents, and APIs over HTTP."
 ---
 
-## API ingestion
+## POST /v1/ingest/url
 
-```bash
-curl -X POST http://127.0.0.1:8000/v1/ingest/api \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://api.example.com/v1/products",
-    "title": "Products",
-    "method": "GET",
-    "output_dir": "files/output/api"
-  }'
+Scrape one or more URLs.
+
+```json
+{
+  "url": "https://example.com/docs",
+  "mode": "each",
+  "max_depth": 3,
+  "max_pages": 200,
+  "output_format": "json"
+}
 ```
 
-## URL ingestion
+Multiple URLs with per-URL config:
 
-```bash
-curl -X POST http://127.0.0.1:8000/v1/ingest/url \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://example.com",
-    "mode": "full",
-    "output_dir": "files/output/web_crawled",
-    "max_depth": 3,
-    "max_pages": 200
-  }'
+```json
+{
+  "url": [
+    "https://example.com/docs",
+    {"url": "https://example.com/blog", "mode": "full", "max_depth": 1}
+  ]
+}
 ```
 
-## Document ingestion
+---
 
-```bash
-curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
-  -H "Content-Type: application/json" \
-  -d '{
-    "folder": "files/input",
-    "output_dir": "files/output/docs"
-  }'
+## POST /v1/ingest/docs
+
+Parse local document files or a folder.
+
+```json
+{
+  "folder": "files/docs/",
+  "output_format": "json"
+}
 ```
 
-All ingestion endpoints return counts, output paths, and error information for failed items.
+---
 
+## POST /v1/ingest/api
+
+Fetch a REST API endpoint.
+
+```json
+{
+  "url": "https://api.example.com/posts",
+  "title": "Blog posts",
+  "headers": {"Authorization": "Bearer token"},
+  "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+  "max_pages": 10
+}
+```
+
+---
+
+All ingestion responses follow this shape:
+
+```json
+{
+  "documents": 5,
+  "failed": 0,
+  "outputs": [...],
+  "errors": []
+}
+```

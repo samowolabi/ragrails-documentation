@@ -1,87 +1,33 @@
 ---
 title: "Embedding"
-description: "Generate vectors from chunk files."
+icon: "binary"
+description: "Turn passages into vectors."
 ---
 
-Embedding reads JSON chunk files, calls an embedding provider, and writes vectors to the configured vector database.
+Embedding converts each chunk into a vector: numbers that capture meaning, so similar meaning lands close together in search.
 
-## Capabilities
+Create an embedder, then embed:
 
-- Read chunk JSON files produced by the chunking stage.
-- Embed all chunk files in a directory or a selected subset of files.
-- Batch embeddings to reduce provider calls and control cost.
-- Select an embedding provider and model.
-- Write embedded vectors to the configured vector database.
-- Return counts, provider metadata, collection name, and per-file errors.
+```python
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="document")
+result = rag.embed(chunks=chunk_result.items, embedder=embedder, batch_size=64)
+result.items  # chunks with an added "embedding" field
+```
 
-## Current provider path
+<Warning>**Match `input_type` to the job.** Use `"document"` when embedding content to store, and `"query"` when embedding a search query. Mismatching them hurts retrieval quality.</Warning>
 
-The default embedder is Voyage AI with `model="voyage-3"`. Vector storage
-examples use Qdrant, but Pinecone and Weaviate are also supported through the
-same arguments.
+## Providers
 
-<Tabs>
-  <Tab title="SDK">
-    ```python
-    from ragrails import RagRails
+| Provider | Extra | Models |
+| --- | --- | --- |
+| Voyage | `ragrails[voyage]` | `voyage-3` (default), `voyage-3-lite`, `voyage-3-large` |
 
-    embedded = RagRails().embed(
-        input_dir="files/output/chunks",
-        vector_db="qdrant",
-        collection="rag_chunks",
-        batch_size=64,
-        embedder="voyage",
-        model="voyage-3",
-    )
-    ```
+Need a different provider? Register your own with `register_embedder()`.
 
-    Deep dive: [SDK embedding](/usage/sdk/embedding).
-  </Tab>
+<Tip>Use the **same model** for indexing and querying. Vectors from different models aren't comparable.</Tip>
 
-  <Tab title="CLI">
-    ```bash
-    ragrails embed \
-      --input-dir files/output/chunks \
-      --vector-db qdrant \
-      --collection rag_chunks \
-      --batch-size 64 \
-      --embedder voyage \
-      --model voyage-3
-    ```
+`batch_size` controls how many chunks go in one request. Raise it to cut API calls; lower it if you hit rate limits.
 
-    Deep dive: [CLI embedding](/usage/cli/embedding).
-  </Tab>
+## Reference
 
-  <Tab title="REST API">
-    ```bash
-    curl -X POST http://127.0.0.1:8000/v1/embed \
-      -H "Content-Type: application/json" \
-      -d '{
-        "input_dir": "files/output/chunks",
-        "vector_db": "qdrant",
-        "collection": "rag_chunks",
-        "batch_size": 64,
-        "embedder": "voyage",
-        "model": "voyage-3"
-      }'
-    ```
-
-    Deep dive: [REST API embedding](/usage/server/embedding).
-  </Tab>
-
-  <Tab title="MCP">
-    Ask your MCP client to use:
-
-    ```text
-    ragrails_embed_chunks
-    ```
-
-    Example prompt:
-
-    ```text
-    Use ragrails_embed_chunks with input_dir files/output/chunks, vector_db qdrant, collection rag_chunks, embedder voyage, and model voyage-3.
-    ```
-
-    Deep dive: [MCP embedding](/usage/mcp/embedding).
-  </Tab>
-</Tabs>
+Full parameters: [SDK embedding](/usage/sdk/embedding) · [CLI](/usage/cli/embedding) · [REST](/usage/server/embedding).

@@ -1,0 +1,50 @@
+---
+title: "Cost Optimization"
+icon: "coins"
+description: "Cut embedding and LLM spend without losing quality."
+---
+
+RAG cost comes from two places: embedding your content (once, at ingest) and LLM calls (every chat turn). Here's where to tune.
+
+## LLM cost
+
+The biggest lever. Pricing per 1M tokens (input / output):
+
+| Model | Input | Output | Use for |
+| --- | --- | --- | --- |
+| `gpt-4o-mini` | $0.15 | $0.60 | Default, for generation, rewriting, summarization |
+| `gpt-4o` | $2.50 | $10.00 | Complex reasoning, tool use |
+| `claude-haiku-4-5-20251001` | $0.80 | $4.00 | Lightweight tasks |
+| `claude-sonnet-4-6` | $3.00 | $15.00 | Balanced |
+
+<Tip>Default to `gpt-4o-mini`. Reserve `gpt-4o` / `claude-sonnet` for turns that genuinely need stronger reasoning.</Tip>
+
+### Spend less per turn
+
+- **History compaction** - summarizes old turns so you don't resend the whole transcript every message. The single biggest saver on long chats. See [chat tuning](/advanced/chat-tuning#history-compaction).
+- **Intent routing** - skips retrieval (and its context tokens) for small talk. On by default.
+- **Cheap rewrite model** - query rewriting is short and mechanical; point `rewrite_llm` at `gpt-4o-mini` even if your main model is larger. See [query rewriting](/advanced/query-rewriting).
+- **`max_context_chunks`** - cap how many retrieved chunks get sent to the LLM (`ChatRetrievalQualityConfig`).
+- **`max_tokens`** - cap output length on `rag.llm(...)`.
+
+## Embedding cost
+
+- **Model choice** - `voyage-3-lite` is cheaper than `voyage-3` / `voyage-3-large`. Use lite for high-volume or less nuanced content.
+- **Chunk size** - bigger chunks mean fewer chunks to embed. Don't go so big that retrieval gets noisy (see [chunking](/features/chunking)).
+- **`batch_size`** - larger batches mean fewer API round-trips.
+- **Embed once** - store vectors; never re-embed unchanged content. Use [`edit()`](/guides/manage-stored-data) to update only what changed.
+
+## Reranking cost
+
+- Use **BM25** (`provider="bm25"`) for a free, local reranker instead of an API call - good when exact-term matching is enough. See [reranking](/advanced/reranking).
+
+## Monitor spend
+
+The interactive CLI logs every LLM call (with cost) and summarizes it:
+
+```bash
+ragrails chat
+> /usage
+```
+
+Usage is appended to `files/output/token_usage.jsonl`, with per-call cost computed from the model pricing above.

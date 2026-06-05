@@ -1,35 +1,43 @@
 ---
 title: "REST API Overview"
-description: "Run Ragrails behind an HTTP API."
+icon: "list"
+description: "Use Ragrails over HTTP."
 ---
 
-The REST API server is best for language-agnostic applications and hosted integrations.
-
 ```bash
+pip install "ragrails[server-qdrant]"
 ragrails-api
 ```
 
-The API listens on `http://127.0.0.1:8000` by default.
+The server starts on `http://127.0.0.1:8000`.
 
-```bash
-ragrails-api --host 0.0.0.0 --port 8080
-```
+- **Swagger UI** - `http://127.0.0.1:8000/docs`
+- **OpenAPI schema** - `http://127.0.0.1:8000/v1/openapi.json`
 
-Swagger UI and OpenAPI are available at:
+## Endpoints
 
-```text
-http://127.0.0.1:8000/docs
-http://127.0.0.1:8000/v1/openapi.json
-```
-
-Use Swagger UI at `/docs` to inspect request schemas, try endpoints from the
-browser, and copy generated curl examples.
-
-| Stage | Endpoint | Details |
+| Method | Endpoint | Description |
 | --- | --- | --- |
-| Health | `GET /v1/health` | This page |
-| Ingestion | `POST /v1/ingest/api`, `/v1/ingest/url`, `/v1/ingest/docs` | [Ingestion](/usage/server/ingestion) |
-| Chunking | `POST /v1/chunk` | [Chunking](/usage/server/chunking) |
-| Embedding | `POST /v1/embed` | [Embedding](/usage/server/embedding) |
-| Storing | `POST /v1/store` | [Storing](/usage/server/storing) |
-| Retrieval | `POST /v1/retrieve` | [Retrieval](/usage/server/retrieval) |
+| GET | `/v1/health` | Health check |
+| POST | `/v1/ingest/url` | Scrape URLs |
+| POST | `/v1/ingest/docs` | Parse documents |
+| POST | `/v1/ingest/api` | Fetch REST APIs |
+| POST | `/v1/chunk` | Chunk documents |
+| POST | `/v1/embed` | Embed chunks |
+| POST | `/v1/store` | Store embedded chunks |
+| POST | `/v1/edit` | Edit stored chunks |
+| POST | `/v1/delete` | Delete stored chunks |
+| POST | `/v1/retrieve` | Retrieve chunks |
+| POST | `/v1/pipelines/ingest` | Full ingest pipeline |
+| POST | `/v1/pipelines/query` | Query pipeline |
+| POST | `/v1/chat` | RAG chat turn |
+
+All request and response bodies are JSON. See the Swagger UI for full request schemas.
+
+## Server extras
+
+| Stack | Install |
+| --- | --- |
+| Qdrant | `pip install "ragrails[server-qdrant]"` |
+| Pinecone | `pip install "ragrails[server-pinecone]"` |
+| Weaviate | `pip install "ragrails[server-weaviate]"` |

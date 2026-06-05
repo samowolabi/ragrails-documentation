@@ -1,20 +1,54 @@
 ---
 title: "Release"
+icon: "package"
 description: "Build and publish Ragrails."
 ---
 
-Before releasing, update `CHANGELOG.md` under `Unreleased`, run tests, then build.
+## 1. Update the changelog
+
+Move entries from `[Unreleased]` under a new version heading in `CHANGELOG.md`, and bump `version` in `pyproject.toml`.
+
+## 2. Run tests
 
 ```bash
-scripts/test.sh
-scripts/build.sh
+scripts/test-core.sh
+scripts/test-sdk.sh
+scripts/test-cli.sh
+scripts/test-rest.sh
 ```
 
-Publishing uses:
+## 3. Build
 
 ```bash
-scripts/publish.sh
+uv build
 ```
 
-`scripts/build.sh` and `scripts/publish.sh` run `scripts/test.sh` before build or publish.
+This produces a wheel and sdist in `dist/`.
 
+## 4. Validate
+
+```bash
+uvx twine check dist/*
+```
+
+## 5. Publish
+
+```bash
+# Test PyPI first
+uvx twine upload --repository testpypi dist/*
+
+# Then PyPI
+uv publish
+```
+
+## Installing from Test PyPI
+
+Test PyPI does not host all dependencies, so resolve dependencies from real PyPI:
+
+```bash
+uv pip install \
+  --index-url https://test.pypi.org/simple/ \
+  --extra-index-url https://pypi.org/simple/ \
+  --index-strategy unsafe-best-match \
+  "ragrails[voyage]==<version>"
+```

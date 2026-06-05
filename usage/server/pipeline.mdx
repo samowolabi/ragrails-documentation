@@ -1,0 +1,86 @@
+---
+title: "REST Pipeline"
+icon: "workflow"
+description: "Run the full ingest and query pipeline over HTTP."
+---
+
+## POST /v1/pipelines/ingest
+
+Run ingestion → chunking → embedding → storage in one request.
+
+```json
+{
+  "markdown": "# Guide\n\nRagrails builds modular RAG pipelines.",
+  "embedding": {
+    "provider": "voyage",
+    "model": "voyage-3"
+  },
+  "storage": {
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333"
+  }
+}
+```
+
+With a document folder:
+
+<CodeGroup>
+```json Request
+{
+  "docs": {"folder": "files/docs/"},
+  "chunking": {"chunk_size": 1000, "chunk_overlap": 100},
+  "embedding": {"provider": "voyage", "model": "voyage-3"},
+  "storage": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"}
+}
+```
+
+```json Response
+{
+  "sources": 3,
+  "chunks": 24,
+  "embedded": 24,
+  "stored": 24,
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+---
+
+## POST /v1/pipelines/query
+
+Run query embedding → retrieval.
+
+```json
+{
+  "query": "What does the guide cover?",
+  "embedding": {
+    "provider": "voyage",
+    "model": "voyage-3"
+  },
+  "retrieval": {
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "top_k": 5
+  }
+}
+```
+
+With reranking:
+
+```json
+{
+  "query": "What does the guide cover?",
+  "embedding": {"provider": "voyage", "model": "voyage-3"},
+  "retrieval": {
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "top_k": 20,
+    "rerank": {"enabled": true, "provider": "voyage", "top_k": 5}
+  }
+}
+```

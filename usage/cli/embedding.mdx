@@ -1,28 +1,39 @@
 ---
 title: "CLI Embedding"
-description: "Embed chunk files from the terminal."
+icon: "binary"
+description: "Embed chunk JSON files from the terminal."
 ---
 
-```bash
-pip install "ragrails[voyage,qdrant]"
-```
+`embed` reads chunk JSON files from `--input-dir` and writes an `embedded.json` file to `--output-dir`. Embedding is separate from storage. Pass embedded output to `store` in the next step.
 
 ```bash
+pip install "ragrails[voyage]"
+```
+
+<CodeGroup>
+```bash Command
 ragrails embed \
-  --input-dir files/output/chunks \
-  --vector-db qdrant \
-  --collection rag_chunks \
-  --url http://localhost:6333 \
-  --batch-size 64 \
-  --embedder voyage \
-  --model voyage-3
+  --input-dir files/chunks/ \
+  --output-dir files/embedded/ \
+  --provider voyage \
+  --model voyage-3 \
+  --batch-size 64
 ```
 
-Embed selected files:
-
-```bash
-ragrails embed --input-dir files/output/chunks --files guide.json --vector-db qdrant --collection rag_chunks
+```text Output
+Inputs   : 87
+Embedded : 87
+Failed   : 0
+Saved to : files/embedded/embedded.json
 ```
+</CodeGroup>
 
-Use `--vector-db pinecone` or `--vector-db weaviate` with the matching provider extra and credentials.
+## Options
 
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input-dir` | required | Folder containing chunk JSON files |
+| `--output-dir` | required | Folder to write `embedded.json` to |
+| `--provider` | `voyage` | Embedding provider |
+| `--model` | `voyage-3` | Embedding model name |
+| `--batch-size` | `64` | Chunks per embedding request |

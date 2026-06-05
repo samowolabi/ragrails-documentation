@@ -1,48 +1,68 @@
 ---
 title: "SDK Embedding"
-description: "Generate vectors for chunk files and write them to a vector store."
+icon: "binary"
+description: "Generate vector representations for chunks."
 ---
 
-Embedding reads chunk JSON files and uses an embedding provider before writing vectors to a vector database.
+Create an embedder object with `embedder()`, then pass it to `embed()`.
 
 ```bash
-pip install "ragrails[voyage,qdrant]"
+pip install "ragrails[voyage]"
 ```
 
-```python
+<CodeGroup>
+```python Request
 from ragrails import RagRails
 
-result = RagRails().embed(
-    input_dir="files/output/chunks",
-    vector_db="qdrant",
-    collection="rag_chunks",
-    url="http://localhost:6333",
-    files=None,
+rag = RagRails()
+
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="document")
+
+result = rag.embed(
+    chunks=chunk_result.items,  # list of chunk dicts from rag.chunk()
+    embedder=embedder,
     batch_size=64,
-    embedder="voyage",
-    model="voyage-3",
 )
+
+result.inputs    # chunks passed in
+result.embedded  # chunks successfully embedded
+result.items     # chunk dicts with an added "embedding" vector field
+result.failed    # failed chunks
+result.errors    # list of error dicts
 ```
 
-Use `files` to embed only selected chunk files:
-
-```python
-result = RagRails().embed(
-    input_dir="files/output/chunks",
-    files=["guide.json"],
-    vector_db="qdrant",
-    collection="rag_chunks",
-)
+```python Response
+result.embedded  # 64
+result.items[0]  # {
+                 #   "id": "guide-0",
+                 #   "text": "Ragrails builds modular RAG workflows...",
+                 #   "embedding": [0.0132, -0.0719, 0.0241, ...],  # 1024 floats
+                 #   "metadata": {"title": "Guide", "chunk_index": 0},
+                 # }
 ```
+</CodeGroup>
 
-| Parameter | Purpose |
-| --- | --- |
-| `input_dir` | Directory containing chunk JSON files. |
-| `vector_db` | `qdrant`, `pinecone`, or `weaviate`. |
-| `collection` | Collection, index, or class name. |
-| `url` | Optional vector database URL. |
-| `files` | Optional list of chunk files to embed. |
-| `batch_size` | Chunks per provider/storage batch. |
-| `embedder` | Embedding provider. |
-| `model` | Embedding model name. |
+## `embedder()` parameters
 
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `provider` | `"voyage"` | Embedding provider (`"voyage"`) |
+| `model` | `"voyage-3"` | Model name |
+| `input_type` | `"document"` | `"document"` for indexing, `"query"` for retrieval |
+| `options` | `None` | Provider-specific options dict |
+
+## `embed()` parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `chunks` | required | List of chunk dicts; each must have `id` and `text` |
+| `embedder` | required | Embedder object from `rag.embedder()` |
+| `batch_size` | `64` | Chunks per embedding API request |
+
+## Supported providers
+
+| Provider | Extra | Models |
+| --- | --- | --- |
+| Voyage | `ragrails[voyage]` | `voyage-3` (default), `voyage-3-lite`, `voyage-3-large` |
+
+<Note>Bring your own provider with `register_embedder()`. See [extending providers](/reference/sdk#extending-providers).</Note>

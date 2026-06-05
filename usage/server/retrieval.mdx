@@ -1,24 +1,58 @@
 ---
-title: "REST API Retrieval"
-description: "Retrieve stored chunks over HTTP."
+title: "REST Retrieval"
+icon: "search"
+description: "Retrieve chunks over HTTP."
 ---
 
-```bash
-curl -X POST http://127.0.0.1:8000/v1/retrieve \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "How do I configure Ragrails?",
-    "vector_db": "qdrant",
-    "collection": "rag_chunks",
-    "top_k": 10,
-    "embedder": "voyage",
-    "model": "voyage-3",
-    "rerank": true,
-    "reranker": "voyage",
-    "reranker_model": "rerank-2-lite",
-    "rerank_top_k": 5
-  }'
+## POST /v1/retrieve
+
+```json
+{
+  "query": "How do I authenticate?",
+  "provider": "voyage",
+  "model": "voyage-3",
+  "vector_db": "qdrant",
+  "collection": "docs",
+  "url": "http://localhost:6333",
+  "top_k": 10
+}
 ```
 
-The response includes the query, provider metadata, and ranked result chunks.
+With reranking:
 
+<CodeGroup>
+```json Request
+{
+  "query": "How do I authenticate?",
+  "provider": "voyage",
+  "model": "voyage-3",
+  "vector_db": "qdrant",
+  "collection": "docs",
+  "url": "http://localhost:6333",
+  "top_k": 20,
+  "use_rerank": true,
+  "reranker_provider": "voyage",
+  "reranker_model": "rerank-2-lite",
+  "rerank_top_k": 5
+}
+```
+
+```json Response
+{
+  "query": "How do I authenticate?",
+  "search_query": "How do I authenticate?",
+  "retrieved": 5,
+  "items": [
+    {
+      "id": "chunk-id",
+      "score": 0.87,
+      "text": "...",
+      "metadata": {"title": "Auth Guide"},
+      "rerank_score": null
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>

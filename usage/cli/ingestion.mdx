@@ -1,42 +1,100 @@
 ---
 title: "CLI Ingestion"
+icon: "file-input"
 description: "Ingest URLs, documents, and APIs from the terminal."
 ---
 
-## URL setup and scraping
+## URL ingestion
 
 ```bash
 pip install "ragrails[url]"
-ragrails setup-url --browser chromium
-ragrails scrape https://example.com --mode full --output-dir files/output/web_crawled
+ragrails setup-url
 ```
 
-## Documents
+<CodeGroup>
+```bash Command
+# Scrape exact URLs
+ragrails scrape https://example.com/docs https://example.com/blog
 
-```bash
-ragrails parse --folder files/input --output-dir files/output/docs
+# Full site crawl, save output as JSON files
+ragrails scrape https://example.com --mode full --max-depth 2 --max-pages 50 --output-dir files/output/web/
+
+# With frontmatter
+ragrails scrape https://example.com/docs --frontmatter --output-dir files/output/web/
 ```
 
-Parse specific files:
+```text Output
+Pages scraped : 1
+Pages failed  : 0
+Output dir    : files/output/web/
+```
+</CodeGroup>
 
-```bash
-ragrails parse --files guide.pdf --files pricing.csv --input-dir files/input --output-dir files/output/docs
+| Option | Default | Description |
+| --- | --- | --- |
+| `URL` | required | One or more URLs (positional, repeatable) |
+| `--mode` | `each` | `each` or `full` |
+| `--max-depth` | `3` | Crawl depth for `mode=full` |
+| `--max-pages` | `200` | Max pages per URL |
+| `--frontmatter` | off | Prepend YAML frontmatter |
+| `--output-dir` | `None` | Save output as JSON files to this directory |
+
+---
+
+## Document ingestion
+
+<CodeGroup>
+```bash Command
+# Parse a folder
+ragrails parse --folder files/docs/ --output-dir files/output/docs/
+
+# Parse specific files
+ragrails parse --files files/guide.pdf --files files/pricing.csv --output-dir files/output/docs/
 ```
 
-## REST APIs
+```text Output
+Documents parsed : 2
+Documents failed : 0
+Output dir       : files/output/docs/
+```
+</CodeGroup>
 
-```bash
-ragrails fetch https://api.example.com/v1/products \
-  --title Products \
+| Option | Description |
+| --- | --- |
+| `--folder` | Directory to parse |
+| `--files` | File path (repeatable) |
+| `--frontmatter` | Prepend YAML frontmatter |
+| `--output-dir` | Save output as JSON files |
+
+---
+
+## API ingestion
+
+<CodeGroup>
+```bash Command
+ragrails fetch https://api.example.com/posts \
+  --title "Blog posts" \
   --header "Authorization:Bearer TOKEN" \
   --param limit:100 \
-  --output-dir files/output/api
+  --max-pages 10 \
+  --output-dir files/output/api/
 ```
 
-| Command | Purpose |
-| --- | --- |
-| `ragrails setup-url` | Install browser support for URL ingestion. |
-| `ragrails scrape` | Scrape one or more URLs into markdown. |
-| `ragrails parse` | Parse local documents into markdown. |
-| `ragrails fetch` | Fetch an API response into markdown. |
+```text Output
+Documents fetched : 1
+Documents failed  : 0
+Output dir        : files/output/api/
+```
+</CodeGroup>
 
+| Option | Default | Description |
+| --- | --- | --- |
+| `URL` | required | API endpoint (positional) |
+| `--title` | `"API Response"` | Document title |
+| `--description` | `""` | Description metadata |
+| `--method` | `GET` | HTTP method |
+| `--header` | none | `KEY:VALUE` (repeatable) |
+| `--param` | none | `KEY:VALUE` (repeatable) |
+| `--max-pages` | `100` | Max paginated requests |
+| `--frontmatter` | off | Prepend YAML frontmatter |
+| `--output-dir` | `None` | Save output as JSON files |

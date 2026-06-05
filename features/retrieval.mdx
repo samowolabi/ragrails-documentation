@@ -1,88 +1,72 @@
 ---
 title: "Retrieval"
-description: "Search stored chunks and optionally rerank results."
+icon: "search"
+description: "Find the chunks relevant to a query."
 ---
 
-Retrieval embeds a query, searches the configured vector database, and can rerank candidate chunks.
+Retrieval embeds the query, searches the vector store, and returns the closest chunks.
 
-## Capabilities
+```python
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
 
-- Embed a query with the configured embedding provider.
-- Search Qdrant, Pinecone, or Weaviate collections.
-- Control candidate count with `top_k`.
-- Return chunk text, score, ID, source metadata, and optional rerank score.
-- Rerank vector-search candidates with a reranker provider and model.
-- Use the same retrieval behavior through SDK, CLI, REST API, or MCP.
+result = rag.retrieve(
+    "How do I authenticate?",
+    embedder=embedder,
+    vector_db="qdrant",
+    collection="docs",
+    url="http://localhost:6333",
+    top_k=10,
+)
+for chunk in result.items:
+    print(chunk.score, chunk.text)
+```
 
-<Tabs>
-  <Tab title="SDK">
-    ```python
-    from ragrails import RagRails
+## Tune it by symptom
 
-    results = RagRails().retrieve(
-        query="How do I configure Ragrails?",
-        vector_db="qdrant",
-        collection="rag_chunks",
-        top_k=10,
-        embedder="voyage",
-        model="voyage-3",
-        rerank=True,
-        reranker="voyage",
-        reranker_model="rerank-2-lite",
-        rerank_top_k=5,
-    )
-    ```
+| Symptom | Fix |
+| --- | --- |
+| Not enough / too many results | Adjust `top_k` |
+| Right topic, wrong ranking | Turn on **reranking** |
+| Conversational follow-ups miss | Turn on **query rewriting** |
 
-    Deep dive: [SDK retrieval](/usage/sdk/retrieval).
-  </Tab>
+### Reranking
 
-  <Tab title="CLI">
-    ```bash
-    ragrails retrieve "How do I configure Ragrails?" \
-      --vector-db qdrant \
-      --collection rag_chunks \
-      --top-k 10 \
-      --rerank \
-      --reranker voyage \
-      --reranker-model rerank-2-lite \
-      --rerank-top-k 5
-    ```
+<Note>**Why:** vector search is fast but rough. A reranker re-reads the top candidates and reorders them by true relevance. Use it when precision matters more than speed.</Note>
 
-    Deep dive: [CLI retrieval](/usage/cli/retrieval).
-  </Tab>
+```python
+reranker = rag.reranker(provider="voyage", model="rerank-2-lite")
 
-  <Tab title="REST API">
-    ```bash
-    curl -X POST http://127.0.0.1:8000/v1/retrieve \
-      -H "Content-Type: application/json" \
-      -d '{
-        "query": "How do I configure Ragrails?",
-        "vector_db": "qdrant",
-        "collection": "rag_chunks",
-        "top_k": 10,
-        "rerank": true,
-        "reranker": "voyage",
-        "reranker_model": "rerank-2-lite",
-        "rerank_top_k": 5
-      }'
-    ```
+result = rag.retrieve(
+    "How do I authenticate?",
+    embedder=embedder,
+    vector_db="qdrant", collection="docs", url="http://localhost:6333",
+    top_k=20,                 # retrieve wide
+    use_rerank=True,
+    reranker=reranker,
+    rerank_top_k=5,           # keep the best few
+)
+```
 
-    Deep dive: [REST API retrieval](/usage/server/retrieval).
-  </Tab>
+<Tip>Retrieve wide (`top_k=20`), rerank down (`rerank_top_k=5`). The reranker needs candidates to choose from.</Tip>
 
-  <Tab title="MCP">
-    Ask your MCP client to use:
+### Query rewriting
 
-    ```text
-    ragrails_retrieve
-    ```
+<Note>**Why:** follow-ups like *"what about the second one?"* mean nothing to a search engine alone. Query rewriting uses context to expand them into standalone questions.</Note>
 
-    Example prompt:
+```python
+rewrite_llm = rag.llm(provider="openai", model="gpt-4o-mini")
 
-    ```text
-    Use ragrails_retrieve for "How do I configure Ragrails?" against qdrant collection rag_chunks with top_k 10 and reranking enabled.
-    ```
+result = rag.retrieve(
+    "What about the second step?",
+    embedder=embedder,
+    vector_db="qdrant", collection="docs", url="http://localhost:6333",
+    use_query_rewrite=True,
+    rewrite_llm=rewrite_llm,
+    session_context="User is asking about the onboarding flow.",
+)
+result.search_query  # the rewritten query actually searched
+```
 
-    Deep dive: [MCP retrieval](/usage/mcp/retrieval).
-  </Tab>
-</Tabs>
+## Reference
+
+Full parameters: [SDK retrieval](/usage/sdk/retrieval) · [CLI](/usage/cli/retrieval) · [REST](/usage/server/retrieval).

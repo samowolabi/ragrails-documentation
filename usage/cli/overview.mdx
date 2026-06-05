@@ -1,20 +1,48 @@
 ---
 title: "CLI Overview"
-description: "Run Ragrails stages from the terminal."
+icon: "list"
+description: "Run Ragrails from the terminal."
 ---
 
-The CLI is best for terminal workflows, local automation, and CI jobs.
-
 ```bash
-pip install ragrails
 ragrails --help
 ```
 
-| Stage | Commands | Details |
-| --- | --- | --- |
-| Ingestion | `setup-url`, `scrape`, `parse`, `fetch` | [Ingestion](/usage/cli/ingestion) |
-| Chunking | `chunk`, `chunk-file` | [Chunking](/usage/cli/chunking) |
-| Embedding | `embed` | [Embedding](/usage/cli/embedding) |
-| Storing | `store` | [Storing](/usage/cli/storing) |
-| Retrieval | `retrieve` | [Retrieval](/usage/cli/retrieval) |
+The CLI is a thin layer over the SDK. All commands call `RagRails()` internally.
 
+## Commands
+
+| Command | Stage | Description |
+| --- | --- | --- |
+| `setup-url` | Ingestion | Install Playwright browser for URL ingestion |
+| `scrape` | Ingestion | Scrape URLs into JSON files |
+| `parse` | Ingestion | Parse local documents into JSON files |
+| `fetch` | Ingestion | Fetch REST API responses into JSON files |
+| `chunk` | Chunking | Chunk ingestion output JSON files |
+| `embed` | Embedding | Embed chunk JSON files and write to an output dir |
+| `store` | Storing | Store embedded chunk JSON files in a vector DB |
+| `edit` | Storing | Re-embed and replace stored chunks by ID |
+| `delete` | Storing | Delete stored chunks by ID |
+| `retrieve` | Retrieval | Retrieve chunks relevant to a query |
+| `ingest` | Pipeline | Run ingestion → chunk → embed → store in one command |
+| `query` | Pipeline | Run query embedding → retrieval in one command |
+| `chat` | Chat | Run a RAG chat turn, or start the interactive chat REPL |
+
+## Stage-based workflow
+
+Stage commands pass data through JSON files, giving you full control over each step.
+
+```bash
+ragrails scrape https://example.com/docs --output-dir files/output/web/
+ragrails chunk --input-dir files/output/web/ --output-dir files/chunks/
+ragrails embed --input-dir files/chunks/ --output-dir files/embedded/ --provider voyage --model voyage-3
+ragrails store --input-dir files/embedded/ --vector-db qdrant --collection docs --url http://localhost:6333
+ragrails retrieve "How do I authenticate?" --vector-db qdrant --collection docs --url http://localhost:6333 --provider voyage --model voyage-3
+```
+
+## One-command pipeline
+
+```bash
+ragrails ingest --docs files/guide.pdf --vector-db qdrant --collection docs --url http://localhost:6333 --provider voyage --model voyage-3
+ragrails query "What does the guide cover?" --vector-db qdrant --collection docs --url http://localhost:6333 --provider voyage --model voyage-3
+```

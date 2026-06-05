@@ -1,86 +1,38 @@
 ---
 title: "Storing"
-description: "Store chunks in a vector database."
+icon: "database"
+description: "Save vectors to a database."
 ---
 
-Storing is the explicit vector database write stage. It uses the same provider arguments as embedding.
+Storing upserts embedded chunks into a vector database. The collection is created automatically if it doesn't exist.
 
-## Capabilities
+```python
+rag.store(
+    embedded_chunks=embed_result.items,
+    vector_db="qdrant",
+    collection="docs",
+    url="http://localhost:6333",
+)
+```
 
-- Use a storage-oriented `store` method, command, endpoint, or MCP tool.
-- Embed chunk files and write vectors to a vector database in one stage.
-- Store in Qdrant, Pinecone, or Weaviate.
-- Validate provider-specific collection/index/class naming rules.
-- Process selected chunk JSON files or every JSON file in a chunk directory.
+## Databases
 
-## Relationship to embedding
+| Database | Extra | Notes |
+| --- | --- | --- |
+| Qdrant | `ragrails[qdrant]` | Local or cloud. Needs `url`. |
+| Pinecone | `ragrails[pinecone]` | Cloud. Uses `PINECONE_API_KEY`. |
+| Weaviate | `ragrails[weaviate]` | Local or cloud. Needs `url`. |
 
-`store` uses the same underlying embedding-and-upsert path as `embed`. Use
-`store` when you want the pipeline to read clearly as ingestion -> chunking ->
-storing -> retrieval.
+## Keeping an index current
 
-<Tabs>
-  <Tab title="SDK">
-    ```python
-    from ragrails import RagRails
+| Task | Method |
+| --- | --- |
+| Add new chunks | `store()` |
+| Replace chunks (re-embeds by ID) | `edit()` |
+| Remove chunks by ID | `delete()` |
 
-    stored = RagRails().store(
-        input_dir="files/output/chunks",
-        vector_db="qdrant",
-        collection="rag_chunks",
-        batch_size=64,
-        embedder="voyage",
-        model="voyage-3",
-    )
-    ```
+<Tip>Give chunks stable IDs at chunk time so `edit()` and `delete()` can target them later.</Tip>
 
-    Deep dive: [SDK storing](/usage/sdk/storing).
-  </Tab>
+## Reference
 
-  <Tab title="CLI">
-    ```bash
-    ragrails store \
-      --input-dir files/output/chunks \
-      --vector-db qdrant \
-      --collection rag_chunks \
-      --batch-size 64 \
-      --embedder voyage \
-      --model voyage-3
-    ```
-
-    Deep dive: [CLI storing](/usage/cli/storing).
-  </Tab>
-
-  <Tab title="REST API">
-    ```bash
-    curl -X POST http://127.0.0.1:8000/v1/store \
-      -H "Content-Type: application/json" \
-      -d '{
-        "input_dir": "files/output/chunks",
-        "vector_db": "qdrant",
-        "collection": "rag_chunks",
-        "batch_size": 64,
-        "embedder": "voyage",
-        "model": "voyage-3"
-      }'
-    ```
-
-    Deep dive: [REST API storing](/usage/server/storing).
-  </Tab>
-
-  <Tab title="MCP">
-    Ask your MCP client to use:
-
-    ```text
-    ragrails_store_chunks
-    ```
-
-    Example prompt:
-
-    ```text
-    Use ragrails_store_chunks with input_dir files/output/chunks, vector_db qdrant, collection rag_chunks, batch_size 64, embedder voyage, and model voyage-3.
-    ```
-
-    Deep dive: [MCP storing](/usage/mcp/storing).
-  </Tab>
-</Tabs>
+Full parameters: [SDK storing](/usage/sdk/storing) · [CLI](/usage/cli/storing) · [REST](/usage/server/storing).

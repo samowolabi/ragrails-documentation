@@ -1,82 +1,83 @@
 ---
 title: "Quickstart"
-description: "Run your first Ragrails pipeline."
+icon: "zap"
+description: "Build a knowledge base and chat over it in a few minutes."
 ---
 
-This example parses local documents, chunks them, embeds them, stores them in Qdrant, and retrieves results.
+This example builds a small support knowledge base, then chats over it. Run it as-is, then swap in your own content.
+
+## 1. Install
 
 ```bash
-pip install "ragrails[voyage,qdrant]"
+pip install "ragrails[voyage,openai,qdrant]"
 ```
 
-Start Qdrant locally before storing vectors:
+## 2. Set your keys and start Qdrant
 
 ```bash
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-```python
-from ragrails import RagRails
-
-rag = RagRails()
-
-parsed = rag.parse(
-    folder="files/input",
-    output_dir="files/output/docs",
-)
-
-chunks = rag.chunk(
-    input_dir=parsed.output_dir,
-    output_dir="files/output/chunks/docs",
-)
-
-stored = rag.store(
-    input_dir=chunks.output_dir,
-    vector_db="qdrant",
-    collection="rag_chunks",
-    url="http://localhost:6333",
-)
-
-results = rag.retrieve(
-    query="What does the documentation say about pricing?",
-    vector_db="qdrant",
-    collection="rag_chunks",
-    url="http://localhost:6333",
-    top_k=5,
-)
-
-print(results.results)
-```
-
-For URL ingestion, install `ragrails[url]` and run browser setup once:
+## 3. Build the knowledge base
 
 ```python
 from ragrails import RagRails
 
 rag = RagRails()
-rag.setup_url()
+
+rag.ingest(
+    markdown=(
+        "# Refund policy\n\n"
+        "Customers can request a refund within 30 days of purchase. "
+        "Refunds are returned to the original payment method within 5 business days."
+    ),
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"},
+)
 ```
 
-Then use `rag.scrape(...)` before chunking.
+`ingest()` chunks, embeds, and stores the content in one call. Swap `markdown=` for `docs=`, `urls=`, or `api=` to load real files, websites, or APIs.
 
-For the same workflow through CLI, REST API, or MCP, use the tabs on the stage pages:
+## 4. Chat over it
 
-- [Ingestion](/features/ingestion)
-- [Chunking](/features/chunking)
-- [Storing](/features/storing)
-- [Retrieval](/features/retrieval)
+```python
+llm = rag.llm(provider="openai", model="gpt-4o-mini")
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
 
-## Notebook examples
+result = rag.chat(
+    "How long do I have to request a refund?",
+    llm=llm,
+    embedder=embedder,
+    vector_db="qdrant",
+    collection="support",
+    url="http://localhost:6333",
+    history=[],
+)
 
-The repository includes Jupyter notebooks for each pipeline stage:
+print(result.answer)
+# "You can request a refund within 30 days of purchase."
+```
 
-| Notebook | Stage |
-| --- | --- |
-| `notebooks/01_ingestion.ipynb` | Ingestion |
-| `notebooks/02_chunking.ipynb` | Chunking |
-| `notebooks/03_embedding.ipynb` | Embedding |
-| `notebooks/03_store.ipynb` | Storing |
-| `notebooks/04_retrieval.ipynb` | Retrieval |
+<Tip>Chat is stateless. Save `result.history` and pass it to the next turn to keep context.</Tip>
 
-Use the notebooks when you want to inspect intermediate files and results while
-learning the pipeline.
+## Run it from the CLI
+
+```bash
+ragrails ingest \
+  --markdown "# Refund policy. Customers can request a refund within 30 days of purchase." \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails chat "How long do I have to request a refund?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="How RAG works" icon="book" href="/getting-started/concepts">Understand the pipeline.</Card>
+  <Card title="Tune retrieval and chat" icon="sliders-horizontal" href="/features/overview">Reranking, rewriting, and more.</Card>
+</CardGroup>

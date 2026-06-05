@@ -1,36 +1,66 @@
 ---
 title: "Configuration"
-description: "Configure providers, paths, and local runtime behavior."
+icon: "settings"
+description: "Environment variables and provider setup."
 ---
 
-Ragrails favors explicit arguments. Most examples use local `files/input` and `files/output` folders, but every stage accepts path options.
+Ragrails reads credentials from environment variables. Use a `.env` file at the project root or export them in your shell.
 
-## Common environment variables
+## Embedding providers
 
-Set provider credentials in your shell or `.env` file as needed:
+| Provider | Variable |
+| --- | --- |
+| Voyage | `VOYAGE_API_KEY` |
 
-```bash
-VOYAGE_API_KEY=...
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=...
-PINECONE_API_KEY=...
-WEAVIATE_URL=...
-WEAVIATE_API_KEY=...
-OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
+## LLM providers
+
+| Provider | Variable | Models |
+| --- | --- | --- |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo`, `o1-mini`, `o1` |
+| Anthropic | `ANTHROPIC_API_KEY` | `claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, `claude-opus-4-7` |
+
+## Reranker providers
+
+| Provider | Variable |
+| --- | --- |
+| Voyage | `VOYAGE_API_KEY` |
+| BM25 (local) | none, runs offline |
+
+## Vector databases
+
+| Provider | Variables |
+| --- | --- |
+| Qdrant (local) | `QDRANT_URL` (default: `http://localhost:6333`) |
+| Qdrant (cloud) | `QDRANT_URL`, `QDRANT_API_KEY` |
+| Pinecone | `PINECONE_API_KEY` |
+| Weaviate | `WEAVIATE_URL`, `WEAVIATE_API_KEY` |
+
+## Loading a .env file
+
+```python
+from dotenv import load_dotenv
+load_dotenv()
+
+from ragrails import RagRails
+rag = RagRails()
 ```
 
-## Common paths
+## URL ingestion
 
-| Path | Purpose |
-| --- | --- |
-| `files/input` | Local source documents. |
-| `files/output/web_crawled` | URL ingestion markdown output. |
-| `files/output/docs` | Document ingestion markdown output. |
-| `files/output/api` | API ingestion markdown output. |
-| `files/output/chunks` | Chunk JSON output. |
+URL ingestion uses Playwright via `crawl4ai`. Install the extra and run browser setup once per environment:
 
-## Provider defaults
+```bash
+pip install "ragrails[url]"
+```
 
-Embedding and retrieval default to `embedder="voyage"` and `model="voyage-3"`. Vector database examples use Qdrant, but Pinecone and Weaviate are supported through the same stage arguments.
+```python
+RagRails().setup_url()              # installs chromium (default)
+RagRails().setup_url(browser="firefox")
+```
 
+Or from the CLI:
+
+```bash
+ragrails setup-url
+ragrails setup-url --browser firefox
+```

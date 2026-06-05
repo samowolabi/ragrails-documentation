@@ -1,34 +1,113 @@
 ---
 title: "SDK Retrieval"
-description: "Search stored chunks from Python."
+icon: "search"
+description: "Retrieve relevant chunks for a query."
 ---
 
-Retrieval embeds the query, searches the vector database, and can optionally rerank the candidate chunks.
+Create an embedder with `input_type="query"`, then call `retrieve()`.
 
-```python
+<CodeGroup>
+```python Request
 from ragrails import RagRails
 
-result = RagRails().retrieve(
-    query="How do I configure the API client?",
+rag = RagRails()
+
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+
+result = rag.retrieve(
+    "How do I authenticate?",
+    embedder=embedder,
     vector_db="qdrant",
-    collection="rag_chunks",
+    collection="docs",
+    url="http://localhost:6333",
     top_k=10,
-    embedder="voyage",
-    model="voyage-3",
-    rerank=True,
-    reranker="voyage",
-    reranker_model="rerank-2-lite",
+)
+
+result.query       # original query
+result.retrieved   # number of results
+result.items       # list of RetrievedChunk objects
+result.errors      # list of error dicts
+
+for chunk in result.items:
+    print(chunk.score, chunk.text)
+```
+
+```python Response
+result.retrieved  # 10
+result.items[0]   # RetrievedChunk(
+                  #   id="guide-3",
+                  #   score=0.87,
+                  #   text="To authenticate, create an API key in settings...",
+                  #   metadata={"title": "Authentication", "source": "files/guide.pdf"},
+                  #   rerank_score=None,
+                  # )
+```
+</CodeGroup>
+
+Each `RetrievedChunk` has: `id`, `score`, `text`, `metadata`, `rerank_score`.
+
+## With reranking
+
+```python
+reranker = rag.reranker(provider="voyage", model="rerank-2-lite")
+
+result = rag.retrieve(
+    "How do I authenticate?",
+    embedder=embedder,
+    vector_db="qdrant",
+    collection="docs",
+    url="http://localhost:6333",
+    top_k=20,
+    use_rerank=True,
+    reranker=reranker,
     rerank_top_k=5,
 )
 ```
 
-| Parameter | Purpose |
-| --- | --- |
-| `query` | User question or search text. |
-| `vector_db` | Vector database provider. |
-| `collection` | Collection, index, or class name. |
-| `url` | Optional vector database URL. |
-| `top_k` | Number of vector candidates. |
-| `rerank` | Whether to rerank candidates. |
-| `rerank_top_k` | Number of reranked results to return. |
+## With query rewriting
 
+```python
+rewrite_llm = rag.llm(provider="openai", model="gpt-4o-mini")
+
+result = rag.retrieve(
+    "What about the second step?",
+    embedder=embedder,
+    vector_db="qdrant",
+    collection="docs",
+    url="http://localhost:6333",
+    use_query_rewrite=True,
+    rewrite_llm=rewrite_llm,
+    session_context="User is asking about the onboarding flow.",
+)
+
+result.search_query  # rewritten query used for the vector search
+```
+
+## `reranker()` parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `provider` | `"voyage"` | `"voyage"` (API) or `"bm25"` (local, keyword-based) |
+| `model` | `"rerank-2-lite"` | Model name. Voyage: `rerank-2-lite`, `rerank-2`; BM25: `bm25` |
+| `options` | `None` | Provider-specific options dict |
+
+<Note>**`bm25`** is a local, keyword-based reranker that needs no API key or network call. It's free and fast, good for exact-term matching, but won't catch semantic matches the way Voyage does. Use Voyage when meaning matters; use BM25 for offline or cost-sensitive setups. Register others with `register_reranker()`.</Note>
+
+## `retrieve()` parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `query` | required | Search query string |
+| `embedder` | required | Embedder object from `rag.embedder()` with `input_type="query"` |
+| `vector_db` | `"qdrant"` | Vector DB provider |
+| `collection` | `None` | Collection name |
+| `url` | `None` | Vector DB URL |
+| `top_k` | `10` | Candidates to retrieve |
+| `use_query_rewrite` | `False` | Rewrite the query before searching |
+| `rewrite_llm` | `None` | LLM object from `rag.llm()` for rewriting |
+| `rewrite_context` | `""` | Context hint for the rewriter |
+| `session_context` | `""` | Broader session context for rewriting |
+| `use_rerank` | `False` | Rerank results after retrieval |
+| `reranker` | `None` | Reranker object from `rag.reranker()` |
+| `rerank_top_k` | `5` | Results to keep after reranking |
+| `options` | `None` | Provider-specific options dict |

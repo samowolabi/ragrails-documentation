@@ -1,32 +1,121 @@
 ---
 title: "SDK Storing"
-description: "Store chunks in a vector database."
+icon: "database"
+description: "Store, edit, and delete chunks in a vector database."
 ---
 
-`store` is the explicit storage stage. In the current implementation it uses the same embedding-and-storage path as `embed`, so it is useful when you want pipeline code to read as ingestion -> chunking -> storing.
+## Store (`store()`)
 
-```python
+Upsert embedded chunks into a vector database. The collection is created automatically if it does not exist.
+
+<CodeGroup>
+```python Request
 from ragrails import RagRails
 
-result = RagRails().store(
-    input_dir="files/output/chunks",
+rag = RagRails()
+
+result = rag.store(
+    embedded_chunks=embed_result.items,  # list of chunk dicts with "embedding" field
     vector_db="qdrant",
-    collection="rag_chunks",
+    collection="docs",
+    url="http://localhost:6333",
     batch_size=64,
-    embedder="voyage",
-    model="voyage-3",
 )
+
+result.inputs      # chunks passed in
+result.stored      # chunks upserted
+result.failed      # failed chunks
+result.provider    # vector DB provider
+result.collection  # collection name
+result.errors      # list of error dicts
 ```
 
-Install the matching vector-store extra:
+```python Response
+result.stored      # 12
+result.failed      # 0
+result.provider    # "qdrant"
+result.collection  # "docs"
+```
+</CodeGroup>
 
-```bash
-pip install "ragrails[store-qdrant]"
+### Parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `embedded_chunks` | required | Chunk dicts with `id`, `text`, `metadata`, and `embedding` |
+| `vector_db` | `"qdrant"` | `"qdrant"`, `"pinecone"`, or `"weaviate"` |
+| `collection` | `None` | Collection, index, or class name |
+| `url` | `None` | Vector DB URL (Qdrant / Weaviate) |
+| `batch_size` | `64` | Chunks per upsert request |
+| `ensure_collection` | `True` | Create collection if it does not exist |
+| `options` | `None` | Provider-specific options dict |
+
+---
+
+## Edit (`edit()`)
+
+Re-embed and replace stored chunks by ID. Pass the updated chunk dicts with the same IDs.
+
+<CodeGroup>
+```python Request
+edit_result = rag.edit(
+    chunks=[
+        {
+            "id": "chunk-id",
+            "text": "Updated chunk text.",
+            "source": "files/guide.pdf",
+            "metadata": {"title": "Guide"},
+        }
+    ],
+    embedder=rag.embedder(provider="voyage", model="voyage-3"),
+    vector_db="qdrant",
+    collection="docs",
+    url="http://localhost:6333",
+)
+
+edit_result.requested  # chunks submitted
+edit_result.edited     # chunks updated
+edit_result.failed     # failed chunks
 ```
 
-| Provider | Extra |
-| --- | --- |
-| Qdrant | `ragrails[store-qdrant]` |
-| Pinecone | `ragrails[store-pinecone]` |
-| Weaviate | `ragrails[store-weaviate]` |
+```python Response
+edit_result.requested  # 1
+edit_result.edited     # 1
+edit_result.failed     # 0
+```
+</CodeGroup>
 
+---
+
+## Delete (`delete()`)
+
+Delete chunks by ID.
+
+<CodeGroup>
+```python Request
+delete_result = rag.delete(
+    ids=["chunk-id-1", "chunk-id-2"],
+    vector_db="qdrant",
+    collection="docs",
+    url="http://localhost:6333",
+)
+
+delete_result.requested  # IDs submitted
+delete_result.deleted    # IDs deleted
+delete_result.failed     # failed IDs
+```
+
+```python Response
+delete_result.requested  # 2
+delete_result.deleted    # 2
+delete_result.failed     # 0
+```
+</CodeGroup>
+
+## Supported databases
+
+| Database | Extra | Notes |
+| --- | --- | --- |
+| Qdrant | `ragrails[qdrant]` | Local or cloud. Requires `url` |
+| Pinecone | `ragrails[pinecone]` | Cloud. Uses `PINECONE_API_KEY` |
+| Weaviate | `ragrails[weaviate]` | Local or cloud. Requires `url` |

@@ -1,0 +1,44 @@
+---
+title: "Custom Providers"
+icon: "puzzle"
+description: "Plug in your own embedding and reranking providers."
+---
+
+Ragrails ships with Voyage embeddings and Voyage/BM25 reranking. Register your own to use a provider it doesn't bundle.
+
+## Register an embedder
+
+```python
+from ragrails.models.embedder.registry import register_embedder
+
+register_embedder(
+    "my-provider",
+    my_embedder_factory,          # callable returning an embedder instance
+    default_model="my-model",
+    models=("my-model", "my-model-large"),
+)
+```
+
+## Register a reranker
+
+```python
+from ragrails.models.reranker.registry import register_reranker
+
+register_reranker(
+    "my-reranker",
+    my_reranker_factory,
+    default_model="my-model",
+    models=("my-model",),
+)
+```
+
+Once registered, use them anywhere a provider name is accepted:
+
+```python
+embedder = rag.embedder(provider="my-provider", model="my-model")
+reranker = rag.reranker(provider="my-reranker", model="my-model")
+```
+
+<Note>Register providers once at startup, before you create embedders or rerankers.</Note>
+
+Reference: [Built-in providers](/reference/sdk#built-in-providers).

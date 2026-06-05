@@ -1,57 +1,67 @@
 ---
-title: "Ragrails"
-description: "A developer toolkit for turning websites, documents, and APIs into retrieval-ready knowledge bases."
+title: "Overview"
+icon: "house"
+description: "Build AI agents, RAG chatbots, and AI search on a knowledge base from your own data."
 ---
 
-Ragrails is an end-to-end RAG preparation toolkit. It ingests source content,
-converts it to markdown, chunks it with structure-aware metadata, embeds and
-stores the chunks, then retrieves relevant context for applications and agents.
+Ragrails builds the knowledge base for you. It scrapes websites, extracts content from documents, and pulls in REST APIs, then chunks, embeds, stores, and retrieves it so your LLM answers from real, current information instead of guessing.
 
-## What Ragrails does
+## Install
 
-| Capability | What you get |
-| --- | --- |
-| Website ingestion | Scrape exact URLs, crawl full sites, write markdown, and retry failed URL jobs from a dead-letter queue. |
-| Document ingestion | Parse PDFs, DOCX files, spreadsheets, CSV/TSV, Markdown, HTML, JSON, XML, ZIP files, and other supported local formats. |
-| REST API ingestion | Fetch API responses with methods, headers, query params, JSON bodies, pagination, and max page limits. |
-| Structure-aware chunking | Split markdown while preserving headings, code blocks, tables, links, stable chunk IDs, and useful metadata. |
-| Embedding and storage | Batch chunks through an embedding provider and write vectors to Qdrant, Pinecone, or Weaviate. |
-| Retrieval and reranking | Search stored chunks with top-k retrieval and optional reranking. |
-| Multiple interfaces | Use the same pipeline through the Python SDK, CLI, REST API server, or local MCP server. |
+```bash
+pip install "ragrails[voyage,qdrant]"
+```
 
-## Core workflow
+See [installation](/getting-started/installation) for all extras.
 
-| Stage | Purpose | Start |
+## Quick example
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+
+# Ingest, chunk, embed, and store in one call
+rag.ingest(
+    urls="https://example.com/docs",          # scrape a website
+    docs=["files/guide.pdf"],                  # parse local files
+    api={"url": "https://api.example.com/faq"},  # fetch a REST API
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
+)
+```
+
+Mix any sources in one call, or use them on their own:
+
+| Source | Method | Usage |
 | --- | --- | --- |
-| Ingestion | Convert URLs, documents, or API responses into markdown. | [Ingestion](/features/ingestion) |
-| Chunking | Split markdown into retrieval-ready JSON chunks. | [Chunking](/features/chunking) |
-| Embedding | Generate vectors from chunk JSON files. | [Embedding](/features/embedding) |
-| Storing | Write vectors and metadata into a vector database. | [Storing](/features/storing) |
-| Retrieval | Search stored chunks and optionally rerank results. | [Retrieval](/features/retrieval) |
+| Websites | `urls=` | [Website to RAG](/guides/website-to-rag) · [`scrape()`](/usage/sdk/ingestion#url-ingestion-scrape) |
+| Documents | `docs=` | [Documents to RAG](/guides/docs-to-rag) · [`parse()`](/usage/sdk/ingestion#document-ingestion-parse) |
+| REST APIs | `api=` | [API to RAG](/guides/api-to-rag) · [`fetch()`](/usage/sdk/ingestion#api-ingestion-fetch) |
 
-## Common use cases
+<Note>Website scraping needs `pip install "ragrails[url]"` and a one-time `rag.setup_url()`.</Note>
 
-| Use case | Start |
+## Start here
+
+<CardGroup cols={2}>
+  <Card title="How RAG works" icon="book" href="/getting-started/concepts">
+    New to RAG? Read this first. The whole pipeline in 5 minutes.
+  </Card>
+  <Card title="Quickstart" icon="zap" href="/getting-started/quickstart">
+    A working knowledge base and chat in ~20 lines.
+  </Card>
+  <Card title="Features" icon="layers" href="/features/overview">
+    Each stage, what it's for, and how to tune it.
+  </Card>
+  <Card title="Pick an interface" icon="code" href="/usage/sdk/overview">
+    SDK, CLI, or REST API.
+  </Card>
+</CardGroup>
+
+## Pick your interface
+
+| Interface | Use it when |
 | --- | --- |
-| Scrape websites into markdown | [Scrape websites](/use-cases/scrape-websites) |
-| Parse local files and documents | [Parse documents](/use-cases/parse-documents) |
-| Turn REST APIs into RAG content | [Ingest REST APIs](/use-cases/ingest-rest-apis) |
-| Build a vector knowledge base | [Build a vector knowledge base](/use-cases/build-vector-knowledge-base) |
-| Retrieve context for an app or agent | [Retrieve context](/use-cases/retrieve-context) |
-| Use Ragrails from AI clients | [Use with AI clients](/use-cases/use-with-ai-clients) |
-| Host Ragrails as an HTTP service | [Host a language-agnostic API](/use-cases/host-language-agnostic-api) |
-
-## Choose your interface
-
-| Surface | Best for | Start |
-| --- | --- | --- |
-| SDK | Python applications, notebooks, workers, and tests | [SDK overview](/usage/sdk/overview) |
-| CLI | Terminal workflows, scripts, and automation | [CLI overview](/usage/cli/overview) |
-| REST API server | Language-agnostic apps and hosted integrations | [REST API overview](/usage/server/overview) |
-| MCP server | AI clients and agents using Model Context Protocol | [MCP overview](/usage/mcp/overview) |
-
-## First steps
-
-1. Install Ragrails with the extras you need: [Installation](/getting-started/installation).
-2. Run a first pipeline: [Quickstart](/getting-started/quickstart).
-3. Review the complete capability map: [Core workflow](/features/overview).
+| [SDK](/usage/sdk/overview) | You build in Python |
+| [CLI](/usage/cli/overview) | You work in the terminal or scripts |
+| [REST API](/usage/server/overview) | Your app isn't Python |

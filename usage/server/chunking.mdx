@@ -1,19 +1,32 @@
 ---
-title: "REST API Chunking"
-description: "Chunk markdown files over HTTP."
+title: "REST Chunking"
+icon: "scissors"
+description: "Chunk documents over HTTP."
 ---
 
-```bash
-curl -X POST http://127.0.0.1:8000/v1/chunk \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_dir": "files/output/docs",
-    "output_dir": "files/output/chunks",
-    "chunk_size": 2000,
-    "chunk_overlap": 200,
-    "min_chunk_length": 100
-  }'
+## POST /v1/chunk
+
+<CodeGroup>
+```json Request
+{
+  "markdown": [
+    {"id": "doc-1", "text": "# Guide\n\nContent.", "source": "files/guide.pdf", "metadata": {}}
+  ],
+  "chunk_size": 2000,
+  "chunk_overlap": 200,
+  "min_chunk_length": 100
+}
 ```
 
-The response includes file counts, chunk counts, failures, and written chunk file paths.
+```json Response
+{
+  "inputs": 1,
+  "chunks": 4,
+  "items": [...],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
 
+`markdown` accepts a string, list of strings, or list of document dicts with a `text` field.

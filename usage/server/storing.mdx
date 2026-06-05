@@ -1,20 +1,60 @@
 ---
-title: "REST API Storing"
-description: "Store chunks in a vector database over HTTP."
+title: "REST Storing"
+icon: "database"
+description: "Store, edit, and delete chunks over HTTP."
 ---
 
-```bash
-curl -X POST http://127.0.0.1:8000/v1/store \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input_dir": "files/output/chunks",
-    "vector_db": "qdrant",
-    "collection": "rag_chunks",
-    "batch_size": 64,
-    "embedder": "voyage",
-    "model": "voyage-3"
-  }'
+## POST /v1/store
+
+<CodeGroup>
+```json Request
+{
+  "embedded_chunks": [...],
+  "vector_db": "qdrant",
+  "collection": "docs",
+  "url": "http://localhost:6333",
+  "batch_size": 64
+}
 ```
 
-`/v1/store` is the explicit storage endpoint. It uses the same provider arguments as `/v1/embed`.
+```json Response
+{
+  "inputs": 10,
+  "stored": 10,
+  "failed": 0,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": []
+}
+```
+</CodeGroup>
 
+---
+
+## POST /v1/edit
+
+```json
+{
+  "chunks": [
+    {"id": "chunk-id", "text": "Updated text.", "source": "files/guide.pdf", "metadata": {}}
+  ],
+  "provider": "voyage",
+  "model": "voyage-3",
+  "vector_db": "qdrant",
+  "collection": "docs",
+  "url": "http://localhost:6333"
+}
+```
+
+---
+
+## POST /v1/delete
+
+```json
+{
+  "ids": ["chunk-id-1", "chunk-id-2"],
+  "vector_db": "qdrant",
+  "collection": "docs",
+  "url": "http://localhost:6333"
+}
+```

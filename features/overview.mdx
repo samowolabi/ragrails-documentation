@@ -1,48 +1,27 @@
 ---
-title: "Core Features"
-description: "What Ragrails can do across ingestion, chunking, embedding, storing, and retrieval."
+title: "Features"
+icon: "layers"
+description: "Each stage, what it's for, and how to tune it."
 ---
 
-Ragrails is organized around five RAG workflow stages. Each stage is exposed
-through the SDK, CLI, REST API server, and local MCP server.
+Ragrails is six stages. The first four build your index; the last two query it.
 
-## Feature map
-
-| Stage | Capabilities | Page |
+| Stage | Purpose | Page |
 | --- | --- | --- |
-| Ingestion | Website scraping, full-site crawling, local document parsing, REST API fetching, metadata output, and URL retry support. | [Ingestion](/features/ingestion) |
-| Chunking | Markdown-aware splitting, heading metadata, stable chunk IDs, table handling, code block preservation, link repair, and navigation filtering. | [Chunking](/features/chunking) |
-| Embedding | Batch embedding, provider/model selection, selected-file embedding, and vector-store writes. | [Embedding](/features/embedding) |
-| Storing | Explicit vector database write stage for Qdrant, Pinecone, and Weaviate. | [Storing](/features/storing) |
-| Retrieval | Query embedding, vector search, top-k results, metadata-rich chunks, and optional reranking. | [Retrieval](/features/retrieval) |
+| Ingestion | Pull content from URLs, files, and APIs | [Ingestion](/features/ingestion) |
+| Chunking | Split content into searchable passages | [Chunking](/features/chunking) |
+| Embedding | Turn passages into vectors | [Embedding](/features/embedding) |
+| Storing | Save vectors to a database | [Storing](/features/storing) |
+| Retrieval | Find the chunks relevant to a query | [Retrieval](/features/retrieval) |
+| Chat | Answer questions grounded in your data | [Chat](/features/chat) |
 
-## Source types
+<Tip>New to RAG? Read [How RAG works](/getting-started/concepts) first.</Tip>
 
-Ragrails can ingest:
+## Run stages individually or together
 
-- Websites and exact URLs
-- Local documents such as PDF, DOCX, CSV, XLS/XLSX, Markdown, HTML, JSON, XML, TXT, ZIP, and other supported file types
-- REST API responses with headers, params, JSON bodies, pagination, and method selection
+- **Individually** - call each stage when you need to inspect or control intermediate output.
+- **Together** - use [`ingest()` and `query()`](/usage/sdk/pipeline) to run the whole pipeline in one call.
 
-## Output path
+## Keeping your index current
 
-The pipeline moves data through predictable local artifacts:
-
-```text
-source content
-  -> markdown files
-  -> JSON chunk files
-  -> embedded vectors in a vector database
-  -> retrieved chunks for an application or agent
-```
-
-## Interfaces
-
-Use the same stages through the interface that fits your workflow:
-
-| Interface | Use it when |
-| --- | --- |
-| SDK | You are building in Python. |
-| CLI | You want terminal commands or shell automation. |
-| REST API | You need a language-agnostic hosted service. |
-| MCP | You want AI clients to call Ragrails tools locally. |
+Stored data isn't frozen. As sources change, update or remove chunks by ID with `edit()` and `delete()` so answers stay accurate. See [Keep your knowledge base current](/guides/manage-stored-data).

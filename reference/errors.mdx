@@ -1,14 +1,32 @@
 ---
 title: "Errors"
+icon: "triangle-alert"
 description: "Common Ragrails errors and fixes."
 ---
 
-| Error | Likely cause | Fix |
-| --- | --- | --- |
-| Missing optional dependency | A provider or URL scraping extra is not installed. | Install the matching extra such as `ragrails[url]`, `ragrails[voyage]`, or `ragrails[store-qdrant]`. |
-| Provider authentication failed | Missing API key or invalid credentials. | Set provider environment variables. |
-| Collection is required | Vector database needs a collection, index, or class. | Pass `collection`. |
-| Input path not found | Stage cannot find source files. | Check `input_dir`, `folder`, or file names. |
-| URL scraping setup missing | Browser support is not installed. | Run `setup_url`, `ragrails setup-url`, or `ragrails_setup_url`. |
+## Error dict shape
 
-The REST API maps validation issues and runtime failures to JSON error responses.
+Stage methods do not raise on per-item failures. Instead they collect failures in the result's `errors` list. Each error is a dict:
+
+| Field | Description |
+| --- | --- |
+| `source` | Source identifier (URL, file path, or chunk ID) |
+| `source_kind` | `"url"`, `"file"`, `"chunk"`, etc. |
+| `stage` | Pipeline stage where the failure occurred |
+| `error` | Error message |
+| `isRetryable` | Whether the failure is safe to retry |
+| `attempts` | Number of attempts made |
+
+## Common setup errors
+
+| Message | Cause | Fix |
+| --- | --- | --- |
+| `... requires optional dependencies` | A provider or URL extra is not installed | Install the matching extra, e.g. `pip install "ragrails[url]"` or `"ragrails[voyage]"` |
+| `VOYAGE_API_KEY environment variable not set` | Missing embedding credentials | Set the provider environment variable |
+| `URL ingestion requires ...` | Browser support not installed | Run `rag.setup_url()` or `ragrails setup-url` |
+| Collection required | Vector DB needs a collection/index/class | Pass `collection` |
+| Connection refused | Vector DB not running or wrong URL | Start the database and check `url` |
+
+## Retrying scrape failures
+
+URL scrape failures with `isRetryable: true` are captured in a [dead-letter queue](/usage/sdk/ingestion#dead-letter-queue-dlq) and can be retried by passing `result.dlq` or a saved file path back to `scrape()`.

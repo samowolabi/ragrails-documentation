@@ -1,20 +1,96 @@
 ---
 title: "SDK Reference"
-description: "RagRails SDK methods."
+icon: "code"
+description: "All RagRails SDK methods."
 ---
 
-| Method | Stage | Summary |
+```python
+from ragrails import RagRails
+rag = RagRails()
+```
+
+## Ingestion
+
+| Method | Description |
+| --- | --- |
+| `setup_url(browser="chromium")` | Install Playwright browser for URL ingestion |
+| `scrape(url, *, mode, max_depth, max_pages, verbose, frontmatter, output_format, output_dest, output_dir, dlq)` | Scrape URLs into document dicts |
+| `parse(files, folder, *, frontmatter, output_format, output_dest, output_dir)` | Parse local documents into document dicts |
+| `fetch(url, *, title, description, method, headers, params, body, pagination, max_pages, timeout, apis, frontmatter, output_format, output_dest, output_dir)` | Fetch REST API responses |
+
+## Chunking
+
+| Method | Description |
+| --- | --- |
+| `chunk(markdown, *, title, source, chunk_size, chunk_overlap, min_chunk_length)` | Split documents into chunk dicts |
+
+## Embedding
+
+| Method | Description |
+| --- | --- |
+| `embedder(provider, model, input_type, options)` | Create an embedder object |
+| `embed(chunks, embedder, *, batch_size)` | Generate embedding vectors for chunks |
+
+## Storing
+
+| Method | Description |
+| --- | --- |
+| `store(embedded_chunks, *, vector_db, collection, url, batch_size, ensure_collection, options)` | Upsert embedded chunks |
+| `edit(chunks, embedder, *, vector_db, collection, url, batch_size, options)` | Re-embed and replace chunks by ID |
+| `delete(ids, *, vector_db, collection, url, options)` | Delete chunks by ID |
+
+## Retrieval
+
+| Method | Description |
+| --- | --- |
+| `reranker(provider, model, options)` | Create a reranker object |
+| `retrieve(query, *, embedder, vector_db, collection, url, top_k, use_query_rewrite, rewrite_llm, rewrite_context, session_context, use_rerank, reranker, rerank_top_k, options)` | Retrieve relevant chunks |
+
+## Chat
+
+| Method | Description |
+| --- | --- |
+| `llm(provider, model, *, max_tokens)` | Create an LLM object |
+| `chat(query, *, llm, embedder, vector_db, collection, url, options, reranker, history, history_compaction, query_rewrite, intent_routing, retrieval_quality, persona, retrieval_config)` | Run a stateless RAG chat turn |
+
+## Pipeline
+
+| Method | Description |
+| --- | --- |
+| `ingest(*, docs, urls, api, markdown, ingestion, chunking, embedding, storage)` | Run ingestion → chunk → embed → store |
+| `query(query, *, embedding, retrieval)` | Run embed query → retrieve |
+
+## Config objects
+
+| Class | Used with | Description |
 | --- | --- | --- |
-| `setup_url(browser="chromium")` | Ingestion | Install URL browser support. |
-| `scrape(...)` | Ingestion | Scrape URLs into markdown. |
-| `retry_scrape(...)` | Ingestion | Retry URL ingestion failures. |
-| `parse(...)` | Ingestion | Parse local documents into markdown. |
-| `fetch(...)` | Ingestion | Fetch REST API responses into markdown. |
-| `chunk(...)` | Chunking | Chunk markdown directories. |
-| `chunk_file(...)` | Chunking | Preview chunks for one file. |
-| `embed(...)` | Embedding | Embed and write chunks to a vector database. |
-| `store(...)` | Storing | Explicit storage stage for chunks. |
-| `retrieve(...)` | Retrieval | Search stored chunks. |
+| `DLQ(path, items)` | `scrape(dlq=...)` | Dead-letter queue for retryable scrape failures |
+| `QueryRewriteConfig(enabled, session_context, llm)` | `chat(query_rewrite=...)` | Query rewriting config |
+| `HistoryCompactionConfig(enabled, history_limit, keep_recent)` | `chat(history_compaction=...)` | History summarisation config |
+| `IntentRoutingConfig(enabled)` | `chat(intent_routing=...)` | Intent routing config |
+| `ChatRetrievalQualityConfig(min_retrieval_score, min_rerank_score, low_confidence_mode, max_context_chunks)` | `chat(retrieval_quality=...)` | Retrieval quality thresholds |
 
-See the SDK stage pages for examples and parameters.
+## Built-in providers
 
+| Type | Providers |
+| --- | --- |
+| Embedding | `voyage` (`voyage-3`, `voyage-3-lite`, `voyage-3-large`) |
+| Reranking | `voyage` (`rerank-2-lite`, `rerank-2`), `bm25` (local) |
+| LLM | `openai` (`gpt-4o-mini`, `gpt-4o`, `gpt-4-turbo`, `o1-mini`, `o1`), `anthropic` (`claude-haiku-4-5-20251001`, `claude-sonnet-4-6`, `claude-opus-4-7`) |
+| Vector DB | `qdrant`, `pinecone`, `weaviate` |
+
+## Extending providers
+
+Register custom embedding and reranking providers at runtime:
+
+```python
+from ragrails.models.embedder.registry import register_embedder
+from ragrails.models.reranker.registry import register_reranker
+
+register_embedder("my-provider", my_factory, default_model="my-model", models=("my-model",))
+register_reranker("my-reranker", my_factory, default_model="my-model", models=("my-model",))
+```
+
+Once registered, use them anywhere a provider name is accepted, e.g. `rag.embedder(provider="my-provider", ...)`.
+
+→ [Result types reference](/reference/result-types)

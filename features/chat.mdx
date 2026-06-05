@@ -1,0 +1,87 @@
+---
+title: "Chat"
+icon: "messages-square"
+description: "Answer questions grounded in your data."
+---
+
+Chat runs retrieval and answer generation together, with conversation history.
+
+```python
+llm = rag.llm(provider="openai", model="gpt-4o-mini")
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+
+result = rag.chat(
+    "How do I authenticate?",
+    llm=llm,
+    embedder=embedder,
+    vector_db="qdrant", collection="docs", url="http://localhost:6333",
+    history=[],
+)
+print(result.answer)
+```
+
+<Note>**Chat is stateless.** Ragrails never stores conversations. You pass `history` in and get the updated `history` back, so you decide where it lives (session, database, memory). Safe for multi-user apps.</Note>
+
+## Tuning knobs
+
+Each is a config object. Use them by symptom:
+
+| Symptom | Config | What it does |
+| --- | --- | --- |
+| Follow-ups miss context | `QueryRewriteConfig` | Expands follow-ups into standalone questions. |
+| Long chats slow / costly | `HistoryCompactionConfig` | Summarizes old turns, keeps recent ones. |
+| Small talk triggers search | `IntentRoutingConfig` | Skips retrieval for non-questions. |
+| Model answers with weak context | `ChatRetrievalQualityConfig` | Sets confidence thresholds; answers with caution or refuses. |
+
+### Query rewriting
+
+<Note>**Why:** *"what about the second one?"* is meaningless to search alone. Rewriting uses history to make it standalone.</Note>
+
+```python
+from ragrails import QueryRewriteConfig
+rag.chat(..., query_rewrite=QueryRewriteConfig(enabled=True))
+```
+
+### History compaction
+
+<Note>**Why:** long conversations overflow the context window and cost more every turn. Compaction summarizes old messages and keeps recent ones verbatim.</Note>
+
+```python
+from ragrails import HistoryCompactionConfig
+rag.chat(..., history_compaction=HistoryCompactionConfig(history_limit=15, keep_recent=5))
+```
+
+### Intent routing
+
+<Note>**Why:** *"Thanks!"* doesn't need a database lookup. Routing skips retrieval for small talk, which is faster and avoids irrelevant context.</Note>
+
+```python
+from ragrails import IntentRoutingConfig
+rag.chat(..., intent_routing=IntentRoutingConfig(enabled=True))
+```
+
+### Retrieval quality
+
+<Note>**Why:** sometimes your index just doesn't have the answer. Rather than hallucinate, Ragrails scores the retrieved context and can answer with caution or refuse.</Note>
+
+```python
+from ragrails import ChatRetrievalQualityConfig
+rag.chat(..., retrieval_quality=ChatRetrievalQualityConfig(
+    min_retrieval_score=0.35,
+    low_confidence_mode="answer_with_caution",  # or "ask_clarifying_question", "refuse_grounded_answer"
+))
+```
+
+## What you get back
+
+| Field | Use it for |
+| --- | --- |
+| `answer` | The grounded reply |
+| `history` | Pass to the next turn |
+| `sources` | Show citations |
+| `intent` | `"rag"` or `"direct"` |
+| `answer_confidence` | Flag low-confidence answers in your UI |
+
+## Reference
+
+Full parameters: [SDK chat](/usage/sdk/chat) · [CLI](/usage/cli/chat) · [REST](/usage/server/chat).
