@@ -4,6 +4,8 @@ icon: "server"
 description: "All HTTP endpoints."
 ---
 
+<Note>This page is generated from the FastAPI route table. Run `RAGRAILS_SOURCE=/path/to/ragrails uv run python scripts/generate-reference.py` from the docs repo after REST route or schema changes.</Note>
+
 Start the server:
 
 ```bash
@@ -15,52 +17,30 @@ Base URL: `http://127.0.0.1:8000`
 
 Interactive docs: `http://127.0.0.1:8000/docs`
 
-## Health
+OpenAPI schema: `http://127.0.0.1:8000/v1/openapi.json`
+
+REST defaults are request payload fields. REST examples do not inherit SDK constructor defaults or CLI `.ragrails.toml` values.
+
+## Endpoints
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/v1/health` | Returns `{"status": "ok"}` |
+| POST | `/v1/chat` | Chat |
+| POST | `/v1/chat/stream` | Stream chat |
+| POST | `/v1/chunk` | Chunk |
+| POST | `/v1/delete` | Delete |
+| POST | `/v1/edit` | Edit |
+| POST | `/v1/embed` | Embed |
+| GET | `/v1/health` | Health |
+| POST | `/v1/ingest/api` | Ingest api |
+| POST | `/v1/ingest/docs` | Ingest docs |
+| POST | `/v1/ingest/docs/upload` | Upload docs |
+| POST | `/v1/ingest/url` | Ingest url |
+| POST | `/v1/ingest/url/stream` | Stream URL ingest |
+| GET | `/v1/openapi.json` | Openapi |
+| POST | `/v1/pipelines/ingest` | Ingest |
+| POST | `/v1/pipelines/query` | Query |
+| POST | `/v1/retrieve` | Retrieve |
+| POST | `/v1/store` | Store |
 
-## Ingestion
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/v1/ingest/url` | Scrape URLs |
-| POST | `/v1/ingest/docs` | Parse documents |
-| POST | `/v1/ingest/api` | Fetch REST APIs |
-
-## Processing
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/v1/chunk` | Chunk documents |
-| POST | `/v1/embed` | Embed chunks |
-
-## Storage
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/v1/store` | Store embedded chunks |
-| POST | `/v1/edit` | Re-embed and replace stored chunks |
-| POST | `/v1/delete` | Delete stored chunks |
-
-## Retrieval
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/v1/retrieve` | Retrieve relevant chunks |
-
-## Pipeline
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/v1/pipelines/ingest` | Full ingest pipeline |
-| POST | `/v1/pipelines/query` | Query pipeline |
-
-## Chat
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST | `/v1/chat` | Stateless RAG chat turn |
-
-See the Swagger UI at `/docs` for full request and response schemas.
+Streaming endpoints return `text/event-stream` SSE frames. See the Swagger UI at `/docs` for full request and response schemas.

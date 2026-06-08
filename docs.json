@@ -25,19 +25,37 @@
               "getting-started/installation",
               "getting-started/quickstart",
               "getting-started/concepts",
-              "getting-started/configuration"
+              "getting-started/configuration",
+              "getting-started/env-examples"
             ]
           },
           {
             "group": "Features",
             "pages": [
               "features/overview",
-              "features/ingestion",
-              "features/chunking",
-              "features/embedding",
-              "features/storing",
-              "features/retrieval",
-              "features/chat"
+              {
+                "group": "Workflows",
+                "expanded": true,
+                "pages": [
+                  "features/ingest",
+                  "features/query"
+                ],
+                "icon": "workflow"
+              },
+              {
+                "group": "Pipeline",
+                "expanded": true,
+                "pages": [
+                  "features/extraction",
+                  "features/chunking",
+                  "features/embedding",
+                  "features/storing",
+                  "features/retrieval",
+                  "features/chat"
+                ],
+                "icon": "route"
+              },
+              "features/knowledge-base-maintenance"
             ]
           },
           {
@@ -49,6 +67,7 @@
               "advanced/chat-tuning",
               "advanced/resilient-ingestion",
               "advanced/agentic-tools",
+              "advanced/tool-calling",
               "advanced/custom-providers",
               "advanced/cost-optimization"
             ]
@@ -74,8 +93,7 @@
               "guides/website-to-rag",
               "guides/docs-to-rag",
               "guides/api-to-rag",
-              "guides/hosted-rest-api",
-              "guides/manage-stored-data"
+              "guides/hosted-rest-api"
             ]
           }
         ]
@@ -111,7 +129,8 @@
             "group": "Get Started",
             "pages": [
               "usage/cli/overview",
-              "usage/cli/quickstart"
+              "usage/cli/quickstart",
+              "usage/cli/doctor"
             ]
           },
           {
@@ -162,6 +181,7 @@
               "reference/cli",
               "reference/rest-api",
               "reference/models",
+              "reference/vector-databases",
               "reference/result-types",
               "reference/errors"
             ]

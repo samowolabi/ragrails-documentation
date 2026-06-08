@@ -15,32 +15,48 @@ Pull your product catalog from its API, embed the product descriptions, and let 
 1. **Fetch** the catalog API (paginated) into a collection.
 2. **Retrieve or chat** over product descriptions and attributes.
 
-```python
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-
-rag.ingest(
-    api={
-        "url": "https://api.shop.example.com/products",
-        "title": "Products",
-        "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
-        "max_pages": 50,
-    },
+rag = RagRails(
+    collection="products",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "products", "url": "http://localhost:6333"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
-hits = rag.retrieve(
-    "waterproof hiking jacket under $200",
-    embedder=embedder,
-    vector_db="qdrant", collection="products", url="http://localhost:6333",
-    top_k=10,
-)
+rag.ingest(api={
+    "url": "https://api.shop.example.com/products",
+    "title": "Products",
+    "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+    "max_pages": 50,
+})
+hits = rag.retrieve("waterproof hiking jacket under $200", top_k=10)
 ```
 
-<Tip>Refresh the catalog regularly with [`edit()`/`delete()`](/guides/manage-stored-data) so discontinued products drop out of results.</Tip>
+```bash CLI
+ragrails ingest \
+  --api-url https://api.shop.example.com/products \
+  --vector-db qdrant --collection products --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails retrieve "waterproof hiking jacket under $200" \
+  --vector-db qdrant --collection products --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 10
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"api": {"url": "https://api.shop.example.com/products", "title": "Products", "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100}, "max_pages": 50}, "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "products", "url": "http://localhost:6333"}}' 
+
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{"query": "waterproof hiking jacket under $200", "provider": "voyage", "model": "voyage-3", "vector_db": "qdrant", "collection": "products", "url": "http://localhost:6333", "top_k": 10}' 
+```
+</CodeGroup>
+
+<Tip>Refresh the catalog regularly with [`edit()`/`delete()`](/features/knowledge-base-maintenance) so discontinued products drop out of results.</Tip>
 
 ## Features used
 

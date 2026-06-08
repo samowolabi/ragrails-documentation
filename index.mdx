@@ -4,7 +4,7 @@ icon: "house"
 description: "Build AI agents, RAG chatbots, and AI search on a knowledge base from your own data."
 ---
 
-Ragrails builds the knowledge base for you. It scrapes websites, extracts content from documents, and pulls in REST APIs, then chunks, embeds, stores, and retrieves it, so your AI agents and LLM answers from real, grounded, current information.
+Ragrails builds a RAG knowledge base from many source types: websites, documents, REST APIs, or Markdown you already have. Source content is normalized to Markdown internally, then chunked, embedded, stored, and retrieved so your AI agents and LLMs answer from grounded information.
 
 ## Install
 
@@ -12,24 +12,97 @@ Ragrails builds the knowledge base for you. It scrapes websites, extracts conten
 pip install "ragrails[voyage,qdrant]"
 ```
 
-See [installation](/getting-started/installation) for all extras.
+The extras add an embedder (`voyage`) and a vector database (`qdrant`, `pinecone`, or `weaviate`).
+
+LLM providers (`openai`, `anthropic`, `google`) are built in, no extra needed.
+
+See [installation](/getting-started/installation).
 
 ## Quick example
 
-```python
+Pick the interface you use in production. The example below uses a document source; Ragrails converts documents, websites, and API responses to Markdown internally before chunking and embedding them. If your content is already Markdown, you can pass it directly with `markdown=` / `--markdown` / `"markdown"`.
+
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-
-# Ingest, chunk, embed, and store in one call
-rag.ingest(
-    urls="https://example.com/docs",          # scrape a website
-    docs=["files/guide.pdf"],                  # parse local files
-    api={"url": "https://api.example.com/faq"},  # fetch a REST API
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
+
+rag.ingest(docs=["files/refund-policy.pdf"])
+
+# Other source forms use the same pipeline:
+# rag.ingest(urls="https://example.com/help/refunds")
+# rag.ingest(api={"url": "https://api.example.com/refund-policy"})
+# rag.ingest(markdown="# Refund policy\n\nCustomers can request a refund within 30 days of purchase.")
+
+print(rag.query("How long do I have to request a refund?", retrieval={"top_k": 5}).items)
+print(rag.chat("How long do I have to request a refund?", history=[]).answer)
 ```
+
+```bash CLI
+ragrails ingest \
+  --docs files/refund-policy.pdf \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+# Other source forms use the same pipeline:
+# ragrails ingest --source-url https://example.com/help/refunds
+# ragrails ingest --api-url https://api.example.com/refund-policy
+# ragrails ingest --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase."
+
+ragrails query "How long do I have to request a refund?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --top-k 5 \
+  --provider voyage --model voyage-3
+
+ragrails chat "How long do I have to request a refund?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": ["files/refund-policy.pdf"],
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+
+# Other source forms use the same pipeline:
+# "urls": "https://example.com/help/refunds"
+# "api": {"url": "https://api.example.com/refund-policy"}
+# "markdown": "# Refund policy\n\nCustomers can request a refund within 30 days of purchase."
+
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do I have to request a refund?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333", "top_k": 5}
+  }'
+
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do I have to request a refund?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+</CodeGroup>
 
 Mix any sources in one call, or use them on their own:
 
@@ -38,8 +111,9 @@ Mix any sources in one call, or use them on their own:
 | Websites | `urls=` | [Website to RAG](/guides/website-to-rag) · [`scrape()`](/usage/sdk/ingestion#url-ingestion-scrape) |
 | Documents | `docs=` | [Documents to RAG](/guides/docs-to-rag) · [`parse()`](/usage/sdk/ingestion#document-ingestion-parse) |
 | REST APIs | `api=` | [API to RAG](/guides/api-to-rag) · [`fetch()`](/usage/sdk/ingestion#api-ingestion-fetch) |
+| Markdown | `markdown=` | Use when your content is already Markdown or already normalized |
 
-<Note>Website scraping needs `pip install "ragrails[url]"` and a one-time `rag.setup_url()`.</Note>
+<Note>Config boundaries: SDK defaults live in `RagRails(...)`; CLI defaults live in `.ragrails.toml`; REST examples pass defaults in each request body. Website scraping also needs `pip install "ragrails[url]"` and a one-time `rag.setup_url()` or `ragrails setup-url`.</Note>
 
 ## Start here
 

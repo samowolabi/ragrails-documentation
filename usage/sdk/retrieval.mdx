@@ -4,29 +4,22 @@ icon: "search"
 description: "Retrieve relevant chunks for a query."
 ---
 
-Create an embedder with `input_type="query"`, then call `retrieve()`.
+Retrieval embeds the query, searches the vector store, and returns the closest chunks. With providers configured on `RagRails`, `retrieve()` is a one-liner; it creates the query embedder for you.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="docs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    reranker={"provider": "voyage", "model": "rerank-2-lite"},
+)
+```
 
 <CodeGroup>
 ```python Request
-from ragrails import RagRails
-
-rag = RagRails()
-
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
-
-result = rag.retrieve(
-    "How do I authenticate?",
-    embedder=embedder,
-    vector_db="qdrant",
-    collection="docs",
-    url="http://localhost:6333",
-    top_k=10,
-)
-
-result.query       # original query
-result.retrieved   # number of results
-result.items       # list of RetrievedChunk objects
-result.errors      # list of error dicts
+result = rag.retrieve("How do I authenticate?", top_k=10)
 
 for chunk in result.items:
     print(chunk.score, chunk.text)
@@ -38,76 +31,62 @@ result.items[0]   # RetrievedChunk(
                   #   id="guide-3",
                   #   score=0.87,
                   #   text="To authenticate, create an API key in settings...",
-                  #   metadata={"title": "Authentication", "source": "files/guide.pdf"},
+                  #   metadata={"title": "Authentication"},
                   #   rerank_score=None,
                   # )
 ```
 </CodeGroup>
 
-Each `RetrievedChunk` has: `id`, `score`, `text`, `metadata`, `rerank_score`.
-
 ## With reranking
 
-```python
-reranker = rag.reranker(provider="voyage", model="rerank-2-lite")
+Set `use_rerank=True`. The reranker is created from the constructor `reranker` config (or pass one explicitly). Retrieve wide, keep the best few.
 
+```python
 result = rag.retrieve(
     "How do I authenticate?",
-    embedder=embedder,
-    vector_db="qdrant",
-    collection="docs",
-    url="http://localhost:6333",
     top_k=20,
     use_rerank=True,
-    reranker=reranker,
     rerank_top_k=5,
 )
 ```
 
 ## With query rewriting
 
-```python
-rewrite_llm = rag.llm(provider="openai", model="gpt-4o-mini")
+Turn a conversational follow-up into a standalone query before searching. The rewrite LLM falls back to the constructor `llm`.
 
+```python
 result = rag.retrieve(
     "What about the second step?",
-    embedder=embedder,
-    vector_db="qdrant",
-    collection="docs",
-    url="http://localhost:6333",
     use_query_rewrite=True,
-    rewrite_llm=rewrite_llm,
     session_context="User is asking about the onboarding flow.",
 )
 
-result.search_query  # rewritten query used for the vector search
+result.search_query  # the rewritten query that was searched
 ```
-
-## `reranker()` parameters
-
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `provider` | `"voyage"` | `"voyage"` (API) or `"bm25"` (local, keyword-based) |
-| `model` | `"rerank-2-lite"` | Model name. Voyage: `rerank-2-lite`, `rerank-2`; BM25: `bm25` |
-| `options` | `None` | Provider-specific options dict |
-
-<Note>**`bm25`** is a local, keyword-based reranker that needs no API key or network call. It's free and fast, good for exact-term matching, but won't catch semantic matches the way Voyage does. Use Voyage when meaning matters; use BM25 for offline or cost-sensitive setups. Register others with `register_reranker()`.</Note>
 
 ## `retrieve()` parameters
 
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `query` | required | Search query string |
-| `embedder` | required | Embedder object from `rag.embedder()` with `input_type="query"` |
-| `vector_db` | `"qdrant"` | Vector DB provider |
-| `collection` | `None` | Collection name |
-| `url` | `None` | Vector DB URL |
+| `embedder` | inherits constructor (`input_type="query"`) | Query embedder; auto-created when omitted |
+| `vector_db` | inherits constructor | `qdrant`, `qdrant_cloud`, `pinecone`, `weaviate` |
+| `collection` | inherits constructor | Collection name |
+| `url` | inherits constructor | Vector DB URL |
 | `top_k` | `10` | Candidates to retrieve |
 | `use_query_rewrite` | `False` | Rewrite the query before searching |
-| `rewrite_llm` | `None` | LLM object from `rag.llm()` for rewriting |
-| `rewrite_context` | `""` | Context hint for the rewriter |
-| `session_context` | `""` | Broader session context for rewriting |
+| `rewrite_llm` | inherits constructor `llm` | LLM used for rewriting |
+| `rewrite_context` / `session_context` | `""` | Context hints for the rewriter |
 | `use_rerank` | `False` | Rerank results after retrieval |
-| `reranker` | `None` | Reranker object from `rag.reranker()` |
+| `reranker` | inherits constructor | Reranker object; auto-created when omitted |
 | `rerank_top_k` | `5` | Results to keep after reranking |
-| `options` | `None` | Provider-specific options dict |
+
+## `reranker()` parameters
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `provider` | constructor default, else `"voyage"` | `"voyage"` (API) or `"bm25"` (local) |
+| `model` | constructor default, else `"rerank-2-lite"` | Voyage: `rerank-2-lite`, `rerank-2`; BM25: `bm25` |
+| `options` | `None` | Provider-specific options |
+
+<Note>`bm25` is a local, keyword-based reranker with no API key. Use Voyage when meaning matters; BM25 for offline or cost-sensitive setups. Register others with `register_reranker()`.</Note>

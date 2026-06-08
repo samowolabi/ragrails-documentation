@@ -4,7 +4,7 @@ icon: "binary"
 description: "Embed chunk JSON files from the terminal."
 ---
 
-`embed` reads chunk JSON files from `--input-dir` and writes an `embedded.json` file to `--output-dir`. Embedding is separate from storage. Pass embedded output to `store` in the next step.
+`embed` reads chunk JSON from `--input-dir`, generates vectors, and writes an `embedded.json` file to `--output-dir`. Embedding is separate from storage; pass the output to `store` next.
 
 ```bash
 pip install "ragrails[voyage]"
@@ -28,12 +28,16 @@ Saved to : files/embedded/embedded.json
 ```
 </CodeGroup>
 
+The CLI embeds with `input_type="document"` (for indexing). Query-time embedding happens inside `retrieve`.
+
+<Tip>Use the same provider and model for embedding and retrieval. Vectors from different models aren't comparable. Raise `--batch-size` to cut API calls, lower it if you hit rate limits.</Tip>
+
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--input-dir` | required | Folder containing chunk JSON files |
+| `--input-dir` | required | Folder of chunk JSON files |
 | `--output-dir` | required | Folder to write `embedded.json` to |
 | `--provider` | `voyage` | Embedding provider |
-| `--model` | `voyage-3` | Embedding model name |
+| `--model` | `voyage-3` | Embedding model |
 | `--batch-size` | `64` | Chunks per embedding request |

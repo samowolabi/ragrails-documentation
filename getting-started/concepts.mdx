@@ -8,15 +8,17 @@ RAG (Retrieval-Augmented Generation) gives an LLM the right facts at answer time
 
 Ragrails runs that as a pipeline:
 
-```
+<CodeGroup>
+``` Example
 content → chunks → embeddings → vector store → retrieval → answer
 ```
+</CodeGroup>
 
 ## The pipeline, stage by stage
 
 <Steps>
   <Step title="Ingest">
-    Pull in your raw content (websites, documents, or API responses) and normalize it into clean text.
+    Pull in your raw content (scraped websites, documents, or API responses) and normalize it into clean text.
   </Step>
   <Step title="Chunk">
     Split each document into small, focused passages.

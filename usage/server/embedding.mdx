@@ -4,19 +4,23 @@ icon: "binary"
 description: "Embed chunks over HTTP."
 ---
 
-## POST /v1/embed
+`POST /v1/embed` converts chunks into vectors, the same as the SDK [`embed()`](/usage/sdk/embedding). Each returned chunk gains an `embedding` field. Pass the result to [`/v1/store`](/usage/server/storing).
+
+## Request
 
 <CodeGroup>
-```json Request
-{
-  "chunks": [
-    {"id": "chunk-1", "text": "Embedding converts chunks into vectors.", "source": "playground://embedding", "metadata": {}}
-  ],
-  "provider": "voyage",
-  "model": "voyage-3",
-  "input_type": "document",
-  "batch_size": 64
-}
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/embed \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chunks": [
+      { "id": "guide-0", "text": "Ragrails builds modular RAG workflows...", "source": "files/guide.pdf", "metadata": {"title": "Guide"} }
+    ],
+    "provider": "voyage",
+    "model": "voyage-3",
+    "input_type": "document",
+    "batch_size": 64
+  }'
 ```
 
 ```json Response
@@ -24,10 +28,33 @@ description: "Embed chunks over HTTP."
   "inputs": 1,
   "embedded": 1,
   "items": [
-    {"id": "chunk-1", "text": "...", "embedding": [...], "source": "...", "metadata": {}}
+    { "id": "guide-0", "text": "...", "embedding": [0.0132, -0.0719, 0.0241], "source": "files/guide.pdf", "metadata": {"title": "Guide"} }
   ],
   "failed": 0,
   "errors": []
 }
 ```
 </CodeGroup>
+
+<Warning>Use `input_type: "document"` when embedding content to store, and `"query"` when embedding a search query. Mismatching them hurts retrieval quality. Use the same model for indexing and querying.</Warning>
+
+## Request fields
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `chunks` | required | List of chunk dicts; each needs `id` and `text` |
+| `provider` | `"voyage"` | Embedding provider |
+| `model` | `"voyage-3"` | Model name |
+| `input_type` | `"document"` | `"document"` for indexing, `"query"` for retrieval |
+| `batch_size` | `64` | Chunks per embedding request |
+| `options` | `null` | Provider-specific options |
+
+## Response fields
+
+| Field | Description |
+| --- | --- |
+| `inputs` | Chunks passed in |
+| `embedded` | Chunks successfully embedded |
+| `items` | Chunk dicts with an added `embedding` vector |
+| `failed` | Failed chunks |
+| `errors` | Error objects |

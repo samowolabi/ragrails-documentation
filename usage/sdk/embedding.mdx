@@ -4,31 +4,23 @@ icon: "binary"
 description: "Generate vector representations for chunks."
 ---
 
-Create an embedder object with `embedder()`, then pass it to `embed()`.
+Embedding converts chunks into vectors. With an embedding provider configured on `RagRails`, `embed()` works without any extra setup.
 
 ```bash
 pip install "ragrails[voyage]"
 ```
 
-<CodeGroup>
-```python Request
+```python
 from ragrails import RagRails
 
-rag = RagRails()
+rag = RagRails(embedding={"provider": "voyage", "model": "voyage-3"})
 
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="document")
+result = rag.embed(chunks=chunk_result.items)
+```
 
-result = rag.embed(
-    chunks=chunk_result.items,  # list of chunk dicts from rag.chunk()
-    embedder=embedder,
-    batch_size=64,
-)
-
-result.inputs    # chunks passed in
-result.embedded  # chunks successfully embedded
-result.items     # chunk dicts with an added "embedding" vector field
-result.failed    # failed chunks
-result.errors    # list of error dicts
+<CodeGroup>
+```python Request
+result = rag.embed(chunks=chunk_result.items, batch_size=64)
 ```
 
 ```python Response
@@ -36,18 +28,29 @@ result.embedded  # 64
 result.items[0]  # {
                  #   "id": "guide-0",
                  #   "text": "Ragrails builds modular RAG workflows...",
-                 #   "embedding": [0.0132, -0.0719, 0.0241, ...],  # 1024 floats
+                 #   "embedding": [0.0132, -0.0719, 0.0241],  # 1024 floats
                  #   "metadata": {"title": "Guide", "chunk_index": 0},
                  # }
 ```
 </CodeGroup>
 
+## Override the embedder per call
+
+`embed()` creates the embedder from the constructor `embedding` config. Pass an explicit `embedder` to override:
+
+```python
+result = rag.embed(
+    chunks=chunk_result.items,
+    embedder=rag.embedder(provider="voyage", model="voyage-3-large"),
+)
+```
+
 ## `embedder()` parameters
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `provider` | `"voyage"` | Embedding provider (`"voyage"`) |
-| `model` | `"voyage-3"` | Model name |
+| `provider` | constructor default, else `"voyage"` | Embedding provider |
+| `model` | constructor default, else `"voyage-3"` | Model name |
 | `input_type` | `"document"` | `"document"` for indexing, `"query"` for retrieval |
 | `options` | `None` | Provider-specific options dict |
 
@@ -55,8 +58,9 @@ result.items[0]  # {
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `chunks` | required | List of chunk dicts; each must have `id` and `text` |
-| `embedder` | required | Embedder object from `rag.embedder()` |
+| `chunks` | required | List of chunk dicts; each needs `id` and `text` |
+| `embedder` | inherits constructor embedding | Embedder object; auto-created when omitted |
+| `input_type` | `"document"` | Used when `embed` creates the embedder |
 | `batch_size` | `64` | Chunks per embedding API request |
 
 ## Supported providers

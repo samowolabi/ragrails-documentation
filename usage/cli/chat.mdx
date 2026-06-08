@@ -4,9 +4,9 @@ icon: "messages-square"
 description: "RAG chat from the terminal."
 ---
 
-## One-shot chat turn
+`chat` answers a question grounded in your vector index. Pass a query for a one-shot turn, or run it with no query to start an interactive session.
 
-Run a single question against your vector index:
+## One-shot chat turn
 
 <CodeGroup>
 ```bash Command
@@ -26,9 +26,9 @@ Sources:
 ```
 </CodeGroup>
 
-## Multi-turn with history file
+## Multi-turn with a history file
 
-Pass `--history-file` to persist history across turns. The file is created on the first turn and updated after each turn.
+`--history-file` persists conversation history across turns. The file is created on the first turn and updated after each one.
 
 ```bash
 ragrails chat "How do I authenticate?" \
@@ -37,13 +37,12 @@ ragrails chat "How do I authenticate?" \
   --llm-provider openai --llm-model gpt-4o-mini
 
 ragrails chat "What about the second step?" \
-  --history-file files/chat/history.json \
-  --rewrite-query
+  --history-file files/chat/history.json --rewrite-query
 ```
 
-## Interactive REPL
+## Interactive session
 
-Run `chat` with no query argument to start a full interactive session: a REPL that keeps history, streams answers, and can call tools.
+Run `chat` with no query to start a REPL that keeps history, streams answers, and can call tools.
 
 ```bash
 ragrails chat
@@ -51,48 +50,44 @@ ragrails chat
 
 ### Slash commands
 
-Type these in the REPL to control the session live:
-
 | Command | What it does |
 | --- | --- |
-| `/model` | List available models, or `/model gpt-4o` to switch mid-conversation |
+| `/model` | List models, or `/model gpt-4o` to switch mid-conversation |
 | `/stream on` / `/stream off` | Toggle token-by-token streaming |
 | `/tools` | List the tools the assistant can call |
-| `/debug` | Show the retrieval trace for the last answer (scores, rewritten query, chunks used) |
-
-<Tip>`/debug` is the fastest way to see *why* an answer was weak. It shows what was retrieved, the rerank scores, and the query that was actually searched.</Tip>
+| `/debug` | Show the retrieval trace for the last answer |
 
 ### Agentic tools
 
-When the answer isn't in your vector index, the assistant can call tools to go get it:
+When the answer isn't in your index, the assistant can call `web_fetch` (read a web page) or `api_call` (make a live HTTP request). It confirms before each call. See [agentic tools](/advanced/agentic-tools).
 
-| Tool | What it does |
+## Flags map to SDK config
+
+| Flag | SDK config |
 | --- | --- |
-| `web_fetch` | Fetches a web page as readable text, for live lookups beyond your indexed content |
-| `api_call` | Makes a live HTTP request to perform an action the user asks for (e.g. trigger a transfer, fetch account details) |
-
-<Warning>`api_call` makes real requests with the values you provide. The REPL asks for confirmation before each tool call.</Warning>
+| `--rewrite-query`, `--rewrite-session-context` | `QueryRewriteConfig` |
+| `--disable-history-compaction` | `HistoryCompactionConfig(enabled=False)` |
+| `--disable-intent-routing` | `IntentRoutingConfig(enabled=False)` |
+| `--rerank`, `--reranker`, `--reranker-model`, `--rerank-top-k` | reranker |
 
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `QUERY` | none | Question (positional). Omit to start interactive REPL |
-| `--llm-provider` | `openai` | LLM provider |
-| `--llm-model` | `gpt-4o-mini` | LLM model name |
-| `--max-tokens` | `1024` | LLM max output tokens |
+| `QUERY` | none | Question (positional). Omit to start the interactive REPL |
+| `--llm-provider` | `openai` | LLM provider (`openai`, `anthropic`, `google`) |
+| `--llm-model` | `gpt-4o-mini` | LLM model |
+| `--max-tokens` | `1024` | Max output tokens |
 | `--embedder-provider` | `voyage` | Query embedding provider |
 | `--embedder-model` | `voyage-3` | Query embedding model |
 | `--vector-db` | `qdrant` | Vector DB provider |
-| `--collection` | `None` | Collection name |
-| `--url` | `None` | Vector DB URL |
-| `--persona` | `""` | System persona for the chat turn |
-| `--history-file` | `None` | JSON file to load and save history |
+| `--collection` | none | Collection name |
+| `--url` | none | Vector DB URL |
+| `--persona` | `""` | System persona for the turn |
+| `--history-file` | none | JSON file to load and save history |
 | `--rewrite-query` | off | Rewrite the query before retrieval |
 | `--rewrite-session-context` | `""` | Context hint for query rewriting |
 | `--rerank` | off | Rerank retrieved chunks |
-| `--reranker` | `voyage` | Reranker provider |
-| `--reranker-model` | `rerank-2-lite` | Reranker model |
-| `--rerank-top-k` | `5` | Chunks to keep after reranking |
-| `--disable-intent-routing` | off | Always run retrieval, even for small-talk queries |
+| `--reranker` / `--reranker-model` / `--rerank-top-k` | `voyage` / `rerank-2-lite` / `5` | Reranker config |
+| `--disable-intent-routing` | off | Always run retrieval, even for small talk |
 | `--disable-history-compaction` | off | Return full history without summarisation |

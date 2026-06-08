@@ -15,13 +15,13 @@ When the answer isn't in your vector index, the interactive assistant can call t
 
 ## Using them
 
-```bash
+```bash CLI
 ragrails chat
 ```
 
 Inside the REPL:
 
-```
+``` Example
 > /tools                       # list available tools
 > Look up the latest pricing on example.com and compare it to our docs.
   → assistant calls web_fetch, then answers
@@ -32,3 +32,5 @@ Inside the REPL:
 The assistant only reaches for tools when the indexed content isn't enough. Normal questions are answered from your knowledge base as usual.
 
 Reference: [CLI chat](/usage/cli/chat).
+
+To build your own tool loop in the SDK, see [tool calling](/advanced/tool-calling).

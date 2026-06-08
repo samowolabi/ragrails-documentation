@@ -8,33 +8,184 @@ description: "Build a RAG collection from local files, end to end."
 
 ```bash
 pip install "ragrails[voyage,qdrant]"
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-## 2. Ingest a folder
+## 2. Choose an input form
 
-```python
+Document ingestion accepts five input forms. Use the one that matches where your files live.
+
+### Single File
+
+Use this when you already know the exact document path.
+
+- SDK: `docs="files/guide.pdf"`
+- CLI: `--docs files/guide.pdf`
+- REST JSON: `{"files": "files/guide.pdf"}`
+
+### Multiple Files
+
+Use this when you want to ingest a small explicit set of documents.
+
+- SDK: `docs=["files/guide.pdf", "files/handbook.docx"]`
+- CLI: repeat `--docs`
+- REST JSON: `{"files": ["files/guide.pdf", "files/handbook.docx"]}`
+
+### Folder
+
+Use this for a directory of PDFs, Word files, spreadsheets, Markdown, HTML, text, or CSV files.
+
+- SDK: `docs={"folder": "files/docs/"}`
+- CLI: `--folder files/docs/`
+- REST pipeline: `{"docs": {"folder": "files/docs/"}}`
+- REST JSON: `{"folder": "files/docs/"}`
+
+### Remote File URL
+
+Use this when the file is available at a direct URL.
+
+- SDK: `docs="https://example.com/guide.pdf"`
+- CLI: `--docs https://example.com/guide.pdf`
+- REST JSON: `{"files": "https://example.com/guide.pdf"}`
+
+### User Uploads
+
+Use this when an app or browser is sending actual files to the REST API.
+
+- SDK: `docs=[{"content": uploaded_bytes, "filename": "guide.pdf"}]`
+- REST multipart: `POST /v1/ingest/docs/upload`
+- CLI: not supported; use paths, folders, or remote file URLs
+
+<CodeGroup>
+```python SDK
+# One file
+rag.ingest(docs="files/guide.pdf")
+
+# Many files
+rag.ingest(docs=["files/guide.pdf", "files/handbook.docx"])
+
+# Folder
+rag.ingest(docs={"folder": "files/docs/"})
+
+# Remote file URL
+rag.ingest(docs="https://example.com/guide.pdf")
+
+# Upload bytes from an app
+rag.ingest(docs=[{"content": uploaded_bytes, "filename": "guide.pdf"}])
+```
+
+```bash CLI
+# One file
+ragrails ingest --docs files/guide.pdf
+
+# Many files
+ragrails ingest --docs files/guide.pdf --docs files/handbook.docx
+
+# Folder
+ragrails ingest --folder files/docs/
+
+# Remote file URL
+ragrails ingest --docs https://example.com/guide.pdf
+```
+
+```bash REST API
+# Server-side file path
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{"files": "files/guide.pdf"}'
+
+# Folder on the server
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{"folder": "files/docs/"}'
+
+# Remote file URL
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{"files": "https://example.com/guide.pdf"}'
+
+# User-uploaded file
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs/upload \
+  -F "files=@files/guide.pdf" \
+  -F "frontmatter=false" \
+  -F "title=Guide" \
+  -F "description=Product guide"
+```
+</CodeGroup>
+
+<Note>Use JSON `/v1/ingest/docs` for files already reachable by the server, folders, and remote file URLs. Use multipart `/v1/ingest/docs/upload` for files uploaded from a client.</Note>
+
+## 3. Ingest, query, and chat
+
+All three versions build the `docs` collection from `files/docs/`, then query or chat over it.
+
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-
-result = rag.ingest(
-    docs={"folder": "files/docs/"},
+rag = RagRails(
+    collection="docs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
 
+result = rag.ingest(docs={"folder": "files/docs/"})
 print(f"Stored {result.stored} chunks from {result.sources} documents")
+
+rag.query("What does the guide cover?", retrieval={"top_k": 5})
+rag.chat("How do I get started?", history=[])
 ```
 
-Works for PDFs, DOCX, spreadsheets, HTML, Markdown, and other supported formats.
+```bash CLI
+ragrails ingest \
+  --folder files/docs/ \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3
 
-## 3. Query
+ragrails query "What does the guide cover?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 5
 
-```python
-result = rag.query(
-    "What does the guide cover?",
-    embedding={"provider": "voyage", "model": "voyage-3"},
-    retrieval={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 5},
-)
+ragrails chat "How do I get started?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
 ```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"folder": "files/docs/"},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"}
+  }'
+
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What does the guide cover?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 5}
+  }'
+
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I get started?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+</CodeGroup>
+
+Works for PDFs, DOCX, PPTX, XLSX, HTML, Markdown, TXT, CSV, and other formats supported by the document parser.

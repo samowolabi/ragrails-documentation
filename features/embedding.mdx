@@ -4,17 +4,122 @@ icon: "binary"
 description: "Turn passages into vectors."
 ---
 
-Embedding converts each chunk into a vector: numbers that capture meaning, so similar meaning lands close together in search.
+Embedding is part of the [Ingest](/features/ingest) workflow. It converts each chunk into a vector: numbers that capture meaning, so similar meaning lands close together in search.
 
-Create an embedder, then embed:
+## Interface Docs
 
-```python
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="document")
-result = rag.embed(chunks=chunk_result.items, embedder=embedder, batch_size=64)
+Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+
+- [SDK embedding](/usage/sdk/embedding)
+- [CLI embedding](/usage/cli/embedding)
+- [REST embedding](/usage/server/embedding)
+
+<CodeGroup>
+```python SDK
+result = rag.embed(chunks=chunk_result.items)
 result.items  # chunks with an added "embedding" field
 ```
 
-<Warning>**Match `input_type` to the job.** Use `"document"` when embedding content to store, and `"query"` when embedding a search query. Mismatching them hurts retrieval quality.</Warning>
+```bash CLI
+ragrails embed \
+  --input-dir files/chunks/ \
+  --output-dir files/embedded/ \
+  --provider voyage \
+  --model voyage-3
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/embed \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chunks": [{"id": "policy#refunds", "text": "Refunds are available within 30 days.", "source": "policy.md", "metadata": {}}],
+    "provider": "voyage",
+    "model": "voyage-3",
+    "input_type": "document"
+  }'
+```
+</CodeGroup>
+
+
+
+<CodeGroup>
+```json Response
+{
+  "inputs": 1,
+  "embedded": 1,
+  "items": [
+    {
+      "id": "policy#refunds",
+      "text": "Refunds are available within 30 days.",
+      "embedding": [0.01, 0.02, 0.03],
+      "source": "policy.md",
+      "metadata": {
+        "source": "policy.md",
+        "title": "Refund policy",
+        "chunk_id": "chk_abc123"
+      }
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Possible Errors
+
+Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+
+<CodeGroup>
+```json Validation
+{
+  "inputs": 1,
+  "embedded": 0,
+  "items": [],
+  "failed": 1,
+  "errors": [
+    {
+      "source": "policy#refunds",
+      "source_kind": "chunk",
+      "stage": "validate",
+      "error": "chunk text must be a non-empty string",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Provider failure
+{
+  "inputs": 1,
+  "embedded": 0,
+  "items": [],
+  "failed": 1,
+  "errors": [
+    {
+      "source": "policy#refunds",
+      "source_kind": "chunk",
+      "stage": "embed",
+      "error": "embedding model returned a different number of vectors than input texts",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json REST exception
+{
+  "error": {
+    "type": "ValueError",
+    "message": "model is required"
+  }
+}
+```
+</CodeGroup>
+
+<Warning>**Match `input_type` to the job.** `embed()` uses `"document"` for indexing; retrieval embeds the query as `"query"` for you. Mismatching them hurts retrieval quality.</Warning>
 
 ## Providers
 
@@ -25,9 +130,3 @@ result.items  # chunks with an added "embedding" field
 Need a different provider? Register your own with `register_embedder()`.
 
 <Tip>Use the **same model** for indexing and querying. Vectors from different models aren't comparable.</Tip>
-
-`batch_size` controls how many chunks go in one request. Raise it to cut API calls; lower it if you hit rate limits.
-
-## Reference
-
-Full parameters: [SDK embedding](/usage/sdk/embedding) · [CLI](/usage/cli/embedding) · [REST](/usage/server/embedding).

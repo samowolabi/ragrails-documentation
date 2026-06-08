@@ -4,24 +4,126 @@ icon: "database"
 description: "Save vectors to a database."
 ---
 
-Storing upserts embedded chunks into a vector database. The collection is created automatically if it doesn't exist.
+Storing is part of the [Ingest](/features/ingest) workflow. It upserts embedded chunks into the vector database you configured on `RagRails`. The collection is created automatically if it doesn't exist.
 
-```python
-rag.store(
-    embedded_chunks=embed_result.items,
-    vector_db="qdrant",
-    collection="docs",
-    url="http://localhost:6333",
-)
+## Interface Docs
+
+Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+
+- [SDK storing](/usage/sdk/storing)
+- [CLI storing](/usage/cli/storing)
+- [REST storing](/usage/server/storing)
+
+<CodeGroup>
+```python SDK
+rag.store(embedded_chunks=embed_result.items)
 ```
+
+```bash CLI
+ragrails store \
+  --input-dir files/embedded/ \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/store \
+  -H "Content-Type: application/json" \
+  -d '{
+    "embedded_chunks": [{"id": "policy#refunds", "text": "Refunds are available within 30 days.", "embedding": [0.01, 0.02], "source": "policy.md", "metadata": {}}],
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333"
+  }'
+```
+</CodeGroup>
+
+
+
+<CodeGroup>
+```json Response
+{
+  "inputs": 1,
+  "stored": 1,
+  "items": [{"id": "policy#refunds"}],
+  "failed": 0,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Possible Errors
+
+Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+
+<CodeGroup>
+```json Validation
+{
+  "inputs": 1,
+  "stored": 0,
+  "items": [],
+  "failed": 1,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": [
+    {
+      "source": "policy#refunds",
+      "source_kind": "embedded_chunk",
+      "stage": "validate",
+      "error": "embedding must be a non-empty list",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Store failure
+{
+  "inputs": 1,
+  "stored": 0,
+  "items": [],
+  "failed": 1,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": [
+    {
+      "source": "policy#refunds",
+      "source_kind": "embedded_chunk",
+      "stage": "store",
+      "error": "Connection refused: http://localhost:6333",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json REST exception
+{
+  "error": {
+    "type": "ValueError",
+    "message": "Pinecone collection/index names cannot contain underscores. Use hyphens, e.g. 'rag-chunks'."
+  }
+}
+```
+</CodeGroup>
 
 ## Databases
 
-| Database | Extra | Notes |
-| --- | --- | --- |
-| Qdrant | `ragrails[qdrant]` | Local or cloud. Needs `url`. |
-| Pinecone | `ragrails[pinecone]` | Cloud. Uses `PINECONE_API_KEY`. |
-| Weaviate | `ragrails[weaviate]` | Local or cloud. Needs `url`. |
+See [vector databases](/reference/vector-databases) for supported providers, install extras, defaults, and required environment variables.
+
+| Database | `vector_db` | Extra | Notes |
+| --- | --- | --- | --- |
+| Qdrant (local) | `qdrant` | `ragrails[qdrant]` | Needs `url` |
+| Qdrant Cloud | `qdrant_cloud` | `ragrails[qdrant]` | Cloud `url` + `QDRANT_API_KEY` |
+| Pinecone | `pinecone` | `ragrails[pinecone]` | Uses `PINECONE_API_KEY` |
+| Weaviate | `weaviate` | `ragrails[weaviate]` | Local or cloud, needs `url` |
+
+<Note>The constructor uses `vector_store={"provider": ...}` + `collection=`; `store`/`edit`/`delete` use `vector_db=` to override.</Note>
 
 ## Keeping an index current
 
@@ -32,7 +134,3 @@ rag.store(
 | Remove chunks by ID | `delete()` |
 
 <Tip>Give chunks stable IDs at chunk time so `edit()` and `delete()` can target them later.</Tip>
-
-## Reference
-
-Full parameters: [SDK storing](/usage/sdk/storing) · [CLI](/usage/cli/storing) · [REST](/usage/server/storing).

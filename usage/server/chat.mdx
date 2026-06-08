@@ -4,26 +4,71 @@ icon: "messages-square"
 description: "RAG chat over HTTP."
 ---
 
-## POST /v1/chat
+`POST /v1/chat` runs retrieval and answer generation together. It is stateless: pass `history` in and persist the `history` you get back, the same as the SDK [`chat()`](/usage/sdk/chat).
 
-```json
-{
-  "query": "How do I authenticate?",
-  "llm_provider": "openai",
-  "llm_model": "gpt-4o-mini",
-  "embedder_provider": "voyage",
-  "embedder_model": "voyage-3",
-  "vector_db": "qdrant",
-  "collection": "docs",
-  "url": "http://localhost:6333",
-  "history": []
-}
-```
-
-Multi-turn: pass the `history` from the previous response:
+## Basic chat
 
 <CodeGroup>
-```json Request
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+
+```json Response
+{
+  "answer": "To authenticate, create an API key in your account settings...",
+  "sources": [{ "id": "guide-3", "title": "Authentication", "text": "..." }],
+  "history": [
+    { "role": "user", "content": "How do I authenticate?" },
+    { "role": "assistant", "content": "To authenticate, create an API key..." }
+  ],
+  "intent": "rag",
+  "answer_confidence": { "level": "high", "score": 0.86 },
+  "retrieval_quality": { "status": "pass" },
+  "compacted": false,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Streaming chat
+
+`POST /v1/chat/stream` returns `text/event-stream` SSE frames for normal RAG chat. Progress events describe retrieval and generation stages, token events stream generated text, and the final event contains the full chat response.
+
+<CodeGroup>
+```bash Request
+curl -N -X POST http://127.0.0.1:8000/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"query":"How do I authenticate?","collection":"docs"}'
+```
+
+```text Event
+event: token
+data: {"type":"token","stage":"generation","message":"","data":{"text":"Use "},"sequence":4}
+
+event: final
+data: {"type":"final","stage":"complete","message":"Chat complete","data":{"answer":"Use bearer auth.","history":[]},"sequence":5}
+```
+</CodeGroup>
+
+<Note>Chat streaming covers normal RAG chat. It does not stream agentic tool-call execution.</Note>
+
+## Multi-turn
+
+Pass the `history` array from the previous response back on the next request.
+
+```json
 {
   "query": "What about the second step?",
   "llm_provider": "openai",
@@ -34,23 +79,85 @@ Multi-turn: pass the `history` from the previous response:
   "collection": "docs",
   "url": "http://localhost:6333",
   "history": [
-    {"role": "user", "content": "How do I authenticate?"},
-    {"role": "assistant", "content": "To authenticate, you need to..."}
-  ],
-  "query_rewrite": {"enabled": true}
+    { "role": "user", "content": "How do I authenticate?" },
+    { "role": "assistant", "content": "To authenticate, create an API key..." }
+  ]
 }
 ```
 
-```json Response
-{
-  "answer": "To complete the second step, you need to...",
-  "sources": [{"id": "chunk-id", "title": "Auth Guide", "text": "..."}],
-  "history": [...],
-  "intent": "rag",
-  "answer_confidence": {...},
-  "retrieval_quality": {...},
-  "compacted": false,
-  "errors": []
-}
+## Tuning blocks
+
+Each maps to an SDK chat config object. All are optional.
+
+### Query rewriting
+
+Expands conversational follow-ups into standalone questions before retrieval.
+
+```json
+{ "query_rewrite": { "enabled": true, "session_context": "Onboarding flow" } }
 ```
-</CodeGroup>
+
+### History compaction
+
+Summarizes old turns and keeps recent ones, so long conversations stay within the context window.
+
+```json
+{ "history_compaction": { "enabled": true, "history_limit": 15, "keep_recent": 5 } }
+```
+
+### Intent routing
+
+Skips retrieval for small talk and direct questions.
+
+```json
+{ "intent_routing": { "enabled": true } }
+```
+
+### Retrieval quality
+
+Sets confidence thresholds for the retrieved context.
+
+```json
+{ "retrieval_quality": { "min_retrieval_score": 0.35, "min_rerank_score": 0.5, "max_context_chunks": null } }
+```
+
+### Reranking
+
+```json
+{ "rerank": true, "reranker": "voyage", "reranker_model": "rerank-2-lite", "rerank_top_k": 5 }
+```
+
+## Request fields
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `query` | required | User message |
+| `llm_provider` | `"openai"` | LLM provider (`openai`, `anthropic`, `google`) |
+| `llm_model` | `"gpt-4o-mini"` | LLM model |
+| `max_tokens` | `1024` | Max output tokens |
+| `embedder_provider` | `"voyage"` | Query embedding provider |
+| `embedder_model` | `"voyage-3"` | Query embedding model |
+| `vector_db` | `"qdrant"` | Vector DB provider |
+| `collection` | `null` | Collection name |
+| `url` | `null` | Vector DB URL |
+| `rerank` | `false` | Rerank retrieved chunks |
+| `reranker` / `reranker_model` / `rerank_top_k` | `voyage` / `rerank-2-lite` / `5` | Reranker config |
+| `history` | `null` | Previous turns |
+| `history_compaction` | `null` | Compaction block (above) |
+| `query_rewrite` | `null` | Query rewrite block (above) |
+| `intent_routing` | `null` | Intent routing block (above) |
+| `retrieval_quality` | `null` | Quality thresholds block (above) |
+| `persona` | `""` | System persona injected into the prompt |
+
+## Response fields
+
+| Field | Description |
+| --- | --- |
+| `answer` | LLM answer |
+| `sources` | Source chunks used |
+| `history` | Updated history (pass to the next request) |
+| `intent` | `"rag"` or `"direct"` |
+| `answer_confidence` | Confidence assessment |
+| `retrieval_quality` | Quality assessment |
+| `compacted` | Whether history was summarized this turn |
+| `errors` | Error objects |

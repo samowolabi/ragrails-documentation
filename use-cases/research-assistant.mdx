@@ -15,31 +15,43 @@ Ingest the documents from local files, URLs, or bytes, then ask questions that p
 1. **Parse** papers and reports (mix local paths, file URLs, and bytes).
 2. **Chat** to synthesize, with sources for every claim.
 
-```python
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-
-rag.ingest(
-    docs=[
-        "files/reports/q1.pdf",
-        "https://example.com/research/whitepaper.pdf",   # remote file URL
-    ],
+rag = RagRails(
+    collection="research",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "research", "url": "http://localhost:6333"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-
-llm = rag.llm(provider="openai", model="gpt-4o")   # stronger model for synthesis
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
-
-result = rag.chat(
-    "What do these reports agree on about retention?",
-    llm=llm, embedder=embedder,
-    vector_db="qdrant", collection="research", url="http://localhost:6333",
-    history=[],
-)
-print(result.answer)
+rag.ingest(docs=["files/reports/q1.pdf", "https://example.com/research/whitepaper.pdf"])
+print(rag.chat("What do these reports agree on about retention?", history=[]).answer)
 ```
+
+```bash CLI
+ragrails ingest \
+  --docs files/reports/q1.pdf \
+  --docs https://example.com/research/whitepaper.pdf \
+  --vector-db qdrant --collection research --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails chat "What do these reports agree on about retention?" \
+  --vector-db qdrant --collection research --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"docs": ["files/reports/q1.pdf", "https://example.com/research/whitepaper.pdf"], "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "research", "url": "http://localhost:6333"}}' 
+
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What do these reports agree on about retention?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "research", "url": "http://localhost:6333", "history": []}' 
+```
+</CodeGroup>
 
 ## Features used
 

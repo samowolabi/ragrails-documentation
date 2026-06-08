@@ -16,35 +16,48 @@ Crawl the whole docs site once, then answer questions grounded in the actual pag
 2. **Chat** over it, embedded as a widget, Slack bot, or CLI.
 3. Cite `result.sources` so users can click through to the real page.
 
-```python
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-rag.setup_url()
-
-rag.ingest(
-    urls="https://docs.example.com",
-    ingestion={"mode": "full", "max_pages": 500},
+rag = RagRails(
+    collection="docs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-
-llm = rag.llm(provider="openai", model="gpt-4o-mini")
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
-
-result = rag.chat(
-    "How do I rotate an API key?",
-    llm=llm, embedder=embedder,
-    vector_db="qdrant", collection="docs", url="http://localhost:6333",
-    history=[],
-)
+rag.setup_url()
+rag.ingest(urls="https://docs.example.com", ingestion={"urls": {"mode": "full", "max_pages": 500}})
+result = rag.chat("How do I rotate an API key?", history=[])
 print(result.answer)
-for s in result.sources:
-    print("·", s.get("title"))
 ```
 
-<Tip>Re-crawl on a schedule and use [`edit()`/`delete()`](/guides/manage-stored-data) to keep the index in sync as docs change.</Tip>
+```bash CLI
+ragrails setup-url
+ragrails ingest \
+  --source-url https://docs.example.com \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails chat "How do I rotate an API key?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"urls": "https://docs.example.com", "ingestion": {"urls": {"mode": "full", "max_pages": 500}}, "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"}}' 
+
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How do I rotate an API key?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "history": []}' 
+```
+</CodeGroup>
+
+<Tip>Re-crawl on a schedule and use [`edit()`/`delete()`](/features/knowledge-base-maintenance) to keep the index in sync as docs change.</Tip>
 
 ## Features used
 
-[Ingestion](/features/ingestion) · [Chat](/features/chat) · [Keeping your index current](/guides/manage-stored-data)
+[Extraction](/features/extraction) · [Chat](/features/chat) · [Keeping your index current](/features/knowledge-base-maintenance)

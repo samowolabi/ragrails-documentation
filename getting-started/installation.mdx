@@ -6,36 +6,42 @@ description: "Install Ragrails and optional extras."
 
 Ragrails requires Python 3.10 or newer. Python 3.12 or 3.13 is recommended when installing provider extras.
 
-```bash
+<CodeGroup>
+```bash SDK
 pip install ragrails
 ```
 
-The base install includes the SDK, CLI, REST API server, document ingestion, API ingestion, chunking, embedding orchestration, vector storage orchestration, retrieval, chat, and pipeline helpers.
+```bash CLI
+pip install ragrails
+ragrails --help
+```
+
+```bash REST API
+pip install "ragrails[server-qdrant]"
+ragrails-api --help
+```
+</CodeGroup>
+
+The base install includes the SDK, CLI, REST API server, all LLM providers (OpenAI, Anthropic, Google), document ingestion, API ingestion, chunking, embedding orchestration, vector storage orchestration, retrieval, chat, and pipeline helpers.
+
+<Note>LLM providers are built in. You don't need an extra for OpenAI, Anthropic, or Google, just set the matching API key.</Note>
 
 ## Extras
 
-Optional installs cover integrations that pull in heavier dependencies, provider SDKs, or browser runtimes. Install only what you need.
+Optional installs cover integrations that pull in heavier dependencies or browser runtimes: an embedder, a vector database client, URL scraping, or local reranking. Install only what you need.
 
 | Need | Install |
 | --- | --- |
-| URL ingestion | `pip install "ragrails[url]"` |
 | Voyage embeddings | `pip install "ragrails[voyage]"` |
-| OpenAI | `pip install "ragrails[openai]"` |
-| Anthropic | `pip install "ragrails[anthropic]"` |
-| Google Gemini | `pip install "ragrails[google]"` |
-| Qdrant | `pip install "ragrails[qdrant]"` |
+| URL ingestion | `pip install "ragrails[url]"` |
+| Qdrant (local or cloud) | `pip install "ragrails[qdrant]"` |
 | Pinecone | `pip install "ragrails[pinecone]"` |
 | Weaviate | `pip install "ragrails[weaviate]"` |
-| Reranking | `pip install "ragrails[rerank]"` |
+| Local reranking | `pip install "ragrails[rerank]"` |
 | SDK + Qdrant stack | `pip install "ragrails[store-qdrant]"` |
 | REST API + Qdrant stack | `pip install "ragrails[server-qdrant]"` |
 | REST API + Pinecone stack | `pip install "ragrails[server-pinecone]"` |
 | REST API + Weaviate stack | `pip install "ragrails[server-weaviate]"` |
 | Everything | `pip install "ragrails[all]"` |
 
-## Verify
-
-```bash
-ragrails --help
-ragrails-api --help
-```
+<Note>Qdrant Cloud uses the same `qdrant` extra. Point `url` at your cloud endpoint and set `QDRANT_API_KEY`. See [vector databases](/reference/vector-databases) for provider names and defaults.</Note>

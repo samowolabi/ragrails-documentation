@@ -4,19 +4,110 @@ icon: "scissors"
 description: "Split content into searchable passages."
 ---
 
-Chunking splits documents into small passages before embedding.
+Chunking is part of the [Ingest](/features/ingest) workflow. It splits documents into small passages before embedding.
+
+## Interface Docs
+
+Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+
+- [SDK chunking](/usage/sdk/chunking)
+- [CLI chunking](/usage/cli/chunking)
+- [REST chunking](/usage/server/chunking)
 
 <Note>**Why:** search works best on focused passages, not whole files. Chunking lets a query match the one paragraph that answers it, not a 50-page document.</Note>
 
-```python
+<CodeGroup>
+```python SDK
 result = rag.chunk(
-    markdown=docs.outputs,   # ingestion output, or plain strings
+    markdown=docs.outputs,
     chunk_size=2000,
     chunk_overlap=200,
     min_chunk_length=100,
 )
 result.items  # list of chunk dicts
 ```
+
+```bash CLI
+ragrails chunk \
+  --input-dir files/output/docs/ \
+  --output-dir files/chunks/ \
+  --chunk-size 2000 \
+  --chunk-overlap 200 \
+  --min-chunk-length 100
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chunk \
+  -H "Content-Type: application/json" \
+  -d '{
+    "markdown": [{"text": "# Refund policy\n\nRefunds are available within 30 days.", "source": "policy.md", "metadata": {}}],
+    "chunk_size": 2000,
+    "chunk_overlap": 200,
+    "min_chunk_length": 100
+  }'
+```
+</CodeGroup>
+
+
+
+<CodeGroup>
+```json Response
+{
+  "inputs": 1,
+  "chunks": 3,
+  "items": [
+    {
+      "id": "policy#refunds-0",
+      "text": "Refunds are available within 30 days.",
+      "source": "policy.md",
+      "metadata": {
+        "source": "policy.md",
+        "title": "Refund policy",
+        "heading": {"h1": "Refund policy"},
+        "chunk_id": "chk_abc123",
+        "content_hash": "abc123"
+      }
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Possible Errors
+
+Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+
+<CodeGroup>
+```json Validation
+{
+  "inputs": 1,
+  "chunks": 0,
+  "items": [],
+  "failed": 1,
+  "errors": [
+    {
+      "source": "policy.md",
+      "source_kind": "markdown",
+      "stage": "validate",
+      "error": "chunk item text must be a non-empty string",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json REST exception
+{
+  "error": {
+    "type": "ValueError",
+    "message": "chunk_overlap must be smaller than chunk_size"
+  }
+}
+```
+</CodeGroup>
 
 ## Choosing chunk size
 
@@ -32,7 +123,3 @@ result.items  # list of chunk dicts
 **Overlap** repeats a little text between adjacent chunks so a sentence split across a boundary isn't lost. Keep it ~10% of `chunk_size`.
 
 **`min_chunk_length`** drops tiny fragments (stray headings, footers) that add noise.
-
-## Reference
-
-Full parameters: [SDK chunking](/usage/sdk/chunking) · [CLI](/usage/cli/chunking) · [REST](/usage/server/chunking).

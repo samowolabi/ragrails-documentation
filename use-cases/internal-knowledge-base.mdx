@@ -16,21 +16,42 @@ Parse everything into one private, self-hosted collection. No documents leave yo
 2. **Store** in a vector database you host.
 3. **Retrieve or chat** privately.
 
-```python
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-
-# Parse a shared drive of mixed documents
-rag.ingest(
-    docs={"folder": "files/company/"},   # PDF, DOCX, XLSX, PPTX, MD, CSV...
+rag = RagRails(
+    collection="wiki",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "wiki", "url": "http://localhost:6333"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-
-# Ingest an upload straight from memory (e.g. a web app)
-rag.parse(files=[{"content": uploaded_bytes, "filename": "handbook.pdf"}])
+rag.ingest(docs={"folder": "files/company/"})
+print(rag.chat("How many vacation days do new hires get?", history=[]).answer)
 ```
+
+```bash CLI
+ragrails ingest \
+  --folder files/company/ \
+  --vector-db qdrant --collection wiki --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails chat "How many vacation days do new hires get?" \
+  --vector-db qdrant --collection wiki --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"docs": {"folder": "files/company/"}, "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "wiki", "url": "http://localhost:6333"}}' 
+
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How many vacation days do new hires get?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "wiki", "url": "http://localhost:6333", "history": []}' 
+```
+</CodeGroup>
 
 <Note>Uploads can be ingested as raw bytes. See [parse input forms](/usage/sdk/ingestion#input-forms). Everything runs against your own vector database, so data stays in-house.</Note>
 

@@ -32,3 +32,23 @@ ragrails/interfaces/cli/chunking/tests/test_commands.py
 ragrails/interfaces/sdk/storing/tests/test_client.py
 ragrails/core/stg_04_storing/tests/test_storing.py
 ```
+
+## Documentation contracts
+
+Docs examples that are likely to drift are checked against the implementation. Run this from the documentation repo root with the source checkout path:
+
+```bash
+RAGRAILS_SOURCE="/path/to/ragrails" python scripts/check-docs-contracts.py
+```
+
+This verifies the golden quickstart path, the real CLI command list, REST ingestion schema behavior, and SDK `llm()` validation.
+
+## Reference generation
+
+The high-level CLI, SDK, and REST reference pages are generated from the implementation:
+
+```bash
+RAGRAILS_SOURCE="/path/to/ragrails" uv run python scripts/generate-reference.py
+```
+
+Run this after changing CLI commands, SDK method signatures, or REST routes. Then run the docs contract checker.

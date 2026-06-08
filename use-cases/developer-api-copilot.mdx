@@ -15,25 +15,49 @@ Build a knowledge base from your API and SDK docs, then run an interactive assis
 1. **Fetch** API reference + **scrape** SDK docs into a collection.
 2. Run the **interactive chat** with agentic tools enabled.
 
-```python
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-rag.setup_url()
-
-rag.ingest(
-    api={"url": "https://api.example.com/openapi.json", "title": "API Reference"},
-    urls="https://docs.example.com/sdk",
+rag = RagRails(
+    collection="devdocs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "devdocs", "url": "http://localhost:6333"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
+rag.setup_url()
+rag.ingest(api={"url": "https://api.example.com/openapi.json", "title": "API Reference"}, urls="https://docs.example.com/sdk")
+rag.chat("How do I create a customer?", history=[])
 ```
 
-```bash
-ragrails chat --vector-db qdrant --collection devdocs --url http://localhost:6333
-> How do I create a customer? Then call the endpoint with my test key.
-  → answers from devdocs, then uses api_call to run the request
+```bash CLI
+ragrails setup-url
+ragrails ingest \
+  --api-url https://api.example.com/openapi.json \
+  --source-url https://docs.example.com/sdk \
+  --vector-db qdrant --collection devdocs --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails chat "How do I create a customer?" \
+  --vector-db qdrant --collection devdocs --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
 ```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"api": {"url": "https://api.example.com/openapi.json", "title": "API Reference"}, "urls": "https://docs.example.com/sdk", "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "devdocs", "url": "http://localhost:6333"}}' 
+
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How do I create a customer?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "devdocs", "url": "http://localhost:6333", "history": []}' 
+```
+</CodeGroup>
+
+
+Run `ragrails chat` with no query to use the interactive CLI. Ask: `How do I create a customer? Then call the endpoint with my test key.`
+
 
 <Warning>Agentic tools (`web_fetch`, `api_call`) run in the **interactive CLI** and confirm before each call. See [agentic tools](/advanced/agentic-tools).</Warning>
 

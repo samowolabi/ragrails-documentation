@@ -1,0 +1,82 @@
+---
+title: "Vector Databases"
+icon: "database"
+description: "Supported vector database providers and the names to use in SDK, CLI, and REST calls."
+---
+
+Ragrails stores embedded chunks in a vector database. Use the same provider, collection, and URL when you store, retrieve, query, or chat over the same knowledge base.
+
+## Supported Providers
+
+| Provider | Use this value | Install extra | Default URL | Default collection | Notes |
+| --- | --- | --- | --- | --- | --- |
+| Qdrant local | `qdrant` | `ragrails[qdrant]` | `http://localhost:6333` | `rag_chunks` | Good local default and quickstart path |
+| Qdrant Cloud | `qdrant_cloud` | `ragrails[qdrant]` | none | `rag_chunks` | Set `url` to your cloud endpoint and `QDRANT_API_KEY` |
+| Pinecone | `pinecone` | `ragrails[pinecone]` | none | `rag-chunks` | Uses `PINECONE_API_KEY` |
+| Weaviate | `weaviate` | `ragrails[weaviate]` | `http://localhost:8080` | `RagChunks` | Works with local or hosted Weaviate |
+
+## Where The Name Goes
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+)
+```
+
+```bash CLI
+ragrails query "refund policy" \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333
+```
+
+```json REST API
+{
+  "vector_db": "qdrant",
+  "collection": "support",
+  "url": "http://localhost:6333"
+}
+```
+</CodeGroup>
+
+<Note>The SDK constructor uses `vector_store={"provider": ...}`. CLI and REST use `vector_db` for the same provider name.</Note>
+
+## Local Qdrant
+
+The quickstarts use local Qdrant because it is easy to run in Docker:
+
+```bash
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+Use this target in examples:
+
+```text
+provider: qdrant
+url: http://localhost:6333
+collection: support
+```
+
+## Cloud Providers
+
+Cloud vector databases usually require an API key in the environment plus provider-specific setup in the hosted service.
+
+| Provider | Environment variable |
+| --- | --- |
+| Qdrant Cloud | `QDRANT_API_KEY` |
+| Pinecone | `PINECONE_API_KEY` |
+| Weaviate | `WEAVIATE_API_KEY` |
+
+<Note>Keep API keys in environment variables, not in `.ragrails.toml` or request examples.</Note>
+
+## Related Pages
+
+- [Installation](/getting-started/installation)
+- [Configuration](/getting-started/configuration)
+- [Storing](/features/storing)
+- [SDK storing](/usage/sdk/storing)
+- [REST storing](/usage/server/storing)

@@ -48,6 +48,32 @@ result.outputs[0]  # {
 ```
 </CodeGroup>
 
+### Streaming URL ingestion: `scrape_stream()`
+
+Use `scrape_stream()` when you want live progress while a crawl runs. It yields event dicts and ends with a `final` event whose `data` field contains the aggregate scrape result.
+
+<CodeGroup>
+```python Request
+for event in rag.scrape_stream("https://example.com/docs", mode="full", max_pages=50):
+    if event["type"] == "page":
+        print("scraped", event["data"]["url"])
+    elif event["type"] == "error":
+        print("error", event["message"])
+    elif event["type"] == "final":
+        print("pages", event["data"]["pages"])
+```
+
+```python Event
+{
+    "type": "page",
+    "stage": "scrape",
+    "message": "Scraped page",
+    "data": {"url": "https://example.com/docs"},
+    "sequence": 1,
+}
+```
+</CodeGroup>
+
 ### Dead-letter queue (DLQ)
 
 Capture failed pages and retry them later:

@@ -1,0 +1,74 @@
+---
+title: "Environment Variables"
+icon: "key"
+description: "The environment variables Ragrails reads for each provider."
+---
+
+Ragrails reads provider credentials from environment variables. Set them however you manage secrets (shell `export`, your platform's secret manager, or your process environment) before constructing `RagRails()`.
+
+## All variables
+
+Set only the ones for the providers you use.
+
+<CodeGroup>
+```bash Environment
+# Embedding
+export VOYAGE_API_KEY=your-voyage-key
+
+# LLM (chat) - set one or more
+export OPENAI_API_KEY=your-openai-key
+export ANTHROPIC_API_KEY=your-anthropic-key
+export GEMINI_API_KEY=your-gemini-key
+
+# Vector database - set one
+export QDRANT_URL=http://localhost:6333
+export QDRANT_API_KEY=your-qdrant-cloud-key    # only for Qdrant Cloud
+export PINECONE_API_KEY=your-pinecone-key
+export WEAVIATE_URL=https://your-cluster.weaviate.network
+export WEAVIATE_API_KEY=your-weaviate-key
+```
+</CodeGroup>
+
+## Common stacks
+
+<CodeGroup>
+```bash Voyage + OpenAI + Qdrant
+export VOYAGE_API_KEY=your-voyage-key
+export OPENAI_API_KEY=your-openai-key
+export QDRANT_URL=http://localhost:6333
+```
+
+```bash Voyage + Anthropic + Qdrant
+export VOYAGE_API_KEY=your-voyage-key
+export ANTHROPIC_API_KEY=your-anthropic-key
+export QDRANT_URL=http://localhost:6333
+```
+
+```bash Voyage + Gemini + Pinecone
+export VOYAGE_API_KEY=your-voyage-key
+export GEMINI_API_KEY=your-gemini-key
+export PINECONE_API_KEY=your-pinecone-key
+```
+
+```bash Voyage + OpenAI + Weaviate
+export VOYAGE_API_KEY=your-voyage-key
+export OPENAI_API_KEY=your-openai-key
+export WEAVIATE_URL=https://your-cluster.weaviate.network
+export WEAVIATE_API_KEY=your-weaviate-key
+```
+</CodeGroup>
+
+## Reference
+
+| Variable | Provider | Notes |
+| --- | --- | --- |
+| `VOYAGE_API_KEY` | Voyage | Embedding and Voyage reranking |
+| `OPENAI_API_KEY` | OpenAI | Chat LLM |
+| `ANTHROPIC_API_KEY` | Anthropic | Chat LLM |
+| `GEMINI_API_KEY` | Google Gemini | Chat LLM |
+| `QDRANT_URL` | Qdrant | `http://localhost:6333` for local |
+| `QDRANT_API_KEY` | Qdrant Cloud | Only for hosted Qdrant |
+| `PINECONE_API_KEY` | Pinecone | Cloud vector DB |
+| `WEAVIATE_URL` / `WEAVIATE_API_KEY` | Weaviate | Local or cloud |
+
+See [configuration](/getting-started/configuration) for how these map to providers, and [installation](/getting-started/installation) for the matching install extras.

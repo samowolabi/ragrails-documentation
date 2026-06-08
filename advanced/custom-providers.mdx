@@ -8,7 +8,7 @@ Ragrails ships with Voyage embeddings and Voyage/BM25 reranking. Register your o
 
 ## Register an embedder
 
-```python
+```python SDK
 from ragrails.models.embedder.registry import register_embedder
 
 register_embedder(
@@ -21,7 +21,7 @@ register_embedder(
 
 ## Register a reranker
 
-```python
+```python SDK
 from ragrails.models.reranker.registry import register_reranker
 
 register_reranker(
@@ -34,7 +34,7 @@ register_reranker(
 
 Once registered, use them anywhere a provider name is accepted:
 
-```python
+```python SDK
 embedder = rag.embedder(provider="my-provider", model="my-model")
 reranker = rag.reranker(provider="my-reranker", model="my-model")
 ```

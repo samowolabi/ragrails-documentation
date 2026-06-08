@@ -1,0 +1,416 @@
+---
+title: "Query"
+icon: "search-check"
+description: "Search the index and generate grounded answers."
+---
+
+`query()` is the read workflow. It embeds a user question, searches the vector database, and returns matching chunks.
+
+Use `query()` when your app needs search results. Use `chat()` when your app needs an answer with sources.
+
+| Stage | What it does |
+| --- | --- |
+| [Retrieval](/features/retrieval) | Embeds the query and finds relevant chunks in the vector database |
+| [Chat](/features/chat) | Uses retrieved context and an LLM to generate a grounded answer |
+
+In SDK examples, `RagRails(...)` holds the default collection, vector store, embedding model, LLM, and reranker. The `query()` or `chat()` call only repeats those settings when it is intentionally overriding them for that run.
+
+## Basic Query
+
+Use Basic Query when you want ranked chunks back from the knowledge base.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.query(
+    "How long do refunds take?",
+    retrieval={"top_k": 5},
+)
+
+print(result.items)
+```
+
+```bash CLI
+ragrails query "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do refunds take?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "top_k": 5
+    }
+  }'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "query": "How long do refunds take?",
+  "search_query": "How long do refunds take?",
+  "retrieved": 1,
+  "items": [
+    {
+      "id": "policy#refunds",
+      "chunk_id": "refunds",
+      "score": 0.84,
+      "text": "Refunds are returned to the original payment method within 5 business days.",
+      "metadata": {"title": "Refund policy"},
+      "rerank_score": null
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Reranked Query
+
+Use reranking when vector search returns good candidates but you want a second ranking model to reorder the final results.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    reranker={"enabled": True, "provider": "voyage", "model": "rerank-2-lite"},
+)
+
+result = rag.query(
+    "How long do refunds take?",
+    retrieval={
+        "top_k": 10,
+        "rerank": {"enabled": True, "top_k": 5},
+    },
+)
+
+print(result.items)
+```
+
+```bash CLI
+ragrails query "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --top-k 10 \
+  --rerank --reranker voyage --reranker-model rerank-2-lite --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do refunds take?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "top_k": 10,
+      "rerank": {
+        "enabled": true,
+        "provider": "voyage",
+        "model": "rerank-2-lite",
+        "top_k": 5
+      }
+    }
+  }'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "query": "How long do refunds take?",
+  "search_query": "How long do refunds take?",
+  "retrieved": 5,
+  "items": [
+    {
+      "id": "policy#refunds",
+      "chunk_id": "refunds",
+      "score": 0.84,
+      "text": "Refunds are returned to the original payment method within 5 business days.",
+      "metadata": {"title": "Refund policy"},
+      "rerank_score": 0.93
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Query Rewrite
+
+Use query rewrite for follow-up questions that need conversation context before retrieval.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
+)
+
+result = rag.query(
+    "What about the timing?",
+    retrieval={
+        "top_k": 5,
+        "query_rewrite": {
+            "enabled": True,
+            "context": "The user is asking about refunds.",
+            "session_context": "Previous turn asked whether refunds are allowed.",
+        },
+    },
+)
+
+print(result.search_query)
+print(result.items)
+```
+
+```bash CLI
+# The query pipeline CLI does not expose query rewrite flags.
+# Use SDK query rewrite, or use `ragrails chat --rewrite-query` for answer generation.
+ragrails chat "What about the timing?" \
+  --rewrite-query \
+  --rewrite-session-context "Previous turn asked whether refunds are allowed." \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+# The REST pipeline query endpoint does not accept an LLM object for query rewrite.
+# Use REST chat query rewrite when you need HTTP access to rewritten retrieval.
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What about the timing?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "query_rewrite": {
+      "enabled": true,
+      "session_context": "Previous turn asked whether refunds are allowed."
+    },
+    "history": [
+      {"role": "user", "content": "Can customers get refunds?"},
+      {"role": "assistant", "content": "Yes. Customers can request refunds within 30 days."}
+    ]
+  }'
+```
+</CodeGroup>
+
+<Note>Pure query rewrite is currently SDK-only because it needs an LLM object. CLI and REST expose query rewrite through `chat`, where the LLM provider can be configured as part of the request.</Note>
+
+## Chat Answers
+
+Use chat when you want a grounded natural-language answer instead of raw chunks. Chat is stateless: save the returned `history` and pass it to the next turn.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
+)
+
+result = rag.chat(
+    "How long do refunds take?",
+    history=[],
+    persona="Answer as a concise support agent.",
+)
+
+print(result.answer)
+print(result.history)
+```
+
+```bash CLI
+ragrails chat "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini \
+  --max-tokens 1024 \
+  --persona "Answer as a concise support agent." \
+  --history-file history/support-chat.json \
+  --history-compaction
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do refunds take?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "max_tokens": 1024,
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "rerank": false,
+    "history": [],
+    "history_compaction": {"enabled": true, "history_limit": 15, "keep_recent": 5},
+    "intent_routing": {"enabled": true},
+    "retrieval_quality": {
+      "min_retrieval_score": 0.0,
+      "min_rerank_score": 0.0,
+      "low_confidence_mode": "answer_with_caution",
+      "max_context_chunks": null
+    },
+    "persona": "Answer as a concise support agent."
+  }'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "answer": "Refunds are returned to the original payment method within 5 business days.",
+  "sources": [{"id": "policy#refunds", "score": 0.84, "metadata": {"title": "Refund policy"}}],
+  "history": [
+    {"role": "user", "content": "How long do refunds take?"},
+    {"role": "assistant", "content": "Refunds are returned to the original payment method within 5 business days."}
+  ],
+  "retrieval": {"retrieved": 1, "failed": 0, "outputs": [], "errors": []},
+  "llm": {"provider": "openai", "model": "gpt-4o-mini"},
+  "errors": [],
+  "retrieval_quality": {"status": "not_evaluated"},
+  "answer_confidence": {"level": "high", "reason": "retrieval_quality_pass"},
+  "compacted": false,
+  "intent": "rag"
+}
+```
+</CodeGroup>
+
+## Configuration
+
+| Config | Applies to | Supported keys |
+| --- | --- | --- |
+| `embedding` | Query embedding model | `provider`, `model`, `options` |
+| `retrieval` | Vector search | `vector_db`, `collection`, `url`, `options`, `top_k` |
+| `retrieval.rerank` | Optional reranking in `query()` | `enabled`, `provider`, `model`, `options`, `top_k` |
+| `retrieval.query_rewrite` | SDK-only rewrite for `query()` | `enabled`, `llm`, `context`, `session_context` |
+| `chat` request fields | Answer generation | `llm_provider`, `llm_model`, `max_tokens`, `history`, `history_compaction`, `query_rewrite`, `intent_routing`, `retrieval_quality`, `persona` |
+
+<Note>SDK defaults live on the `RagRails(...)` instance. CLI defaults come from `.ragrails.toml` or flags. REST defaults come from each request payload and any server-side configuration.</Note>
+
+## Response Fields
+
+### Query
+
+| Field | Meaning |
+| --- | --- |
+| `query` | Original user query |
+| `search_query` | Query used for retrieval after rewrite, if enabled |
+| `retrieved` | Number of returned chunks |
+| `items` | Retrieved chunks with `id`, `chunk_id`, `score`, `text`, `metadata`, and optional `rerank_score` |
+| `failed` | Number of failed retrieval operations |
+| `errors` | Retrieval errors collected during the query |
+
+### Chat
+
+| Field | Meaning |
+| --- | --- |
+| `answer` | Generated answer |
+| `sources` | Source chunks used for the answer |
+| `history` | Updated chat history to persist and pass to the next turn |
+| `retrieval` | Retrieval result used by chat |
+| `llm` | LLM provider/model metadata |
+| `errors` | Retrieval, generation, or quality errors |
+| `retrieval_quality` | Retrieval quality evaluation |
+| `answer_confidence` | Confidence level and reason |
+| `compacted` | Whether history was compacted |
+| `intent` | Routed intent, usually `rag` |
+
+## Possible Errors
+
+`query()` can return retrieval and validation errors. `chat()` can return retrieval, generation, or quality errors.
+
+<CodeGroup>
+```json Query retrieval failure
+{
+  "query": "How long do refunds take?",
+  "search_query": "How long do refunds take?",
+  "retrieved": 0,
+  "items": [],
+  "failed": 1,
+  "errors": [
+    {
+      "source": "How long do refunds take?",
+      "source_kind": "query",
+      "stage": "retrieve",
+      "error": "Collection not found: support",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json REST validation
+{
+  "error": {
+    "type": "ValueError",
+    "message": "query must be a non-empty string"
+  }
+}
+```
+
+```json Chat generation failure
+{
+  "answer": "",
+  "sources": [],
+  "history": [{"role": "user", "content": "How long do refunds take?"}],
+  "retrieval": {"retrieved": 1, "failed": 0, "outputs": [], "errors": []},
+  "llm": {},
+  "errors": [
+    {
+      "source": "",
+      "source_kind": "chat",
+      "stage": "generate",
+      "error": "OPENAI_API_KEY environment variable not set",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ],
+  "retrieval_quality": {"status": "not_evaluated"},
+  "answer_confidence": {"level": "none", "reason": "errors"},
+  "compacted": false,
+  "intent": "rag"
+}
+```
+</CodeGroup>
+
+<Tip>For lower-level search-only controls, see [Retrieval](/features/retrieval). For answer-generation controls, see [Chat](/features/chat).</Tip>

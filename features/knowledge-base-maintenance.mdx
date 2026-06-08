@@ -1,0 +1,186 @@
+---
+title: "Keep Your Knowledge Base Current"
+icon: "refresh-cw"
+description: "Update and remove stored data so answers stay accurate."
+---
+
+Source content changes: docs get revised, pages get deleted, products get discontinued. If your vector index doesn't keep up, your chatbot answers from stale data.
+
+## Interface Docs
+
+Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+
+- [SDK storing](/usage/sdk/storing)
+- [CLI storing](/usage/cli/storing)
+- [REST storing](/usage/server/storing)
+
+Two operations keep it current:
+
+| Task | Method | What it does |
+| --- | --- | --- |
+| Content changed | `edit()` | Re-embeds the updated chunk and replaces it by ID |
+| Content removed | `delete()` | Removes chunks by ID |
+
+<Note>Both target chunks by **`id`**. Give chunks stable IDs at chunk time so you can update or remove them later. Derive the ID from the source (e.g. file path + section) rather than letting it be random.</Note>
+
+## Update changed content
+
+<CodeGroup>
+```python SDK
+# rag configured with your embedding + vector store (see Quickstart)
+rag.edit(chunks=[
+    {"id": "guide#refunds", "text": "Refunds now take 3 to 5 business days.", "source": "files/guide.pdf", "metadata": {"title": "Refunds"}},
+])
+```
+
+```bash CLI
+ragrails edit \
+  --input-dir files/updated/ \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/edit \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chunks": [{"id": "guide#refunds", "text": "Refunds now take 3-5 business days.", "source": "files/guide.pdf", "metadata": {}}],
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333"
+  }'
+```
+</CodeGroup>
+
+
+
+<CodeGroup>
+```json Response
+{
+  "requested": 1,
+  "edited": 1,
+  "items": [{"id": "guide#refunds"}],
+  "failed": 0,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Possible Errors
+
+Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+
+<CodeGroup>
+```json Edit validation
+{
+  "requested": 1,
+  "edited": 0,
+  "items": [],
+  "failed": 1,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": [
+    {
+      "source": "guide#refunds",
+      "source_kind": "stored_chunk",
+      "stage": "validate",
+      "error": "chunk text must be a non-empty string",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Edit embed failure
+{
+  "requested": 1,
+  "edited": 0,
+  "items": [],
+  "failed": 1,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": [
+    {
+      "source": "",
+      "source_kind": "stored_chunk",
+      "stage": "embed",
+      "error": "embedding model returned a different number of vectors than input chunks",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Delete validation
+{
+  "requested": 2,
+  "deleted": 0,
+  "items": [],
+  "failed": 1,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": [
+    {
+      "source": "",
+      "source_kind": "stored_chunk",
+      "stage": "validate",
+      "error": "ids[1] must be a non-empty string",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Remove stale content
+
+<CodeGroup>
+```python SDK
+rag.delete(ids=["guide#old-pricing", "blog#discontinued"])
+```
+
+```bash CLI
+ragrails delete \
+  --id guide#old-pricing \
+  --id blog#discontinued \
+  --vector-db qdrant --collection docs --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/delete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ids": ["guide#old-pricing", "blog#discontinued"],
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333"
+  }'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "requested": 2,
+  "deleted": 2,
+  "items": [{"id": "guide#old-pricing"}, {"id": "blog#discontinued"}],
+  "failed": 0,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Re-indexing a source
+
+To refresh a whole document, re-ingest it. New chunks with the same IDs overwrite the old ones; chunks that no longer exist should be deleted.
+
+<Tip>A simple refresh loop: re-ingest the source, then `delete()` any IDs that were in the old version but not the new one.</Tip>

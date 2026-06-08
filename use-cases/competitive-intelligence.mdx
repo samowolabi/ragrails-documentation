@@ -16,23 +16,47 @@ Crawl competitor sites and news on a schedule, recover failures automatically, a
 2. **Refresh** on a schedule: re-ingest, and `delete()` pages that disappeared.
 3. **Query or chat** to compare and summarize.
 
-```python
-from ragrails import RagRails, DLQ
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
 
-rag = RagRails()
-rag.setup_url()
-
-result = rag.scrape(
-    ["https://competitor-a.com", "https://competitor-b.com"],
-    mode="full", max_pages=200,
-    dlq=DLQ("files/dlq/competitors.json"),   # capture failures
+rag = RagRails(
+    collection="competitors",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-# later: retry just the failures
-rag.scrape(dlq="files/dlq/competitors.json")
+rag.setup_url()
+rag.ingest(urls=["https://competitor-a.com", "https://competitor-b.com"], ingestion={"urls": {"mode": "full", "max_pages": 200}})
+rag.query("What changed in competitor pricing?", retrieval={"top_k": 5})
 ```
 
-<Tip>Schedule the crawl (cron, a worker) and use [`edit()`/`delete()`](/guides/manage-stored-data) so answers always reflect the latest competitor state.</Tip>
+```bash CLI
+ragrails setup-url
+ragrails ingest \
+  --source-url https://competitor-a.com \
+  --source-url https://competitor-b.com \
+  --vector-db qdrant --collection competitors --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails query "What changed in competitor pricing?" \
+  --vector-db qdrant --collection competitors --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"urls": ["https://competitor-a.com", "https://competitor-b.com"], "ingestion": {"urls": {"mode": "full", "max_pages": 200}}, "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "competitors", "url": "http://localhost:6333"}}' 
+
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What changed in competitor pricing?", "embedding": {"provider": "voyage", "model": "voyage-3"}, "retrieval": {"vector_db": "qdrant", "collection": "competitors", "url": "http://localhost:6333", "top_k": 5}}' 
+```
+</CodeGroup>
+
+<Tip>Schedule the crawl (cron, a worker) and use [`edit()`/`delete()`](/features/knowledge-base-maintenance) so answers always reflect the latest competitor state.</Tip>
 
 ## Features used
 
-[URL ingestion](/usage/sdk/ingestion#url-ingestion-scrape) · [Resilient ingestion](/advanced/resilient-ingestion) · [Keeping your index current](/guides/manage-stored-data)
+[URL ingestion](/usage/sdk/ingestion#url-ingestion-scrape) · [Resilient ingestion](/advanced/resilient-ingestion) · [Keeping your index current](/features/knowledge-base-maintenance)

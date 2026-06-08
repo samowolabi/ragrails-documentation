@@ -4,61 +4,75 @@ icon: "code"
 description: "All RagRails SDK methods."
 ---
 
-```python
-from ragrails import RagRails
-rag = RagRails()
-```
+<Note>This page is generated from `inspect.signature(RagRails)`. Run `RAGRAILS_SOURCE=/path/to/ragrails uv run python scripts/generate-reference.py` from the docs repo after SDK signature changes.</Note>
+
+SDK defaults live on each `RagRails(...)` instance. They do not write `.ragrails.toml` and they do not change CLI or REST defaults.
+
+
+## Constructor
+
+| Method | Signature |
+| --- | --- |
+| `RagRails` | `RagRails(*, collection: 'str | None' = None, vector_store: 'dict[str, Any] | None' = None, embedding: 'dict[str, Any] | None' = None, llm: 'dict[str, Any] | None' = None, reranker: 'dict[str, Any] | None' = None) -> 'None'` |
 
 ## Ingestion
 
-| Method | Description |
+| Method | Signature |
 | --- | --- |
-| `setup_url(browser="chromium")` | Install Playwright browser for URL ingestion |
-| `scrape(url, *, mode, max_depth, max_pages, verbose, frontmatter, output_format, output_dest, output_dir, dlq)` | Scrape URLs into document dicts |
-| `parse(files, folder, *, frontmatter, output_format, output_dest, output_dir)` | Parse local documents into document dicts |
-| `fetch(url, *, title, description, method, headers, params, body, pagination, max_pages, timeout, apis, frontmatter, output_format, output_dest, output_dir)` | Fetch REST API responses |
+| `setup_url` | `setup_url(*, browser: 'str' = 'chromium') -> 'dict'` |
+| `scrape` | `scrape(url: 'str | list[str | dict] | None' = None, *, mode: "Literal['each', 'full']" = 'each', max_depth: 'int' = 3, max_pages: 'int' = 200, verbose: 'bool' = False, frontmatter: 'bool' = False, output_format: "Literal['markdown', 'json']" = 'markdown', output_dest: "Literal['response', 'file']" = 'response', output_dir: 'str | None' = None, dlq: 'DLQ | str | None' = None) -> 'ScrapeResult'` |
+| `scrape_stream` | `scrape_stream(url: 'str | list[str | dict] | None' = None, *, mode: "Literal['each', 'full']" = 'each', max_depth: 'int' = 3, max_pages: 'int' = 200, verbose: 'bool' = False, frontmatter: 'bool' = False)` |
+| `parse` | `parse(files: 'str | list[str | dict] | None' = None, *, folder: 'str | None' = None, frontmatter: 'bool' = False, output_format: "Literal['markdown', 'json']" = 'markdown', output_dest: "Literal['response', 'file']" = 'response', output_dir: 'str | None' = None) -> 'ParseResult'` |
+| `fetch` | `fetch(url: 'str | None' = None, *, title: 'str | None' = None, description: 'str' = '', method: 'str' = 'GET', headers: 'dict | None' = None, params: 'dict | None' = None, body: 'dict | None' = None, pagination: 'dict | None' = None, max_pages: 'int' = 100, timeout: 'float | None' = None, apis: 'list[str | dict] | None' = None, frontmatter: 'bool' = False, output_format: "Literal['markdown', 'json']" = 'markdown', output_dest: "Literal['response', 'file']" = 'response', output_dir: 'str | None' = None) -> 'ApiIngestResult'` |
 
 ## Chunking
 
-| Method | Description |
+| Method | Signature |
 | --- | --- |
-| `chunk(markdown, *, title, source, chunk_size, chunk_overlap, min_chunk_length)` | Split documents into chunk dicts |
+| `chunk` | `chunk(*, markdown: 'str | list[str | dict[str, Any]]', title: 'str' = '', source: 'str' = '', chunk_size: 'int' = 2000, chunk_overlap: 'int' = 200, min_chunk_length: 'int' = 100) -> 'ChunkResult'` |
 
 ## Embedding
 
-| Method | Description |
+| Method | Signature |
 | --- | --- |
-| `embedder(provider, model, input_type, options)` | Create an embedder object |
-| `embed(chunks, embedder, *, batch_size)` | Generate embedding vectors for chunks |
+| `embedder` | `embedder(*, provider: 'str | None' = None, model: 'str | None' = None, input_type: 'str' = 'document', options: 'dict[str, Any] | None' = None)` |
+| `embed` | `embed(*, chunks: 'list[dict]', embedder=None, input_type: 'str' = 'document', batch_size: 'int' = 64) -> 'EmbedResult'` |
 
 ## Storing
 
-| Method | Description |
+| Method | Signature |
 | --- | --- |
-| `store(embedded_chunks, *, vector_db, collection, url, batch_size, ensure_collection, options)` | Upsert embedded chunks |
-| `edit(chunks, embedder, *, vector_db, collection, url, batch_size, options)` | Re-embed and replace chunks by ID |
-| `delete(ids, *, vector_db, collection, url, options)` | Delete chunks by ID |
+| `store` | `store(*, embedded_chunks: 'list[dict]', vector_db: "Literal['qdrant', 'qdrant_cloud', 'pinecone', 'weaviate'] | None" = None, collection: 'str | None' = None, url: 'str | None' = None, batch_size: 'int' = 64, ensure_collection: 'bool' = True, options: 'dict[str, Any] | None' = None) -> 'StoreResult'` |
+| `edit` | `edit(*, chunks: 'list[dict]', embedder=None, vector_db: "Literal['qdrant', 'qdrant_cloud', 'pinecone', 'weaviate'] | None" = None, collection: 'str | None' = None, url: 'str | None' = None, batch_size: 'int' = 64, options: 'dict[str, Any] | None' = None) -> 'EditResult'` |
+| `delete` | `delete(*, ids: 'list[str]', vector_db: "Literal['qdrant', 'qdrant_cloud', 'pinecone', 'weaviate'] | None" = None, collection: 'str | None' = None, url: 'str | None' = None, options: 'dict[str, Any] | None' = None) -> 'DeleteResult'` |
 
 ## Retrieval
 
-| Method | Description |
+| Method | Signature |
 | --- | --- |
-| `reranker(provider, model, options)` | Create a reranker object |
-| `retrieve(query, *, embedder, vector_db, collection, url, top_k, use_query_rewrite, rewrite_llm, rewrite_context, session_context, use_rerank, reranker, rerank_top_k, options)` | Retrieve relevant chunks |
+| `reranker` | `reranker(*, provider: 'str | None' = None, model: 'str | None' = None, options: 'dict[str, Any] | None' = None)` |
+| `retrieve` | `retrieve(query: 'str', *, embedder=None, vector_db: "Literal['qdrant', 'qdrant_cloud', 'pinecone', 'weaviate'] | None" = None, collection: 'str | None' = None, url: 'str | None' = None, options: 'dict[str, Any] | None' = None, top_k: 'int' = 10, use_query_rewrite: 'bool' = False, rewrite_llm=None, rewrite_context: 'str' = '', session_context: 'str' = '', use_rerank: 'bool' = False, reranker=None, rerank_top_k: 'int' = 5) -> 'RetrieveResult'` |
 
 ## Chat
 
-| Method | Description |
+| Method | Signature |
 | --- | --- |
-| `llm(provider, model, *, max_tokens)` | Create an LLM object |
-| `chat(query, *, llm, embedder, vector_db, collection, url, options, reranker, history, history_compaction, query_rewrite, intent_routing, retrieval_quality, persona, retrieval_config)` | Run a stateless RAG chat turn |
+| `llm` | `llm(*, provider: 'str | None' = None, model: 'str | None' = None, max_tokens: 'int | None' = None)` |
+| `chat` | `chat(query: 'str', *, llm=None, embedder=None, vector_db: 'str | None' = None, collection: 'str | None' = None, url: 'str | None' = None, options: 'dict | None' = None, reranker=None, history: 'list[dict] | None' = None, history_compaction: 'HistoryCompactionConfig | None' = None, query_rewrite: 'QueryRewriteConfig | None' = None, intent_routing: 'IntentRoutingConfig | None' = None, retrieval_quality: 'ChatRetrievalQualityConfig | None' = None, persona: 'str' = '', retrieval_config=None) -> 'ChatResult'` |
+| `chat_stream` | `chat_stream(query: 'str', *, llm=None, embedder=None, vector_db: 'str | None' = None, collection: 'str | None' = None, url: 'str | None' = None, options: 'dict | None' = None, reranker=None, history: 'list[dict] | None' = None, history_compaction: 'HistoryCompactionConfig | None' = None, query_rewrite: 'QueryRewriteConfig | None' = None, intent_routing: 'IntentRoutingConfig | None' = None, retrieval_quality: 'ChatRetrievalQualityConfig | None' = None, persona: 'str' = '', retrieval_config=None)` |
 
 ## Pipeline
 
-| Method | Description |
+| Method | Signature |
 | --- | --- |
-| `ingest(*, docs, urls, api, markdown, ingestion, chunking, embedding, storage)` | Run ingestion → chunk → embed → store |
-| `query(query, *, embedding, retrieval)` | Run embed query → retrieve |
+| `ingest` | `ingest(*, docs: 'str | list[str | dict] | dict[str, Any] | None' = None, urls: 'str | list[str | dict] | dict[str, Any] | None' = None, api: 'str | list[str | dict] | dict[str, Any] | None' = None, markdown: 'str | list[str | dict[str, Any]] | None' = None, ingestion: 'dict[str, Any] | None' = None, chunking: 'dict[str, Any] | None' = None, embedding: 'dict[str, Any] | None' = None, storage: 'dict[str, Any] | None' = None, concurrency: 'str' = 'serial') -> 'IngestPipelineResult'` |
+| `query` | `query(query: 'str', *, embedding: 'dict[str, Any] | None' = None, retrieval: 'dict[str, Any] | None' = None) -> 'RetrieveResult'` |
+
+## Important validation notes
+
+- `rag.llm()` requires a model unless `llm={"model": ...}` was configured on the constructor.
+- Provider, embedding, vector-store, and reranker defaults are constructor defaults only.
+- SDK `fetch(apis=...)` supports batch API ingestion; REST `/v1/ingest/api` currently requires `url`.
 
 ## Config objects
 
@@ -69,32 +83,3 @@ rag = RagRails()
 | `HistoryCompactionConfig(enabled, history_limit, keep_recent)` | `chat(history_compaction=...)` | History summarisation config |
 | `IntentRoutingConfig(enabled)` | `chat(intent_routing=...)` | Intent routing config |
 | `ChatRetrievalQualityConfig(min_retrieval_score, min_rerank_score, low_confidence_mode, max_context_chunks)` | `chat(retrieval_quality=...)` | Retrieval quality thresholds |
-
-## Built-in providers
-
-| Type | Providers |
-| --- | --- |
-| Embedding | `voyage` (`voyage-3`, `voyage-3-lite`, `voyage-3-large`) |
-| Reranking | `voyage` (`rerank-2-lite`, `rerank-2`), `bm25` (local) |
-| LLM | `openai` (`gpt-5.5`, `gpt-4.1`, `gpt-4o`, `gpt-4o-mini`, ...), `anthropic` (`claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5`, ...), `google` (`gemini-3-pro`, `gemini-2.5-pro`, `gemini-2.5-flash`, ...) |
-| Vector DB | `qdrant`, `pinecone`, `weaviate` |
-
-<Note>Google Gemini models don't support tool calling yet.</Note>
-
-See the [full model list](/reference/models) for every model with pricing and tool support.
-
-## Extending providers
-
-Register custom embedding and reranking providers at runtime:
-
-```python
-from ragrails.models.embedder.registry import register_embedder
-from ragrails.models.reranker.registry import register_reranker
-
-register_embedder("my-provider", my_factory, default_model="my-model", models=("my-model",))
-register_reranker("my-reranker", my_factory, default_model="my-model", models=("my-model",))
-```
-
-Once registered, use them anywhere a provider name is accepted, e.g. `rag.embedder(provider="my-provider", ...)`.
-
-→ [Result types reference](/reference/result-types)

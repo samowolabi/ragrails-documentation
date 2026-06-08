@@ -1,0 +1,171 @@
+---
+title: "Extraction"
+icon: "file-input"
+description: "Load documents, scraped websites, APIs, or Markdown before indexing."
+---
+
+Extraction is part of the ingest workflow. It loads source content and normalizes it into Markdown the rest of the pipeline can use.
+
+## Interface Docs
+
+Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+
+- [SDK extraction](/usage/sdk/ingestion)
+- [CLI extraction](/usage/cli/ingestion)
+- [REST extraction](/usage/server/ingestion)
+
+Supported source forms:
+
+| Method | Source | Needs |
+| --- | --- | --- |
+| `scrape()` | Scrape Website (one URL or a full crawl) | `ragrails[url]` + `setup_url()` |
+| `scrape_stream()` | Scrape Website with live progress events | `ragrails[url]` + `setup_url()` |
+| `parse()` | Files: local paths, file URLs, or raw bytes (PDF, DOCX, XLSX, HTML, MD, CSV...) | none |
+| `fetch()` | REST API responses | none |
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+rag = RagRails()
+
+docs = rag.parse(folder="files/docs/")
+api = rag.fetch(url="https://api.example.com/products", title="Products")
+
+rag.setup_url()  # one-time browser install
+site = rag.scrape("https://example.com", mode="full", max_pages=50)
+events = rag.scrape_stream("https://example.com", mode="full", max_pages=50)
+```
+
+```bash CLI
+ragrails parse --folder files/docs/ --output-dir files/output/docs/
+ragrails fetch https://api.example.com/products --title Products --output-dir files/output/api/
+
+ragrails setup-url
+ragrails scrape https://example.com --mode full --max-pages 50 --output-dir files/output/web/
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{"folder": "files/docs/"}'
+
+curl -X POST http://127.0.0.1:8000/v1/ingest/api \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://api.example.com/products", "title": "Products"}'
+
+curl -X POST http://127.0.0.1:8000/v1/ingest/url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "mode": "full", "max_pages": 50}'
+
+curl -N -X POST http://127.0.0.1:8000/v1/ingest/url/stream \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com", "mode": "full", "max_pages": 50}'
+```
+</CodeGroup>
+
+
+
+<CodeGroup>
+```json Response
+{
+  "documents": 1,
+  "failed": 0,
+  "outputs": [
+    {
+      "id": "doc_123",
+      "text": "# Refund policy\n\nRefunds are available within 30 days.",
+      "source": "files/docs/refund-policy.pdf",
+      "metadata": {"title": "Refund policy"}
+    }
+  ],
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Possible Errors
+
+Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+
+<CodeGroup>
+```json Document parse
+{
+  "documents": 0,
+  "failed": 1,
+  "outputs": [],
+  "errors": [
+    {
+      "source": "files/missing.pdf",
+      "source_kind": "path",
+      "stage": "validate",
+      "error": "File not found: files/missing.pdf",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Scrape Website
+{
+  "pages": 0,
+  "failed": 1,
+  "total_kb": 0.0,
+  "page_times": [],
+  "outputs": [],
+  "crawled": [],
+  "errors": [
+    {
+      "source": "https://example.com/docs",
+      "source_kind": "url",
+      "stage": "fetch",
+      "error": "Timeout while loading page",
+      "isRetryable": true,
+      "mode": "full",
+      "root_url": "https://example.com/docs",
+      "attempts": 1,
+      "retry_input": {"url": "https://example.com/docs", "mode": "full"}
+    }
+  ]
+}
+```
+
+```json API fetch
+{
+  "documents": 0,
+  "failed": 1,
+  "outputs": [],
+  "errors": [
+    {
+      "source": "https://api.example.com/products",
+      "source_kind": "api",
+      "stage": "fetch",
+      "error": "HTTP 500 from upstream API",
+      "isRetryable": true,
+      "attempts": 1,
+      "retry_input": {"url": "https://api.example.com/products", "method": "GET"}
+    }
+  ]
+}
+```
+
+```json REST validation
+{
+  "error": {
+    "type": "ValueError",
+    "message": "Provide either 'files' or 'folder'"
+  }
+}
+```
+</CodeGroup>
+
+<Note>**`parse()` takes more than file paths.** Pass a local path, a file URL (downloaded automatically), or raw bytes, which is ideal for web uploads and object storage where the file never touches disk. See [input forms](/usage/sdk/ingestion#input-forms).</Note>
+
+## Scrape Website
+
+- `mode="each"` - scrape only the exact URLs you pass.
+- `mode="full"` - crawl the whole site from a starting URL.
+
+<Warning>Always cap `max_pages` on a full crawl. Sites can be huge, and every page costs a fetch.</Warning>
+
+<Note>**Dead-letter queue:** in a large crawl, some pages fail (timeouts, rate limits). Pass `dlq=DLQ("file.json")` to record failures, then retry only those with `scrape(dlq="file.json")`. See [DLQ](/usage/sdk/ingestion#dead-letter-queue-dlq).</Note>

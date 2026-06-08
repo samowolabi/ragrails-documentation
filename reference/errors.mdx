@@ -1,32 +1,109 @@
 ---
 title: "Errors"
 icon: "triangle-alert"
-description: "Common Ragrails errors and fixes."
+description: "Common Ragrails error shapes and fixes."
 ---
 
-## Error dict shape
+Ragrails uses two error shapes.
 
-Stage methods do not raise on per-item failures. Instead they collect failures in the result's `errors` list. Each error is a dict:
+Stage methods usually return per-item failures in the result's `errors` list. REST requests that fail before a stage can run return an exception envelope.
+
+## Stage Error Dict
+
+Pipeline stages do not raise for every item-level failure. They collect failures in `errors` and continue when possible.
 
 | Field | Description |
 | --- | --- |
-| `source` | Source identifier (URL, file path, or chunk ID) |
-| `source_kind` | `"url"`, `"file"`, `"chunk"`, etc. |
-| `stage` | Pipeline stage where the failure occurred |
-| `error` | Error message |
-| `isRetryable` | Whether the failure is safe to retry |
+| `source` | Source identifier: URL, file path, query, chunk ID, or empty string when the error is global |
+| `source_kind` | Error domain, e.g. `path`, `bytes`, `url`, `api`, `markdown`, `chunk`, `embedded_chunk`, `stored_chunk`, `query`, or `chat` |
+| `stage` | Stage where the failure occurred: `validate`, `fetch`, `convert`, `embed`, `store`, `edit`, `delete`, `retrieve`, `rewrite`, `rerank`, `generate`, or `quality` |
+| `error` | Human-readable error message |
+| `isRetryable` | Whether retrying the same item can reasonably succeed |
 | `attempts` | Number of attempts made |
+| `retry_input` | Optional retry payload for URL/API failures |
+| `mode` / `root_url` | Optional URL crawl context |
 
-## Common setup errors
+<CodeGroup>
+```json Validation
+{
+  "failed": 1,
+  "errors": [
+    {
+      "source": "policy.md",
+      "source_kind": "markdown",
+      "stage": "validate",
+      "error": "chunk item text must be a non-empty string",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Retryable
+{
+  "failed": 1,
+  "errors": [
+    {
+      "source": "https://example.com/docs",
+      "source_kind": "url",
+      "stage": "fetch",
+      "error": "Timeout while loading page",
+      "isRetryable": true,
+      "attempts": 1,
+      "retry_input": {"url": "https://example.com/docs", "mode": "full"}
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## REST Exception Envelope
+
+If a REST request fails before the stage returns a result, the server returns an exception envelope.
+
+<CodeGroup>
+```json 400
+{
+  "error": {
+    "type": "ValueError",
+    "message": "chunk_overlap must be smaller than chunk_size"
+  }
+}
+```
+
+```json 404
+{
+  "error": {
+    "type": "FileNotFoundError",
+    "message": "files/missing.pdf"
+  }
+}
+```
+
+```json 500
+{
+  "error": {
+    "type": "RuntimeError",
+    "message": "Chunking dependencies are missing. Reinstall with: pip install -U ragrails"
+  }
+}
+```
+</CodeGroup>
+
+## Common Setup Errors
 
 | Message | Cause | Fix |
 | --- | --- | --- |
-| `... requires optional dependencies` | A provider or URL extra is not installed | Install the matching extra, e.g. `pip install "ragrails[url]"` or `"ragrails[voyage]"` |
+| `... requires optional dependencies` | A provider or URL extra is not installed | Install the matching extra, e.g. `pip install "ragrails[url]"` or `pip install "ragrails[voyage]"` |
 | `VOYAGE_API_KEY environment variable not set` | Missing embedding credentials | Set the provider environment variable |
-| `URL ingestion requires ...` | Browser support not installed | Run `rag.setup_url()` or `ragrails setup-url` |
-| Collection required | Vector DB needs a collection/index/class | Pass `collection` |
-| Connection refused | Vector DB not running or wrong URL | Start the database and check `url` |
+| `OPENAI_API_KEY environment variable not set` | Missing LLM credentials | Set the provider environment variable |
+| `URL ingestion requires ...` | Browser support is not installed | Run `rag.setup_url()` or `ragrails setup-url` |
+| `collection is required` | Vector DB needs a collection/index/class | Pass `collection` |
+| `Connection refused` | Vector DB is not running or `url` is wrong | Start the database and check `url` |
 
-## Retrying scrape failures
+## Retrying Scrape/API Failures
+
+URL and API failures can include `isRetryable: true` and a `retry_input` payload.
 
 URL scrape failures with `isRetryable: true` are captured in a [dead-letter queue](/usage/sdk/ingestion#dead-letter-queue-dlq) and can be retried by passing `result.dlq` or a saved file path back to `scrape()`.

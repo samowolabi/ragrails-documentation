@@ -10,7 +10,7 @@ Large ingestion jobs don't fully succeed on the first try. These features make t
 
 Crawl hundreds of pages and a handful will fail from timeouts or rate limits. A dead-letter queue (DLQ) records just the failures so you retry those, not the whole crawl.
 
-```python
+```python SDK
 from ragrails import RagRails, DLQ
 
 rag = RagRails()
@@ -45,7 +45,7 @@ result = rag.scrape(dlq=result.dlq)
 | `offset` | Row offsets (`?offset=100`) | `{"type": "offset", "param": "offset", "size_param": "limit", "size": 100}` |
 | `cursor` | Next-page token | `{"type": "cursor", "param": "cursor", "cursor_path": "meta.next_cursor"}` |
 
-```python
+```python SDK
 result = rag.fetch(
     url="https://api.example.com/products",
     pagination={"type": "page", "param": "page", "size_param": "per_page", "size": 100},

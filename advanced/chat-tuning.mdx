@@ -4,52 +4,73 @@ icon: "sliders-horizontal"
 description: "Manage conversation flow and guard answer quality."
 ---
 
-`chat()` takes config objects that control how it handles conversation flow and low-quality retrieval. Each targets a specific failure mode.
+`chat()` takes controls for conversation flow and low-quality retrieval. Each targets a specific failure mode.
 
 ## Conversation management
 
-### History compaction
+<CodeGroup>
+```python SDK
+from ragrails import HistoryCompactionConfig, IntentRoutingConfig
 
-Long conversations overflow the LLM's context window and cost more on every turn. Compaction summarizes older messages into a short recap and keeps recent turns verbatim.
-
-```python
-from ragrails import HistoryCompactionConfig
-
-rag.chat(..., history_compaction=HistoryCompactionConfig(
-    enabled=True,
-    history_limit=15,   # summarize once history passes this many turns
-    keep_recent=5,      # keep the last 5 turns verbatim
-))
+rag.chat(
+    query,
+    history=history,
+    history_compaction=HistoryCompactionConfig(enabled=True, history_limit=15, keep_recent=5),
+    intent_routing=IntentRoutingConfig(enabled=True),
+)
 ```
 
-<Note>Compaction is also a **cost lever**: fewer tokens per turn means lower spend on long chats. See [cost optimization](/advanced/cost-optimization).</Note>
-
-### Intent routing
-
-Not every message needs a database lookup. *"Thanks!"* or *"who are you?"* should get a direct reply. Intent routing detects these and skips retrieval, which is faster, cheaper, and avoids irrelevant context.
-
-```python
-from ragrails import IntentRoutingConfig
-
-rag.chat(..., intent_routing=IntentRoutingConfig(enabled=True))  # on by default
+```bash CLI
+ragrails chat "$QUERY" \
+  --history-file files/chat-history.json \
+  --history-compaction \
+  --intent-routing \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
 ```
 
-`result.intent` is `"rag"` (retrieval ran) or `"direct"` (answered without retrieval).
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How do I authenticate?", "history_compaction": {"enabled": true, "history_limit": 15, "keep_recent": 5}, "intent_routing": {"enabled": true}, "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "history": []}'
+```
+</CodeGroup>
 
 ## Answer quality
 
 Sometimes your index simply doesn't contain the answer. Rather than hallucinate, Ragrails scores the retrieved context and acts on low confidence.
 
-```python
+<CodeGroup>
+```python SDK
 from ragrails import ChatRetrievalQualityConfig
 
-rag.chat(..., retrieval_quality=ChatRetrievalQualityConfig(
-    min_retrieval_score=0.35,
-    min_rerank_score=0.50,
-    low_confidence_mode="answer_with_caution",
-    max_context_chunks=None,
-))
+rag.chat(
+    query,
+    history=history,
+    retrieval_quality=ChatRetrievalQualityConfig(
+        min_retrieval_score=0.35,
+        min_rerank_score=0.50,
+        low_confidence_mode="answer_with_caution",
+    ),
+)
 ```
+
+```bash CLI
+ragrails chat "$QUERY" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Can I get a refund after 30 days?", "retrieval_quality": {"min_retrieval_score": 0.35, "min_rerank_score": 0.50, "low_confidence_mode": "answer_with_caution"}, "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "history": []}'
+```
+</CodeGroup>
+
+<Note>The CLI does not expose retrieval-quality threshold flags yet; use SDK or REST for those controls.</Note>
 
 | `low_confidence_mode` | Behaviour when context is weak |
 | --- | --- |
@@ -57,6 +78,4 @@ rag.chat(..., retrieval_quality=ChatRetrievalQualityConfig(
 | `ask_clarifying_question` | Asks the user to refine the question instead of answering |
 | `refuse_grounded_answer` | Declines to answer rather than risk a wrong one |
 
-Every response carries `result.answer_confidence` and `result.retrieval_quality`. Surface them in your UI to flag shaky answers.
-
-Reference: [SDK chat](/usage/sdk/chat).
+Every response carries `answer_confidence` and `retrieval_quality`. Surface them in your UI to flag shaky answers.

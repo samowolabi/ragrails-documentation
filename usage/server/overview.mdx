@@ -11,8 +11,8 @@ ragrails-api
 
 The server starts on `http://127.0.0.1:8000`.
 
-- **Swagger UI** - `http://127.0.0.1:8000/docs`
-- **OpenAPI schema** - `http://127.0.0.1:8000/v1/openapi.json`
+- **Swagger UI**: `http://127.0.0.1:8000/docs`
+- **OpenAPI schema**: `http://127.0.0.1:8000/v1/openapi.json`
 
 ## Endpoints
 
@@ -20,6 +20,7 @@ The server starts on `http://127.0.0.1:8000`.
 | --- | --- | --- |
 | GET | `/v1/health` | Health check |
 | POST | `/v1/ingest/url` | Scrape URLs |
+| POST | `/v1/ingest/url/stream` | Stream URL scrape events |
 | POST | `/v1/ingest/docs` | Parse documents |
 | POST | `/v1/ingest/api` | Fetch REST APIs |
 | POST | `/v1/chunk` | Chunk documents |
@@ -31,8 +32,9 @@ The server starts on `http://127.0.0.1:8000`.
 | POST | `/v1/pipelines/ingest` | Full ingest pipeline |
 | POST | `/v1/pipelines/query` | Query pipeline |
 | POST | `/v1/chat` | RAG chat turn |
+| POST | `/v1/chat/stream` | Stream RAG chat events |
 
-All request and response bodies are JSON. See the Swagger UI for full request schemas.
+Most request and response bodies are JSON. Streaming endpoints return `text/event-stream`. See the Swagger UI for full request schemas.
 
 ## Server extras
 

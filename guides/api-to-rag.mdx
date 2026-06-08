@@ -8,34 +8,87 @@ description: "Build a RAG collection from a REST API, end to end."
 
 ```bash
 pip install "ragrails[voyage,qdrant]"
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-## 2. Ingest the API
+## 2. Ingest, query, and chat
 
-```python
+All three versions fetch the same paginated product API into the `products` collection.
+
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
+rag = RagRails(
+    collection="products",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
+)
 
-result = rag.ingest(
-    api={
-        "url": "https://api.example.com/products",
-        "title": "Products",
-        "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
-        "max_pages": 10,
+rag.ingest(api={
+    "url": "https://api.example.com/products",
+    "title": "Products",
+    "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+    "max_pages": 10,
+})
+
+rag.query("Which products are available?", retrieval={"top_k": 5})
+rag.chat("Recommend a waterproof jacket under $200", history=[])
+```
+
+```bash CLI
+ragrails ingest \
+  --api-url https://api.example.com/products \
+  --vector-db qdrant --collection products --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails query "Which products are available?" \
+  --vector-db qdrant --collection products --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 5
+
+ragrails chat "Recommend a waterproof jacket under $200" \
+  --vector-db qdrant --collection products --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api": {
+      "url": "https://api.example.com/products",
+      "title": "Products",
+      "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+      "max_pages": 10
     },
-    embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "products", "url": "http://localhost:6333"},
-)
-```
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "products", "url": "http://localhost:6333"}
+  }'
 
-## 3. Query
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Which products are available?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {"vector_db": "qdrant", "collection": "products", "url": "http://localhost:6333", "top_k": 5}
+  }'
 
-```python
-result = rag.query(
-    "Which products are available?",
-    embedding={"provider": "voyage", "model": "voyage-3"},
-    retrieval={"vector_db": "qdrant", "collection": "products", "url": "http://localhost:6333", "top_k": 5},
-)
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Recommend a waterproof jacket under $200",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "products",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
 ```
+</CodeGroup>

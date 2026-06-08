@@ -4,22 +4,152 @@ icon: "search"
 description: "Find the chunks relevant to a query."
 ---
 
-Retrieval embeds the query, searches the vector store, and returns the closest chunks.
+Retrieval is part of the [Query](/features/query) workflow. It embeds the query, searches the vector store, and returns the closest chunks.
 
-```python
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+## Interface Docs
 
-result = rag.retrieve(
-    "How do I authenticate?",
-    embedder=embedder,
-    vector_db="qdrant",
-    collection="docs",
-    url="http://localhost:6333",
-    top_k=10,
-)
+Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+
+- [SDK retrieval](/usage/sdk/retrieval)
+- [CLI retrieval](/usage/cli/retrieval)
+- [REST retrieval](/usage/server/retrieval)
+
+<CodeGroup>
+```python SDK
+result = rag.retrieve("How do I authenticate?", top_k=10)
 for chunk in result.items:
     print(chunk.score, chunk.text)
 ```
+
+```bash CLI
+ragrails retrieve "How do I authenticate?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --top-k 10
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "top_k": 10
+  }'
+```
+</CodeGroup>
+
+
+
+<CodeGroup>
+```json Response
+{
+  "query": "How do I authenticate?",
+  "search_query": "How do I authenticate?",
+  "retrieved": 1,
+  "items": [
+    {
+      "id": "auth#overview",
+      "score": 0.84,
+      "text": "Create an API key and send it as a Bearer token.",
+      "metadata": {"title": "Authentication"}
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Possible Errors
+
+Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+
+<CodeGroup>
+```json Validation
+{
+  "query": "",
+  "search_query": "",
+  "retrieved": 0,
+  "items": [],
+  "failed": 1,
+  "errors": [
+    {
+      "source": "",
+      "source_kind": "query",
+      "stage": "validate",
+      "error": "query must be a non-empty string",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Rewrite setup
+{
+  "query": "What about the second step?",
+  "search_query": "What about the second step?",
+  "retrieved": 0,
+  "items": [],
+  "failed": 1,
+  "errors": [
+    {
+      "source": "What about the second step?",
+      "source_kind": "query",
+      "stage": "rewrite",
+      "error": "rewrite_llm is required when use_query_rewrite is True",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Retrieve failure
+{
+  "query": "How do I authenticate?",
+  "search_query": "How do I authenticate?",
+  "retrieved": 0,
+  "items": [],
+  "failed": 1,
+  "errors": [
+    {
+      "source": "How do I authenticate?",
+      "source_kind": "query",
+      "stage": "retrieve",
+      "error": "Collection not found: docs",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Rerank failure
+{
+  "query": "How do I authenticate?",
+  "search_query": "How do I authenticate?",
+  "retrieved": 0,
+  "items": [],
+  "failed": 1,
+  "errors": [
+    {
+      "source": "How do I authenticate?",
+      "source_kind": "query",
+      "stage": "rerank",
+      "error": "reranker returned a different number of scores than input results",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ]
+}
+```
+</CodeGroup>
 
 ## Tune it by symptom
 
@@ -31,42 +161,114 @@ for chunk in result.items:
 
 ### Reranking
 
-<Note>**Why:** vector search is fast but rough. A reranker re-reads the top candidates and reorders them by true relevance. Use it when precision matters more than speed.</Note>
-
-```python
-reranker = rag.reranker(provider="voyage", model="rerank-2-lite")
-
+<CodeGroup>
+```python SDK
 result = rag.retrieve(
     "How do I authenticate?",
-    embedder=embedder,
-    vector_db="qdrant", collection="docs", url="http://localhost:6333",
-    top_k=20,                 # retrieve wide
+    top_k=20,
     use_rerank=True,
-    reranker=reranker,
-    rerank_top_k=5,           # keep the best few
+    rerank_top_k=5,
 )
 ```
+
+```bash CLI
+ragrails retrieve "How do I authenticate?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --top-k 20 --rerank --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "top_k": 20,
+    "use_rerank": true,
+    "rerank_top_k": 5
+  }'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "query": "How do I authenticate?",
+  "retrieved": 5,
+  "items": [
+    {
+      "id": "auth#overview",
+      "score": 0.77,
+      "rerank_score": 0.94,
+      "text": "Create an API key and send it as a Bearer token.",
+      "metadata": {"title": "Authentication"}
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
 
 <Tip>Retrieve wide (`top_k=20`), rerank down (`rerank_top_k=5`). The reranker needs candidates to choose from.</Tip>
 
 ### Query rewriting
 
-<Note>**Why:** follow-ups like *"what about the second one?"* mean nothing to a search engine alone. Query rewriting uses context to expand them into standalone questions.</Note>
-
-```python
-rewrite_llm = rag.llm(provider="openai", model="gpt-4o-mini")
-
+<CodeGroup>
+```python SDK
 result = rag.retrieve(
     "What about the second step?",
-    embedder=embedder,
-    vector_db="qdrant", collection="docs", url="http://localhost:6333",
     use_query_rewrite=True,
-    rewrite_llm=rewrite_llm,
     session_context="User is asking about the onboarding flow.",
 )
-result.search_query  # the rewritten query actually searched
+result.search_query
 ```
 
-## Reference
+```bash CLI
+ragrails retrieve "What about the second step?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+```
 
-Full parameters: [SDK retrieval](/usage/sdk/retrieval) · [CLI](/usage/cli/retrieval) · [REST](/usage/server/retrieval).
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What about the second step?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "use_query_rewrite": true,
+    "session_context": "User is asking about the onboarding flow."
+  }'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "query": "What about the second step?",
+  "search_query": "What is the second step in the onboarding flow?",
+  "retrieved": 1,
+  "items": [
+    {
+      "id": "onboarding#step-2",
+      "score": 0.81,
+      "text": "Step two is to invite your team.",
+      "metadata": {"title": "Onboarding"}
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+<Note>The CLI retrieval command does not currently expose query rewriting flags; use SDK or REST when you need rewrite controls.</Note>

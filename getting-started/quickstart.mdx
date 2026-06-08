@@ -6,78 +6,128 @@ description: "Build a knowledge base and chat over it in a few minutes."
 
 This example builds a small support knowledge base, then chats over it. Run it as-is, then swap in your own content.
 
-## 1. Install
+## 1. Install and start Qdrant
 
 ```bash
-pip install "ragrails[voyage,openai,qdrant]"
-```
-
-## 2. Set your keys and start Qdrant
-
-```bash
+pip install "ragrails[voyage,qdrant]"
 export VOYAGE_API_KEY="..."
 export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-## 3. Build the knowledge base
+<Note>
+LLM providers (OpenAI, Anthropic, Google) are built in, so there's no LLM extra.
 
-```python
+This quickstart uses `openai` with `gpt-4o-mini`.
+</Note>
+
+<Tip>
+See [models](/reference/models) for other supported LLM providers and model names, [vector databases](/reference/vector-databases) for supported vector stores, and [environment variables](/getting-started/env-examples) for provider keys.
+</Tip>
+
+## 2. Build and chat
+
+Each example creates the same `support` collection from the same refund-policy text, runs one retrieval query, then runs one chat turn.
+
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-
-rag.ingest(
-    markdown=(
-        "# Refund policy\n\n"
-        "Customers can request a refund within 30 days of purchase. "
-        "Refunds are returned to the original payment method within 5 business days."
-    ),
-    embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"},
-)
-```
-
-`ingest()` chunks, embeds, and stores the content in one call. Swap `markdown=` for `docs=`, `urls=`, or `api=` to load real files, websites, or APIs.
-
-## 4. Chat over it
-
-```python
-llm = rag.llm(provider="openai", model="gpt-4o-mini")
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
-
-result = rag.chat(
-    "How long do I have to request a refund?",
-    llm=llm,
-    embedder=embedder,
-    vector_db="qdrant",
+rag = RagRails(
     collection="support",
-    url="http://localhost:6333",
-    history=[],
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
 
-print(result.answer)
-# "You can request a refund within 30 days of purchase."
+rag.ingest(docs=["files/refund-policy.pdf"])
+
+# Other source forms use the same pipeline:
+# rag.ingest(urls="https://example.com/help/refunds")  # Scrape Website
+# rag.ingest(api={"url": "https://api.example.com/refund-policy"})  # Fetch API responses
+# rag.ingest(markdown="# Refund policy\n\nCustomers can request a refund within 30 days of purchase.")  # Pass Markdown directly
+
+# Query retrieves matching chunks from the collection.
+query_result = rag.query("How long do I have to request a refund?", retrieval={"top_k": 5})
+print(query_result.items)
+
+# Chat retrieves context and asks the configured LLM for a grounded answer.
+chat_result = rag.chat("How long do I have to request a refund?", history=[])
+print(chat_result.answer)
 ```
 
-<Tip>Chat is stateless. Save `result.history` and pass it to the next turn to keep context.</Tip>
-
-## Run it from the CLI
-
-```bash
+```bash CLI
 ragrails ingest \
-  --markdown "# Refund policy. Customers can request a refund within 30 days of purchase." \
+  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase. Refunds are returned to the original payment method within 5 business days." \
   --vector-db qdrant --collection support --url http://localhost:6333 \
   --provider voyage --model voyage-3
 
+ragrails query "How long do I have to request a refund?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 5
+
 ragrails chat "How long do I have to request a refund?" \
   --vector-db qdrant --collection support --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
   --llm-provider openai --llm-model gpt-4o-mini
 ```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "markdown": "# Refund policy\n\nCustomers can request a refund within 30 days of purchase. Refunds are returned to the original payment method within 5 business days.",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do I have to request a refund?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333", "top_k": 5}
+  }'
+
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do I have to request a refund?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+</CodeGroup>
+
+<Tip>
+SDK defaults live in `RagRails(...)`.
+
+CLI defaults live in `.ragrails.toml` or explicit flags.
+
+REST defaults live in request payload fields.
+
+Chat is stateless: save the returned history and pass it to the next turn.
+</Tip>
+
+## Use Your Own Data
+
+The markdown example proves the full loop works. Next, swap in a real source:
+
+<CardGroup cols={2}>
+  <Card title="Documents" icon="file-text" href="/guides/docs-to-rag">Ingest PDFs, DOCX, spreadsheets, Markdown, and folders.</Card>
+  <Card title="Scrape Website" icon="globe" href="/guides/website-to-rag">Crawl a docs site or support center.</Card>
+  <Card title="REST APIs" icon="plug" href="/guides/api-to-rag">Fetch and index API responses.</Card>
+</CardGroup>
 
 ## Next
 
 <CardGroup cols={2}>
   <Card title="How RAG works" icon="book" href="/getting-started/concepts">Understand the pipeline.</Card>
-  <Card title="Tune retrieval and chat" icon="sliders-horizontal" href="/features/overview">Reranking, rewriting, and more.</Card>
+  <Card title="Configuration" icon="gear" href="/getting-started/configuration">Set defaults with .ragrails.toml.</Card>
 </CardGroup>

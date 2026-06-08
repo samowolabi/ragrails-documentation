@@ -34,7 +34,7 @@ The biggest lever. Pricing per 1M tokens (input / output):
 - **Model choice** - `voyage-3-lite` is cheaper than `voyage-3` / `voyage-3-large`. Use lite for high-volume or less nuanced content.
 - **Chunk size** - bigger chunks mean fewer chunks to embed. Don't go so big that retrieval gets noisy (see [chunking](/features/chunking)).
 - **`batch_size`** - larger batches mean fewer API round-trips.
-- **Embed once** - store vectors; never re-embed unchanged content. Use [`edit()`](/guides/manage-stored-data) to update only what changed.
+- **Embed once** - store vectors; never re-embed unchanged content. Use [`edit()`](/features/knowledge-base-maintenance) to update only what changed.
 
 ## Reranking cost
 

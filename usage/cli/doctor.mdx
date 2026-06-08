@@ -1,0 +1,49 @@
+---
+title: "Doctor"
+icon: "stethoscope"
+description: "Diagnose your Ragrails setup before you run anything."
+---
+
+`ragrails doctor` is a production-readiness check. It validates your `.ragrails.toml`, the provider packages you've installed, your API keys, and (optionally) vector database connectivity, then reports what's wrong and how to fix it.
+
+```bash
+ragrails doctor
+```
+
+## What it checks
+
+- **Config file**: `.ragrails.toml` exists and is valid TOML.
+- **Required sections**: `vector_store`, `embedding`, `llm`, `reranker` are present.
+- **Provider choices**: `vector_store.provider` is one of `qdrant`, `qdrant_cloud`, `pinecone`, `weaviate`; `llm.provider` is one of `openai`, `anthropic`, `google`.
+- **Required values**: collection, embedding provider/model, LLM model and max tokens are set.
+- **Installed packages**: the provider packages your config needs are importable (with the install hint if not).
+- **Environment variables**: the API keys for your configured providers are set.
+- **Connectivity** (with `--connections`): Qdrant or Qdrant Cloud is reachable.
+
+Each check reports `OK`, `WARN`, or `FAIL` with a one-line fix.
+
+## Flags
+
+| Flag | Description |
+| --- | --- |
+| `--config PATH` | Check a `.ragrails.toml` at a custom path |
+| `--connections` | Also test vector database reachability (live network check) |
+| `--json` | Machine-readable JSON output for CI |
+
+## In CI
+
+`--json` prints a structured report and exits non-zero if any check fails, so you can gate a deploy on a healthy config:
+
+```bash
+ragrails doctor --connections --json
+```
+
+```json
+{
+  "ok": false,
+  "checks": [
+    {"name": "config_file", "status": "pass", "message": "...", "fix": ""},
+    {"name": "env:VOYAGE_API_KEY", "status": "fail", "message": "not set", "fix": "export VOYAGE_API_KEY=..."}
+  ]
+}
+```

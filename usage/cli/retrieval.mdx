@@ -4,6 +4,8 @@ icon: "search"
 description: "Search stored chunks from the terminal."
 ---
 
+`retrieve` embeds the query, searches the vector store, and prints the most relevant chunks. Add `--rerank` to reorder the top candidates by true relevance.
+
 <CodeGroup>
 ```bash Command
 ragrails retrieve "How do I authenticate?" \
@@ -25,20 +27,17 @@ Results: 10
 ```
 </CodeGroup>
 
-With reranking:
+## With reranking
+
+Retrieve wide, rerank down. The reranker needs candidates to choose from, so keep `--top-k` higher than `--rerank-top-k`.
 
 <CodeGroup>
 ```bash Command
 ragrails retrieve "How do I authenticate?" \
-  --vector-db qdrant \
-  --collection docs \
-  --url http://localhost:6333 \
-  --provider voyage \
-  --model voyage-3 \
-  --rerank \
-  --reranker voyage \
-  --reranker-model rerank-2-lite \
-  --rerank-top-k 5
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --top-k 20 \
+  --rerank --reranker voyage --reranker-model rerank-2-lite --rerank-top-k 5
 ```
 
 ```text Output
@@ -51,20 +50,20 @@ Results: 5
 ```
 </CodeGroup>
 
-Output prints result count, score, ID, title/path metadata, and a text preview for each result.
-
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `QUERY` | required | Search query (positional) |
 | `--vector-db` | `qdrant` | `qdrant`, `pinecone`, or `weaviate` |
-| `--collection` | `None` | Collection name |
-| `--url` | `None` | Vector DB URL |
+| `--collection` | none | Collection name |
+| `--url` | none | Vector DB URL |
 | `--top-k` | `10` | Results to retrieve |
 | `--provider` | `voyage` | Query embedding provider |
 | `--model` | `voyage-3` | Query embedding model |
 | `--rerank` | off | Enable reranking |
-| `--reranker` | `voyage` | Reranker provider |
+| `--reranker` | `voyage` | Reranker provider (`voyage` or `bm25`) |
 | `--reranker-model` | `rerank-2-lite` | Reranker model |
 | `--rerank-top-k` | `5` | Results to keep after reranking |
+
+<Note>Query rewriting isn't exposed on the `retrieve` command. Use it in `ragrails chat --rewrite-query`, or the [SDK `retrieve()`](/usage/sdk/retrieval#with-query-rewriting) / [REST](/usage/server/retrieval#with-query-rewriting).</Note>

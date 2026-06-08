@@ -1,27 +1,214 @@
 ---
-title: "Features"
+title: "Overview"
 icon: "layers"
-description: "Each stage, what it's for, and how to tune it."
+description: "Understand the two workflows and the pipeline stages behind them."
 ---
 
-Ragrails is six stages. The first four build your index; the last two query it.
+Ragrails has two workflows.
 
-| Stage | Purpose | Page |
-| --- | --- | --- |
-| Ingestion | Pull content from URLs, files, and APIs | [Ingestion](/features/ingestion) |
-| Chunking | Split content into searchable passages | [Chunking](/features/chunking) |
-| Embedding | Turn passages into vectors | [Embedding](/features/embedding) |
-| Storing | Save vectors to a database | [Storing](/features/storing) |
-| Retrieval | Find the chunks relevant to a query | [Retrieval](/features/retrieval) |
-| Chat | Answer questions grounded in your data | [Chat](/features/chat) |
+`ingest()` builds the index from your sources. `query()` reads from that index. `chat()` builds on query by retrieving context and asking your configured LLM for a grounded answer.
 
-<Tip>New to RAG? Read [How RAG works](/getting-started/concepts) first.</Tip>
+Start with the workflows when you want the shortest path. Open the pipeline stages when you need to inspect output, tune behavior, or run one part directly.
 
-## Run stages individually or together
+## Workflows
 
-- **Individually** - call each stage when you need to inspect or control intermediate output.
-- **Together** - use [`ingest()` and `query()`](/usage/sdk/pipeline) to run the whole pipeline in one call.
+Workflows are the high-level APIs most apps call directly. Use them when you want Ragrails to run the full path for indexing or answering without managing each stage yourself.
 
-## Keeping your index current
+<CardGroup cols={2}>
+  <Card title="Ingest" icon="package-plus" href="/features/ingest">
+    Load sources, chunk them, embed them, and store them in a vector database.
+  </Card>
+  <Card title="Query" icon="search-check" href="/features/query">
+    Search the index and generate grounded answers with retrieved context.
+  </Card>
+</CardGroup>
 
-Stored data isn't frozen. As sources change, update or remove chunks by ID with `edit()` and `delete()` so answers stay accurate. See [Keep your knowledge base current](/guides/manage-stored-data).
+<CodeGroup>
+```python SDK
+# Ingest builds the index.
+rag.ingest(docs=["files/refund-policy.pdf"])
+
+# Query returns matching chunks.
+results = rag.query("How long do refunds take?", retrieval={"top_k": 5})
+
+# Chat returns a grounded answer.
+answer = rag.chat("How long do refunds take?", history=[])
+```
+
+```bash CLI
+# Ingest builds the index.
+ragrails ingest --docs files/refund-policy.pdf \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+# Query returns matching chunks.
+ragrails query "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 5
+
+# Chat returns a grounded answer.
+ragrails chat "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+# Ingest builds the index.
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{"docs": ["files/refund-policy.pdf"], "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}}'
+
+# Query returns matching chunks.
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How long do refunds take?", "embedding": {"provider": "voyage", "model": "voyage-3"}, "retrieval": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333", "top_k": 5}}'
+
+# Chat returns a grounded answer.
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How long do refunds take?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333", "history": []}'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "ingest": {"sources": 1, "chunks": 3, "embedded": 3, "stored": 3, "failed": 0},
+  "query": {"retrieved": 3, "items": [{"id": "policy#refunds", "score": 0.84}]},
+  "chat": {"answer": "Refunds are returned within 5 business days.", "answer_confidence": {"level": "high", "reason": "retrieval_quality_pass"}}
+}
+```
+</CodeGroup>
+
+## Pipeline
+
+Pipeline stages are the lower-level building blocks behind the workflows. Use them when you need to inspect intermediate output, tune a specific step, or run stages independently.
+
+<CardGroup cols={2}>
+  <Card title="Extraction" icon="file-input" href="/features/extraction">
+    Load documents, scraped websites, APIs, or direct Markdown before indexing.
+  </Card>
+  <Card title="Chunking" icon="scissors" href="/features/chunking">
+    Split normalized Markdown into searchable passages.
+  </Card>
+  <Card title="Embedding" icon="binary" href="/features/embedding">
+    Convert chunks into vectors with your embedding model.
+  </Card>
+  <Card title="Storing" icon="database" href="/features/storing">
+    Write embedded chunks to the configured vector database.
+  </Card>
+  <Card title="Retrieval" icon="search" href="/features/retrieval">
+    Find the chunks most relevant to a user query.
+  </Card>
+  <Card title="Chat" icon="messages-square" href="/features/chat">
+    Use retrieved context to answer with an LLM.
+  </Card>
+  <Card title="Knowledge Base Maintenance" icon="refresh-cw" href="/features/knowledge-base-maintenance">
+    Update or remove stored chunks so answers stay current.
+  </Card>
+</CardGroup>
+
+<CodeGroup>
+```python SDK
+# Extraction
+sources = rag.parse(files=["files/refund-policy.pdf"])
+
+# Chunking
+chunks = rag.chunk(markdown=sources.outputs)
+
+# Embedding
+embedded = rag.embed(chunks=chunks.items)
+
+# Storing
+rag.store(embedded_chunks=embedded.items)
+
+# Retrieval
+matches = rag.retrieve("How long do refunds take?", top_k=5)
+
+# Chat
+answer = rag.chat("How long do refunds take?", history=[])
+```
+
+```bash CLI
+# Extraction
+ragrails parse --files files/refund-policy.pdf --output-dir files/output/docs/
+
+# Chunking
+ragrails chunk --input-dir files/output/docs/ --output-dir files/output/chunks/
+
+# Embedding
+ragrails embed --input-dir files/output/chunks/ --output-dir files/output/embedded/ \
+  --provider voyage --model voyage-3
+
+# Storing
+ragrails store --input-dir files/output/embedded/ \
+  --vector-db qdrant --collection support --url http://localhost:6333
+
+# Retrieval
+ragrails retrieve "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 5
+
+# Chat
+ragrails chat "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+# Extraction
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{"files": ["files/refund-policy.pdf"]}'
+
+# Chunking
+curl -X POST http://127.0.0.1:8000/v1/chunk \
+  -H "Content-Type: application/json" \
+  -d '{"markdown": "# Refund policy\n\nRefunds are available within 30 days."}'
+
+# Embedding
+curl -X POST http://127.0.0.1:8000/v1/embed \
+  -H "Content-Type: application/json" \
+  -d '{"chunks": [{"id": "refunds", "text": "Refunds are available within 30 days.", "source": "policy.md", "metadata": {}}], "provider": "voyage", "model": "voyage-3"}'
+
+# Storing
+curl -X POST http://127.0.0.1:8000/v1/store \
+  -H "Content-Type: application/json" \
+  -d '{"embedded_chunks": [{"id": "refunds", "text": "Refunds are available within 30 days.", "embedding": [0.01, 0.02], "source": "policy.md", "metadata": {}}], "vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}'
+
+# Retrieval
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How long do refunds take?", "provider": "voyage", "model": "voyage-3", "vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333", "top_k": 5}'
+
+# Chat
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How long do refunds take?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333", "history": []}'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "extraction": {"documents": 1, "failed": 0},
+  "chunking": {"chunks": 3, "failed": 0},
+  "embedding": {"embedded": 3, "failed": 0},
+  "storing": {"stored": 3, "failed": 0},
+  "retrieval": {"retrieved": 3, "items": [{"id": "policy#refunds", "score": 0.84}]},
+  "chat": {"answer": "Refunds are returned within 5 business days.", "answer_confidence": {"level": "high", "reason": "retrieval_quality_pass"}}
+}
+```
+</CodeGroup>
+
+<Tip>New to RAG? Read [How RAG works](/getting-started/concepts). Ready to run it? Start with the [Quickstart](/getting-started/quickstart).</Tip>
+
+## How it fits together
+
+Ingest path: Extraction -> Chunking -> Embedding -> Storing.
+
+Query path: Retrieval -> Chat.
+
+Stored data is not frozen. As sources change, [keep your knowledge base current](/features/knowledge-base-maintenance) with `edit()` and `delete()` so answers stay accurate.

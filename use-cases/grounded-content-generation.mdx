@@ -15,23 +15,25 @@ Retrieve the relevant facts first, then pass them to your generation prompt as c
 1. **Retrieve** the supporting chunks for the topic.
 2. **Generate** with those chunks as grounding, using your LLM and your prompt.
 
-```python
-from ragrails import RagRails
+<CodeGroup>
+```python SDK
+hits = rag.retrieve("enterprise plan features and limits", top_k=8)
+context = "
 
-rag = RagRails()
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+".join(h.text for h in hits.items)
+prompt = f"Write a product brief using ONLY these facts:
 
-hits = rag.retrieve(
-    "enterprise plan features and limits",
-    embedder=embedder,
-    vector_db="qdrant", collection="docs", url="http://localhost:6333",
-    top_k=8,
-)
-
-context = "\n\n".join(h.text for h in hits.items)
-prompt = f"Write a product brief using ONLY these facts:\n\n{context}"
-# → pass `prompt` to your LLM of choice
+{context}"
 ```
+
+```bash CLI
+ragrails retrieve "enterprise plan features and limits"   --vector-db qdrant --collection docs --url http://localhost:6333   --provider voyage --model voyage-3   --top-k 8
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve   -H "Content-Type: application/json"   -d '{"query": "enterprise plan features and limits", "provider": "voyage", "model": "voyage-3", "vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 8}'
+```
+</CodeGroup>
 
 <Tip>Or use [`chat()`](/features/chat) directly if you want Ragrails to handle generation with grounding and citations built in.</Tip>
 

@@ -1,0 +1,642 @@
+---
+title: "Ingest"
+icon: "package-plus"
+description: "Build a searchable index from documents, scraped websites, APIs, or Markdown."
+---
+
+`ingest()` is the high-level indexing workflow. It runs extraction, chunking, embedding, and storing in one call.
+
+Use it when you want source content to become searchable without manually calling each stage.
+
+| Stage | What happens |
+| --- | --- |
+| [Extraction](/features/extraction) | Documents, scraped websites, APIs, and Markdown become normalized document objects |
+| [Chunking](/features/chunking) | Documents are split into searchable passages |
+| [Embedding](/features/embedding) | Chunks are embedded with the configured embedding model |
+| [Storing](/features/storing) | Embedded chunks are written to the configured vector database |
+
+## Source Forms
+
+You can pass one source type or combine several in the same ingest run. The sections below show equivalent full configurations for each supported source form.
+
+In SDK examples, `RagRails(...)` holds the default collection, vector store, and embedding model. The `ingest()` call only repeats those settings when it is intentionally overriding them for that run.
+
+<Note>Scrape Website requires URL support to be installed and set up. See [Extraction](/features/extraction) for `setup_url()` / `ragrails setup-url`.</Note>
+
+## Basic Usage
+
+This example combines documents, a scraped website, an API endpoint, and direct Markdown in one ingest run.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.ingest(
+    docs=["files/refund-policy.pdf"],
+    urls="https://example.com/help/refunds",
+    api={"url": "https://api.example.com/refund-policy"},
+    markdown="# Refund policy\n\nCustomers can request a refund within 30 days.",
+)
+
+print(result.sources, result.chunks, result.stored)
+```
+
+```bash CLI
+ragrails ingest \
+  --docs files/refund-policy.pdf \
+  --source-url https://example.com/help/refunds \
+  --api-url https://api.example.com/refund-policy \
+  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days." \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": ["files/refund-policy.pdf"],
+    "urls": "https://example.com/help/refunds",
+    "api": {"url": "https://api.example.com/refund-policy"},
+    "markdown": "# Refund policy\n\nCustomers can request a refund within 30 days.",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "sources": 4,
+  "chunks": 8,
+  "embedded": 8,
+  "stored": 8,
+  "source_results": {
+    "docs": {"documents": 1, "failed": 0, "outputs": [], "errors": []},
+    "urls": {"pages": 1, "failed": 0, "outputs": [], "errors": []},
+    "api": {"documents": 1, "failed": 0, "outputs": [], "errors": []},
+    "markdown": [{"text": "# Refund policy\n\nCustomers can request a refund within 30 days.", "source": "markdown", "metadata": {}}]
+  },
+  "chunk_result": {"inputs": 4, "chunks": 8, "items": [], "failed": 0, "errors": []},
+  "embed_result": {"inputs": 8, "embedded": 8, "items": [], "failed": 0, "errors": []},
+  "store_result": {"inputs": 8, "stored": 8, "items": [], "failed": 0, "provider": "qdrant", "collection": "support", "errors": []},
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Concurrency
+
+Use `concurrency` to run document parsing, website scraping, and API fetching serially or in parallel before chunking begins.
+
+| Mode | Behavior | Tradeoff |
+| --- | --- | --- |
+| `serial` | Default. Runs `docs`, `urls`, and `api` one after another. | Easier debugging and lower resource usage. |
+| `parallel` | Runs `docs`, `urls`, and `api` concurrently, then merges results before chunking. | Faster when combining sources, but uses more resources. |
+
+Merge order remains deterministic: `docs`, `urls`, `api`, then `markdown`.
+
+<CodeGroup>
+```python SDK
+rag.ingest(
+    docs=["guide.pdf"],
+    urls=["https://example.com/docs"],
+    api="https://api.example.com/posts",
+    concurrency="parallel",
+)
+```
+
+```bash CLI
+ragrails ingest \
+  --docs guide.pdf \
+  --source-url https://example.com/docs \
+  --api-url https://api.example.com/posts \
+  --concurrency parallel
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": ["guide.pdf"],
+    "urls": ["https://example.com/docs"],
+    "api": "https://api.example.com/posts",
+    "concurrency": "parallel"
+  }'
+```
+</CodeGroup>
+
+## Files
+
+Use files when you know the exact documents to index. File entries can be local paths, HTTP/HTTPS file links, or dictionaries with `path`, `title`, and `description`.
+
+<CodeGroup>
+```python title="SDK" highlight={22}
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.ingest(
+    docs=[
+        {
+            "path": "files/refund-policy.pdf",
+            "title": "Refund policy",
+            "description": "Customer refund rules",
+        },
+        {
+            "path": "files/shipping.md",
+            "title": "Shipping policy",
+            "description": "Shipping timelines and carriers",
+        },
+        {
+            "path": "https://example.com/files/product-guide.pdf",
+            "title": "Product guide",
+            "description": "Hosted PDF guide",
+        },
+    ],
+    ingestion={"docs": {"frontmatter": False}},
+    chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    embedding={"batch_size": 64},
+    storage={"batch_size": 64, "ensure_collection": True},
+)
+
+print(result.sources, result.chunks, result.stored)
+```
+
+```bash title="CLI" highlight={4}
+ragrails ingest \
+  --docs files/refund-policy.pdf \
+  --docs files/shipping.md \
+  --docs https://example.com/files/product-guide.pdf \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --batch-size 64 \
+  --chunk-size 2000 --chunk-overlap 200 --min-chunk-length 100
+```
+
+```bash title="REST API" highlight={16}
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": [
+      {
+        "path": "files/refund-policy.pdf",
+        "title": "Refund policy",
+        "description": "Customer refund rules"
+      },
+      {
+        "path": "files/shipping.md",
+        "title": "Shipping policy",
+        "description": "Shipping timelines and carriers"
+      },
+      {
+        "path": "https://example.com/files/product-guide.pdf",
+        "title": "Product guide",
+        "description": "Hosted PDF guide"
+      }
+    ],
+    "ingestion": {"docs": {"frontmatter": false}},
+    "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "batch_size": 64,
+      "ensure_collection": true
+    }
+  }'
+```
+</CodeGroup>
+
+<Note>HTTP/HTTPS document links must end with a supported file extension, such as `.pdf`, `.md`, `.docx`, or `.xlsx`. REST local file paths are read by the server process.</Note>
+<Tip>For browser/app uploads, use the multipart extraction endpoint first: [REST extraction](/usage/server/ingestion#upload-documents-post-v1ingestdocsupload).</Tip>
+
+## Folders
+
+Use folders when you want Ragrails to parse every supported document inside a directory.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.ingest(
+    docs={"folder": "files/policies/"},
+    ingestion={"docs": {"frontmatter": False}},
+    chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    embedding={"batch_size": 64},
+    storage={"batch_size": 64, "ensure_collection": True},
+)
+
+print(result.sources, result.chunks, result.stored)
+```
+
+```bash CLI
+ragrails ingest --folder files/policies/ \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --batch-size 64 \
+  --chunk-size 2000 --chunk-overlap 200 --min-chunk-length 100
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"folder": "files/policies/"},
+    "ingestion": {"docs": {"frontmatter": false}},
+    "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "batch_size": 64,
+      "ensure_collection": true
+    }
+  }'
+```
+</CodeGroup>
+
+<Note>Folder paths are resolved where the SDK or server process runs. The CLI resolves the folder from the shell where you run the command.</Note>
+
+## Scrape Website
+
+Use `urls` to scrape exact pages or crawl a website. SDK and REST can pass `mode`, `max_depth`, `max_pages`, `verbose`, and `frontmatter`. CLI exposes repeatable `--source-url` for exact URL ingestion through the high-level ingest command.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+rag.setup_url()  # one-time setup
+
+result = rag.ingest(
+    urls={
+        "url": "https://example.com/help",
+        "mode": "full",
+        "max_depth": 2,
+        "max_pages": 50,
+    },
+    ingestion={"urls": {"verbose": False, "frontmatter": False}},
+    chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    embedding={"batch_size": 64},
+    storage={"batch_size": 64, "ensure_collection": True},
+)
+
+print(result.sources, result.chunks, result.stored)
+```
+
+```bash CLI
+ragrails setup-url
+
+ragrails ingest \
+  --source-url https://example.com/help/refunds \
+  --source-url https://example.com/help/shipping \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --batch-size 64 \
+  --chunk-size 2000 --chunk-overlap 200 --min-chunk-length 100
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": {
+      "url": "https://example.com/help",
+      "mode": "full",
+      "max_depth": 2,
+      "max_pages": 50
+    },
+    "ingestion": {"urls": {"verbose": false, "frontmatter": false}},
+    "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "batch_size": 64,
+      "ensure_collection": true
+    }
+  }'
+```
+</CodeGroup>
+
+## APIs
+
+Use `api` when content lives behind an HTTP endpoint. SDK and REST support `method`, `headers`, `params`, `body`, `pagination`, `max_pages`, `timeout`, and batch API configs. The CLI high-level ingest command accepts one `--api-url`.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.ingest(
+    api=[
+        {
+            "url": "https://api.example.com/refunds",
+            "title": "Refunds",
+            "description": "Refund policy API",
+            "method": "GET",
+            "headers": {"Authorization": "Bearer $API_TOKEN"},
+            "params": {"locale": "en-US"},
+            "pagination": {"type": "page", "param": "page"},
+            "max_pages": 10,
+            "timeout": 30.0,
+        }
+    ],
+    ingestion={"api": {"frontmatter": False}},
+    chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    embedding={"batch_size": 64},
+    storage={"batch_size": 64, "ensure_collection": True},
+)
+
+print(result.sources, result.chunks, result.stored)
+```
+
+```bash CLI
+ragrails ingest \
+  --api-url https://api.example.com/refund-policy \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --batch-size 64 \
+  --chunk-size 2000 --chunk-overlap 200 --min-chunk-length 100
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api": [
+      {
+        "url": "https://api.example.com/refunds",
+        "title": "Refunds",
+        "description": "Refund policy API",
+        "method": "GET",
+        "headers": {"Authorization": "Bearer $API_TOKEN"},
+        "params": {"locale": "en-US"},
+        "pagination": {"type": "page", "param": "page"},
+        "max_pages": 10,
+        "timeout": 30.0
+      }
+    ],
+    "ingestion": {"api": {"frontmatter": false}},
+    "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "batch_size": 64,
+      "ensure_collection": true
+    }
+  }'
+```
+</CodeGroup>
+
+<Note>The CLI pipeline command does not expose API headers, params, request bodies, pagination, or timeout flags. Use SDK or REST when the API source needs those fields.</Note>
+
+## Direct Markdown
+
+Use direct Markdown for demos, generated content, or content you already normalized yourself. Markdown entries can be strings or dictionaries with `text`, `source`, and `metadata`.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.ingest(
+    markdown=[
+        {
+            "text": "# Refunds\n\nRefunds are available within 30 days.",
+            "source": "policy.md",
+            "metadata": {"title": "Refunds", "source_kind": "markdown"},
+        },
+        {
+            "text": "# Shipping\n\nOrders ship in 3 business days.",
+            "source": "shipping.md",
+            "metadata": {"title": "Shipping", "source_kind": "markdown"},
+        },
+    ],
+    chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    embedding={"batch_size": 64},
+    storage={"batch_size": 64, "ensure_collection": True},
+)
+
+print(result.sources, result.chunks, result.stored)
+```
+
+```bash CLI
+ragrails ingest \
+  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days." \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --batch-size 64 \
+  --chunk-size 2000 --chunk-overlap 200 --min-chunk-length 100
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "markdown": [
+      {
+        "text": "# Refunds\n\nRefunds are available within 30 days.",
+        "source": "policy.md",
+        "metadata": {"title": "Refunds", "source_kind": "markdown"}
+      },
+      {
+        "text": "# Shipping\n\nOrders ship in 3 business days.",
+        "source": "shipping.md",
+        "metadata": {"title": "Shipping", "source_kind": "markdown"}
+      }
+    ],
+    "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "batch_size": 64,
+      "ensure_collection": true
+    }
+  }'
+```
+</CodeGroup>
+
+## Stage Configuration
+
+Use config blocks when you need to tune a specific part of ingest.
+
+| Config | Applies to | Supported keys in `ingest()` |
+| --- | --- | --- |
+| `ingestion.docs` | Document and folder extraction | `frontmatter` |
+| `ingestion.urls` | Scrape Website extraction | `mode`, `max_depth`, `max_pages`, `verbose`, `frontmatter` |
+| `ingestion.api` | API extraction | `title`, `description`, `method`, `headers`, `params`, `body`, `pagination`, `max_pages`, `timeout`, `frontmatter` |
+| `chunking` | How extracted documents become passages | `chunk_size`, `chunk_overlap`, `min_chunk_length` |
+| `embedding` | Embedding provider and model used for chunks | `provider`, `model`, `batch_size`, `options` |
+| `storage` | Where embedded chunks are stored | `vector_db`, `collection`, `url`, `batch_size`, `ensure_collection`, `options` |
+| `concurrency` | Source ingestion scheduling | `serial`, `parallel` |
+
+<CodeGroup>
+```python SDK
+result = rag.ingest(
+    docs={"folder": "files/policies/"},
+    ingestion={"docs": {"frontmatter": False}},
+    chunking={"chunk_size": 1000, "chunk_overlap": 100},
+    embedding={"provider": "voyage", "model": "voyage-3-large", "batch_size": 32, "options": {}},
+    storage={
+        "vector_db": "qdrant",
+        "collection": "support_large",
+        "url": "http://localhost:6333",
+        "batch_size": 32,
+        "ensure_collection": True,
+        "options": {},
+    },
+    concurrency="parallel",
+)
+```
+
+```bash CLI
+ragrails ingest \
+  --folder files/policies/ \
+  --chunk-size 1000 --chunk-overlap 100 --min-chunk-length 80 \
+  --provider voyage --model voyage-3-large --batch-size 32 \
+  --vector-db qdrant --collection support_large --url http://localhost:6333 \
+  --concurrency parallel
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"folder": "files/policies/"},
+    "ingestion": {"docs": {"frontmatter": false}},
+    "chunking": {"chunk_size": 1000, "chunk_overlap": 100, "min_chunk_length": 80},
+    "embedding": {"provider": "voyage", "model": "voyage-3-large", "batch_size": 32, "options": {}},
+    "storage": {
+      "vector_db": "qdrant",
+      "collection": "support_large",
+      "url": "http://localhost:6333",
+      "batch_size": 32,
+      "ensure_collection": true,
+      "options": {}
+    },
+    "concurrency": "parallel"
+  }'
+```
+</CodeGroup>
+
+<Note>SDK defaults live on the `RagRails(...)` instance. CLI defaults come from `.ragrails.toml` or flags. REST defaults come from each request payload and any server-side configuration. The CLI pipeline exposes source flags, chunking flags, embedding provider/model, vector store settings, and one shared `--batch-size`; it does not expose API request config, URL crawl config, `options`, or `ensure_collection`.</Note>
+
+## Response Fields
+
+The ingest response summarizes each stage and keeps the detailed nested results available.
+
+| Field | Meaning |
+| --- | --- |
+| `sources` | Number of extracted source documents that entered chunking |
+| `chunks` | Number of chunks created |
+| `embedded` | Number of chunks embedded |
+| `stored` | Number of embedded chunks written to the vector database |
+| `source_results` | Per-source extraction results for `docs`, `urls`, `api`, and `markdown` |
+| `chunk_result` | Full chunking result |
+| `embed_result` | Full embedding result |
+| `store_result` | Full storing result |
+| `failed` | Total failed items across extraction, chunking, embedding, and storing |
+| `errors` | Tagged errors collected across the ingest workflow |
+
+## Possible Errors
+
+`ingest()` can fail in extraction, chunking, embedding, or storing. Stage-level failures are returned in the nested result plus the top-level `errors` list.
+
+<CodeGroup>
+```json Extraction failure
+{
+  "sources": 0,
+  "chunks": 0,
+  "embedded": 0,
+  "stored": 0,
+  "source_results": {
+    "docs": {
+      "documents": 0,
+      "failed": 1,
+      "outputs": [],
+      "errors": [
+        {
+          "source": "files/missing.pdf",
+          "source_kind": "path",
+          "stage": "validate",
+          "error": "File not found: files/missing.pdf",
+          "isRetryable": false,
+          "attempts": 1
+        }
+      ]
+    }
+  },
+  "chunk_result": {"inputs": 0, "chunks": 0, "items": [], "failed": 0, "errors": []},
+  "embed_result": {"inputs": 0, "embedded": 0, "items": [], "failed": 0, "errors": []},
+  "store_result": {"inputs": 0, "stored": 0, "items": [], "failed": 0, "provider": "qdrant", "collection": "support", "errors": []},
+  "failed": 1,
+  "errors": [
+    {
+      "stage": "validate",
+      "source": "files/missing.pdf",
+      "source_kind": "path",
+      "error": "File not found: files/missing.pdf",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json REST exception
+{
+  "error": {
+    "type": "ValueError",
+    "message": "Provide at least one source: docs, urls, api, or markdown"
+  }
+}
+```
+</CodeGroup>
+
+## When To Use Stages Directly
+
+Use [Extraction](/features/extraction), [Chunking](/features/chunking), [Embedding](/features/embedding), and [Storing](/features/storing) directly when you need to inspect intermediate files, recover from a specific stage, or run custom logic between stages.
+
+<Tip>For a copy-paste flow, start with the [Quickstart](/getting-started/quickstart). For interface-specific details, see [SDK pipeline](/usage/sdk/pipeline), [CLI pipeline](/usage/cli/pipeline), or [REST pipeline](/usage/server/pipeline).</Tip>

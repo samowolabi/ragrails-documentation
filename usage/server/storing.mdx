@@ -4,57 +4,104 @@ icon: "database"
 description: "Store, edit, and delete chunks over HTTP."
 ---
 
-## POST /v1/store
+Three endpoints manage chunks in a vector database, the same as the SDK [`store()`, `edit()`, and `delete()`](/usage/sdk/storing). The collection is created automatically if it doesn't exist.
+
+## Store (`POST /v1/store`)
+Upsert embedded chunks (each with an `embedding` field) into the vector database.
 
 <CodeGroup>
-```json Request
-{
-  "embedded_chunks": [...],
-  "vector_db": "qdrant",
-  "collection": "docs",
-  "url": "http://localhost:6333",
-  "batch_size": 64
-}
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/store \
+  -H "Content-Type: application/json" \
+  -d '{
+    "embedded_chunks": [
+      { "id": "guide-0", "text": "...", "embedding": [0.0132, -0.0719], "metadata": {"title": "Guide"} }
+    ],
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "batch_size": 64
+  }'
 ```
 
 ```json Response
-{
-  "inputs": 10,
-  "stored": 10,
-  "failed": 0,
-  "provider": "qdrant",
-  "collection": "docs",
-  "errors": []
-}
+{ "inputs": 12, "stored": 12, "items": [], "failed": 0, "provider": "qdrant", "collection": "docs", "errors": [] }
 ```
 </CodeGroup>
 
----
+| Field | Default | Description |
+| --- | --- | --- |
+| `embedded_chunks` | required | Chunks with `id`, `text`, `metadata`, `embedding` |
+| `vector_db` | `"qdrant"` | `qdrant`, `qdrant_cloud`, `pinecone`, or `weaviate` |
+| `collection` | `null` | Collection name |
+| `url` | `null` | Vector DB URL |
+| `batch_size` | `64` | Chunks per upsert request |
+| `ensure_collection` | `true` | Create the collection if missing |
+| `options` | `null` | Provider-specific options |
 
-## POST /v1/edit
+## Edit (`POST /v1/edit`)
+Re-embed and replace stored chunks by ID. Pass the updated chunks with the same IDs; the server embeds them with the given provider before upserting.
 
-```json
-{
-  "chunks": [
-    {"id": "chunk-id", "text": "Updated text.", "source": "files/guide.pdf", "metadata": {}}
-  ],
-  "provider": "voyage",
-  "model": "voyage-3",
-  "vector_db": "qdrant",
-  "collection": "docs",
-  "url": "http://localhost:6333"
-}
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/edit \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chunks": [
+      { "id": "guide-0", "text": "Updated text.", "source": "files/guide.pdf", "metadata": {"title": "Guide"} }
+    ],
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333"
+  }'
 ```
 
----
-
-## POST /v1/delete
-
-```json
-{
-  "ids": ["chunk-id-1", "chunk-id-2"],
-  "vector_db": "qdrant",
-  "collection": "docs",
-  "url": "http://localhost:6333"
-}
+```json Response
+{ "requested": 1, "edited": 1, "items": [], "failed": 0, "provider": "qdrant", "collection": "docs", "errors": [] }
 ```
+</CodeGroup>
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `chunks` | required | Chunks to update (need `id` and `text`) |
+| `provider` / `model` | `voyage` / `voyage-3` | Embedding provider used to re-embed |
+| `vector_db` / `collection` / `url` | see store | Vector DB target |
+| `batch_size` | `64` | Chunks per request |
+
+## Delete (`POST /v1/delete`)
+Remove chunks by ID.
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/delete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ids": ["guide-0", "guide-1"],
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333"
+  }'
+```
+
+```json Response
+{ "requested": 2, "deleted": 2, "items": [], "failed": 0, "provider": "qdrant", "collection": "docs", "errors": [] }
+```
+</CodeGroup>
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `ids` | required | Chunk IDs to delete |
+| `vector_db` / `collection` / `url` | see store | Vector DB target |
+
+<Tip>Give chunks stable IDs at chunk time so `edit` and `delete` can target them later. See [keeping your index current](/features/knowledge-base-maintenance).</Tip>
+
+## Supported databases
+
+| Database | Notes |
+| --- | --- |
+| `qdrant` | Local or cloud. Needs `url` |
+| `qdrant_cloud` | Cloud `url` + `QDRANT_API_KEY` |
+| `pinecone` | Cloud. Uses `PINECONE_API_KEY` |
+| `weaviate` | Local or cloud. Needs `url` |

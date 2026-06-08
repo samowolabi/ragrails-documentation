@@ -4,60 +4,57 @@ icon: "zap"
 description: "Build a knowledge base and chat from Python in a few lines."
 ---
 
-## 1. Install
+## 1. Install and start Qdrant
 
 ```bash
-pip install "ragrails[voyage,openai,qdrant]"
-```
-
-```bash
+pip install "ragrails[voyage,qdrant]"
 export VOYAGE_API_KEY="..."
 export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-## 2. Build the index
+## 2. Configure once
+
+SDK defaults live on the `RagRails(...)` instance. They do not write `.ragrails.toml` and they do not change CLI or REST defaults.
 
 ```python
 from ragrails import RagRails
 
-rag = RagRails()
-
-rag.ingest(
-    docs=["files/guide.pdf"],
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
 ```
 
-`ingest()` runs ingest → chunk → embed → store in one call.
-
-## 3. Query
+## 3. Build the index
 
 ```python
-result = rag.query(
-    "What does the guide cover?",
-    embedding={"provider": "voyage", "model": "voyage-3"},
-    retrieval={"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 5},
+rag.ingest(
+    markdown=(
+        "# Refund policy\n\n"
+        "Customers can request a refund within 30 days of purchase. "
+        "Refunds are returned to the original payment method within 5 business days."
+    ),
 )
+```
+
+`ingest()` runs ingest, chunk, embed, and store in one call.
+
+## 4. Query
+
+```python
+result = rag.query("How long do I have to request a refund?", retrieval={"top_k": 5})
 
 for chunk in result.items:
     print(chunk.score, chunk.text[:200])
 ```
 
-## 4. Chat
+## 5. Chat
 
 ```python
-llm = rag.llm(provider="openai", model="gpt-4o-mini")
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
-
-result = rag.chat(
-    "What does the guide cover?",
-    llm=llm,
-    embedder=embedder,
-    vector_db="qdrant", collection="docs", url="http://localhost:6333",
-    history=[],
-)
+result = rag.chat("How long do I have to request a refund?", history=[])
 print(result.answer)
 ```
 
@@ -67,5 +64,5 @@ print(result.answer)
 
 <CardGroup cols={2}>
   <Card title="SDK Overview" icon="list" href="/usage/sdk/overview">Every method.</Card>
-  <Card title="Run stages individually" icon="layers" href="/usage/sdk/ingestion">Ingest → chunk → embed → store, step by step.</Card>
+  <Card title="Run stages individually" icon="layers" href="/usage/sdk/ingestion">Ingest, chunk, embed, store, step by step.</Card>
 </CardGroup>

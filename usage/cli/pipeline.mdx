@@ -4,108 +4,77 @@ icon: "workflow"
 description: "Run the full ingest and query pipeline in one command."
 ---
 
-Pipeline commands run multiple stages in one call. Use them for quick setup or when you don't need intermediate files.
+Pipeline commands run multiple stages in one call. Use them for quick setup; use the [stage commands](/usage/cli/overview#stage-based-workflow) when you want to inspect intermediate files.
 
 ## `ingest`
 
-Runs ingestion → chunking → embedding → storage.
+Runs ingestion, chunking, embedding, and storage. Combine `--docs`, `--folder`, `--source-url`, `--api-url`, and `--markdown` in one call.
+
+Use `--concurrency parallel` to run independent source ingestion groups together before chunking.
 
 <CodeGroup>
 ```bash Command
-# From a document
 ragrails ingest \
   --docs files/guide.pdf \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-
-# From a folder
-ragrails ingest \
-  --folder files/docs/ \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-
-# From a URL
-ragrails ingest \
   --source-url https://example.com/docs \
   --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-
-# From raw markdown
-ragrails ingest \
-  --markdown "# Guide\n\nContent here." \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
+  --provider voyage --model voyage-3 \
+  --concurrency serial
 ```
 
 ```text Output
-Sources  : 1
-Chunks   : 12
-Embedded : 12
-Stored   : 12
+Sources  : 9
+Chunks   : 72
+Embedded : 72
+Stored   : 72
 Failed   : 0
 ```
 </CodeGroup>
 
-### Options
-
 | Option | Default | Description |
 | --- | --- | --- |
 | `--docs` | none | Document file (repeatable) |
-| `--folder` | `None` | Folder of documents to parse |
+| `--folder` | none | Folder of documents to parse |
 | `--source-url` | none | URL to scrape (repeatable) |
-| `--api-url` | `None` | API endpoint to fetch |
+| `--api-url` | none | API endpoint to fetch |
 | `--markdown` | none | Raw markdown string (repeatable) |
 | `--vector-db` | `qdrant` | Vector DB provider |
-| `--collection` | `None` | Collection name |
-| `--url` | `None` | Vector DB URL |
-| `--provider` | `voyage` | Embedding provider |
-| `--model` | `voyage-3` | Embedding model |
-| `--batch-size` | `64` | Chunks per embedding/storage batch |
-| `--chunk-size` | `2000` | Max characters per chunk |
-| `--chunk-overlap` | `200` | Overlap between chunks |
-| `--min-chunk-length` | `100` | Minimum chunk length |
-
----
+| `--collection` | none | Collection name |
+| `--url` | none | Vector DB URL |
+| `--provider` / `--model` | `voyage` / `voyage-3` | Embedding provider and model |
+| `--batch-size` | `64` | Chunks per batch |
+| `--chunk-size` / `--chunk-overlap` / `--min-chunk-length` | `2000` / `200` / `100` | Chunking config |
+| `--concurrency` | `serial` | Source ingestion mode: `serial` or `parallel` |
 
 ## `query`
 
-Runs query embedding → retrieval.
+Runs query embedding and retrieval.
 
 <CodeGroup>
 ```bash Command
 ragrails query "What does the guide cover?" \
   --vector-db qdrant --collection docs --url http://localhost:6333 \
   --provider voyage --model voyage-3 \
-  --top-k 5
-
-# With reranking
-ragrails query "What does the guide cover?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3 \
+  --top-k 5 \
   --rerank --reranker-model rerank-2-lite --rerank-top-k 3
 ```
 
 ```text Output
 Query  : What does the guide cover?
-Results: 5
+Results: 3
 
-[1] score=0.8300 id=guide-7
+[1] score=0.8300 rerank=0.9100 id=guide-7
     text : The guide covers setup, authentication, and usage...
 ```
 </CodeGroup>
-
-### Options
 
 | Option | Default | Description |
 | --- | --- | --- |
 | `QUERY` | required | Search query (positional) |
 | `--vector-db` | `qdrant` | Vector DB provider |
-| `--collection` | `None` | Collection name |
-| `--url` | `None` | Vector DB URL |
+| `--collection` | none | Collection name |
+| `--url` | none | Vector DB URL |
 | `--top-k` | `10` | Results to retrieve |
-| `--provider` | `voyage` | Query embedding provider |
-| `--model` | `voyage-3` | Query embedding model |
+| `--provider` / `--model` | `voyage` / `voyage-3` | Query embedding provider and model |
 | `--rerank` | off | Enable reranking |
-| `--reranker` | `voyage` | Reranker provider |
-| `--reranker-model` | `rerank-2-lite` | Reranker model |
-| `--rerank-top-k` | `5` | Results after reranking |
+| `--reranker` / `--reranker-model` / `--rerank-top-k` | `voyage` / `rerank-2-lite` / `5` | Reranker config |

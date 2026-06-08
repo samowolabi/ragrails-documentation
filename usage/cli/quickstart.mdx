@@ -4,77 +4,47 @@ icon: "zap"
 description: "Build a knowledge base and chat from the terminal."
 ---
 
-## 1. Install
+## 1. Install and start Qdrant
 
 ```bash
-pip install "ragrails[voyage,openai,qdrant]"
-```
-
-```bash
+pip install "ragrails[voyage,qdrant]"
 export VOYAGE_API_KEY="..."
 export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
+CLI defaults live in `.ragrails.toml` when you run the setup wizard (`ragrails` with no subcommand). The examples below pass explicit flags so they work without a config file.
+
 ## 2. Build the index
 
-One command runs the whole pipeline:
-
-<CodeGroup>
-```bash Command
+```bash
 ragrails ingest \
-  --docs files/guide.pdf \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase. Refunds are returned to the original payment method within 5 business days." \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
   --provider voyage --model voyage-3
 ```
-
-```text Output
-Sources  : 1
-Chunks   : 12
-Embedded : 12
-Stored   : 12
-Failed   : 0
-```
-</CodeGroup>
 
 <Tip>Prefer control over each step? Run the stages separately and pass JSON between them. See the [CLI Overview](/usage/cli/overview#stage-based-workflow).</Tip>
 
 ## 3. Query
 
-<CodeGroup>
-```bash Command
-ragrails query "What does the guide cover?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
+```bash
+ragrails query "How long do I have to request a refund?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 \
+  --top-k 5
 ```
-
-```text Output
-Query  : What does the guide cover?
-Results: 10
-
-[1] score=0.8300 id=guide-7
-    text : The guide covers setup, authentication, and usage...
-```
-</CodeGroup>
 
 ## 4. Chat
 
-<CodeGroup>
-```bash Command
-ragrails chat "What does the guide cover?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
+```bash
+ragrails chat "How long do I have to request a refund?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
   --llm-provider openai --llm-model gpt-4o-mini
 ```
 
-```text Output
-The guide covers setup, authentication, and everyday usage.
-
-Sources:
-[1] Guide
-```
-</CodeGroup>
-
-Run `ragrails chat` with no question to start the interactive session (history, streaming, tools).
+Run `ragrails chat` with no question to start the interactive session. For an already-built collection, keep the same target in `.ragrails.toml` or pass the same flags on one-shot commands.
 
 ## Next
 

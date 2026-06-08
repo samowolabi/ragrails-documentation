@@ -6,11 +6,11 @@ description: "Every model Ragrails recognizes, with pricing and tool support."
 
 These are the built-in models. Pass any model name to `rag.llm(model=...)`; the provider is inferred from the name. Pricing is USD per 1M tokens.
 
-<Note>Models marked **Tools = —** don't support tool calling, so they can't be used with the interactive CLI's [agentic tools](/advanced/agentic-tools). This includes all Google Gemini models and the OpenAI `o`-series reasoning models.</Note>
+<Note>Models marked **Tools = ✗** don't support tool calling, so they can't be used with the interactive CLI's [agentic tools](/advanced/agentic-tools). This includes all Google Gemini models and the OpenAI `o`-series reasoning models.</Note>
 
 ## OpenAI
 
-Set `OPENAI_API_KEY`. Install with `pip install "ragrails[openai]"`.
+Built in. Set `OPENAI_API_KEY`.
 
 | Model | Input / 1M | Output / 1M | Tools |
 | --- | --- | --- | --- |
@@ -38,14 +38,14 @@ Set `OPENAI_API_KEY`. Install with `pip install "ragrails[openai]"`.
 | `gpt-4o` | $2.5 | $10 | ✓ |
 | `gpt-4o-mini` | $0.15 | $0.6 | ✓ |
 | `gpt-4-turbo` | $10 | $30 | ✓ |
-| `o3` | $2 | $8 | — |
-| `o4-mini` | $1.1 | $4.4 | — |
-| `o1` | $15 | $60 | — |
-| `o1-mini` | $1.1 | $4.4 | — |
+| `o3` | $2 | $8 | ✗ |
+| `o4-mini` | $1.1 | $4.4 | ✗ |
+| `o1` | $15 | $60 | ✗ |
+| `o1-mini` | $1.1 | $4.4 | ✗ |
 
 ## Anthropic
 
-Set `ANTHROPIC_API_KEY`. Install with `pip install "ragrails[anthropic]"`.
+Built in. Set `ANTHROPIC_API_KEY`.
 
 | Model | Input / 1M | Output / 1M | Tools |
 | --- | --- | --- | --- |
@@ -67,17 +67,17 @@ Set `ANTHROPIC_API_KEY`. Install with `pip install "ragrails[anthropic]"`.
 
 ## Google Gemini
 
-Set `GEMINI_API_KEY` or `GOOGLE_API_KEY`. Install with `pip install "ragrails[google]"`.
+Built in. Set `GEMINI_API_KEY`.
 
 | Model | Input / 1M | Output / 1M | Tools |
 | --- | --- | --- | --- |
-| `gemini-3-pro` | $2 | $12 | — |
-| `gemini-3-pro-preview` | $2 | $12 | — |
-| `gemini-2.5-pro` | $1.25 | $10 | — |
-| `gemini-2.5-flash` | $0.3 | $2.5 | — |
-| `gemini-2.5-flash-lite` | $0.1 | $0.4 | — |
-| `gemini-2.0-flash` | $0.1 | $0.4 | — |
-| `gemini-2.0-flash-lite` | $0.075 | $0.3 | — |
+| `gemini-3-pro` | $2 | $12 | ✗ |
+| `gemini-3-pro-preview` | $2 | $12 | ✗ |
+| `gemini-2.5-pro` | $1.25 | $10 | ✗ |
+| `gemini-2.5-flash` | $0.3 | $2.5 | ✗ |
+| `gemini-2.5-flash-lite` | $0.1 | $0.4 | ✗ |
+| `gemini-2.0-flash` | $0.1 | $0.4 | ✗ |
+| `gemini-2.0-flash-lite` | $0.075 | $0.3 | ✗ |
 
 ## Embedding models
 

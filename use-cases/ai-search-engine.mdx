@@ -16,25 +16,26 @@ Embeddings match by meaning. Add reranking to push the most relevant results to 
 2. **Retrieve** by meaning, retrieving wide.
 3. **Rerank** down to the few best results.
 
-```python
-from ragrails import RagRails
-
-rag = RagRails()
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
-reranker = rag.reranker(provider="voyage", model="rerank-2-lite")
-
+<CodeGroup>
+```python SDK
 result = rag.retrieve(
     "how do I get my money back",
-    embedder=embedder,
-    vector_db="qdrant", collection="docs", url="http://localhost:6333",
     top_k=20,
     use_rerank=True,
-    reranker=reranker,
     rerank_top_k=5,
 )
 for hit in result.items:
     print(hit.score, hit.metadata.get("title"), hit.text[:120])
 ```
+
+```bash CLI
+ragrails retrieve "how do I get my money back"   --vector-db qdrant --collection docs --url http://localhost:6333   --provider voyage --model voyage-3   --top-k 20 --rerank --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve   -H "Content-Type: application/json"   -d '{"query": "how do I get my money back", "provider": "voyage", "model": "voyage-3", "vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 20, "use_rerank": true, "rerank_top_k": 5}'
+```
+</CodeGroup>
 
 <Tip>No answer generation and no LLM cost; this is pure retrieval. Add [chat](/features/chat) on top if you want generated answers.</Tip>
 

@@ -4,69 +4,168 @@ icon: "file-input"
 description: "Ingest URLs, documents, and APIs over HTTP."
 ---
 
-## POST /v1/ingest/url
+Three endpoints pull content into normalized document objects (`id`, `text`, `source`, `metadata`). All return JSON in the response body.
 
-Scrape one or more URLs.
-
-```json
-{
-  "url": "https://example.com/docs",
-  "mode": "each",
-  "max_depth": 3,
-  "max_pages": 200,
-  "output_format": "json"
-}
+## Scrape URLs (`POST /v1/ingest/url`)
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/ingest/url \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "https://example.com", "mode": "full", "max_depth": 2, "max_pages": 50 }'
 ```
 
-Multiple URLs with per-URL config:
-
-```json
+```json Response
 {
-  "url": [
-    "https://example.com/docs",
-    {"url": "https://example.com/blog", "mode": "full", "max_depth": 1}
-  ]
+  "pages": 12,
+  "failed": 0,
+  "outputs": [
+    { "id": "url_a1b2", "title": "Docs", "text": "# Docs\n\n...", "source": "https://example.com/docs", "metadata": {"source_kind": "url"} }
+  ],
+  "errors": [],
+  "dlq": null
 }
 ```
+</CodeGroup>
 
----
-
-## POST /v1/ingest/docs
-
-Parse local document files or a folder.
+Pass a list for multiple URLs with per-URL config:
 
 ```json
-{
-  "folder": "files/docs/",
-  "output_format": "json"
-}
+{ "url": ["https://example.com/docs", {"url": "https://example.com/blog", "mode": "full", "max_depth": 1}] }
 ```
 
----
+| Field | Default | Description |
+| --- | --- | --- |
+| `url` | required | URL, list of URLs, or list of per-URL dicts |
+| `mode` | `"each"` | `"each"` exact URLs; `"full"` crawl the site |
+| `max_depth` | `3` | Crawl depth for `mode="full"` |
+| `max_pages` | `200` | Max pages per URL |
+| `frontmatter` | `false` | Prepend YAML frontmatter |
+| `verbose` | `false` | Crawler logging |
 
-## POST /v1/ingest/api
+<Note>The dead-letter-queue retry flow is SDK-only. Over HTTP, failures are returned in `errors` and the `dlq` field; re-submit failed URLs yourself.</Note>
 
-Fetch a REST API endpoint.
+### Stream URL scraping (`POST /v1/ingest/url/stream`)
 
-```json
-{
-  "url": "https://api.example.com/posts",
-  "title": "Blog posts",
-  "headers": {"Authorization": "Bearer token"},
-  "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
-  "max_pages": 10
-}
+Use the streaming endpoint when you want live crawl progress. It returns `text/event-stream` SSE frames. The final event contains the aggregate scrape result.
+
+<CodeGroup>
+```bash Request
+curl -N -X POST http://127.0.0.1:8000/v1/ingest/url/stream \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/docs","mode":"full"}'
 ```
 
----
+```text Event
+event: page
+data: {"type":"page","stage":"scrape","message":"Scraped page","data":{"url":"https://example.com/docs"},"sequence":1}
 
-All ingestion responses follow this shape:
+event: final
+data: {"type":"final","stage":"complete","message":"Scrape complete","data":{"pages":1,"failed":0,"outputs":[],"errors":[]},"sequence":2}
+```
+</CodeGroup>
 
-```json
+## Parse documents (`POST /v1/ingest/docs`)
+Supports PDF, DOCX, PPTX, XLSX, HTML, Markdown, CSV, and more.
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{ "folder": "files/docs/" }'
+```
+
+```json Response
 {
   "documents": 5,
   "failed": 0,
-  "outputs": [...],
+  "outputs": [ { "id": "doc_9f8e", "title": "Guide", "text": "...", "source": "files/guide.pdf", "metadata": {"file_type": "pdf"} } ],
   "errors": []
 }
 ```
+</CodeGroup>
+
+`files` accepts paths or file URLs (downloaded automatically), or a `folder`:
+
+```json
+{ "files": ["files/guide.pdf", "https://example.com/whitepaper.pdf"] }
+```
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `files` | `null` | Path(s) or file URL(s). Mutually exclusive with `folder` |
+| `folder` | `null` | Directory to parse |
+| `frontmatter` | `false` | Prepend YAML frontmatter |
+
+## Upload documents (`POST /v1/ingest/docs/upload`)
+Use multipart upload when the client is sending files to the REST API.
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs/upload \
+  -F "files=@docs/guide.pdf" \
+  -F "frontmatter=false" \
+  -F "title=Guide" \
+  -F "description=Product guide"
+```
+
+```json Response
+{
+  "documents": 1,
+  "failed": 0,
+  "outputs": [ { "id": "doc_9f8e", "title": "Guide", "text": "...", "source": "guide.pdf", "metadata": {"source_kind": "bytes"} } ],
+  "errors": []
+}
+```
+</CodeGroup>
+
+Upload multiple files by repeating `files`:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs/upload \
+  -F "files=@docs/guide.pdf" \
+  -F "files=@docs/api.md" \
+  -F "frontmatter=false" \
+  -F "description=Product documentation"
+```
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `files` | required | One or more uploaded files |
+| `frontmatter` | `false` | Prepend YAML frontmatter |
+| `title` | `null` | Title metadata. Applied when uploading one file |
+| `description` | `""` | Description metadata |
+
+## Fetch an API (`POST /v1/ingest/api`)
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/ingest/api \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.example.com/posts",
+    "title": "Blog posts",
+    "headers": {"Authorization": "Bearer token"},
+    "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+    "max_pages": 10
+  }'
+```
+
+```json Response
+{
+  "documents": 1,
+  "failed": 0,
+  "outputs": [ { "id": "api_4c5d", "title": "Blog posts", "text": "[{...}]", "source": "https://api.example.com/posts", "metadata": {"pages": 3} } ],
+  "errors": []
+}
+```
+</CodeGroup>
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `url` | required | Endpoint |
+| `title` / `description` | `"API Response"` / `""` | Document metadata |
+| `method` | `"GET"` | HTTP method |
+| `headers` / `params` / `body` | `null` | Request headers, query params, JSON body |
+| `pagination` | `null` | `page`, `offset`, or `cursor` strategy ([details](/usage/sdk/ingestion#pagination)) |
+| `max_pages` | `100` | Max paginated requests |
+
+<Note>Batch API ingestion with `apis` is SDK-only for now. The REST schema currently requires `url`, so `/v1/ingest/api` examples use one endpoint per request.</Note>

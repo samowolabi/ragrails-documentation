@@ -8,41 +8,63 @@ description: "Run Ragrails from the terminal."
 ragrails --help
 ```
 
-The CLI is a thin layer over the SDK. All commands call `RagRails()` internally.
+The CLI is a thin layer over the SDK: every command calls `RagRails()` internally, but CLI defaults come from `.ragrails.toml`, not from SDK constructor examples. Stage commands pass data through JSON files, so you can inspect each step; pipeline commands run the whole flow in one call.
+
+## Project setup
+
+Run `ragrails` with no subcommand once to launch the [setup wizard](/getting-started/configuration), which writes a `.ragrails.toml`. After that, commands read their defaults (vector store, providers, models, chunking, retrieval) from that file, so you can drop most flags. A flag always overrides the config for a single run.
+
+```bash
+ragrails          # interactive setup wizard, writes .ragrails.toml
+ragrails doctor   # check your config, packages, and API keys
+```
 
 ## Commands
 
-| Command | Stage | Description |
+| Command | Purpose | SDK method |
 | --- | --- | --- |
-| `setup-url` | Ingestion | Install Playwright browser for URL ingestion |
-| `scrape` | Ingestion | Scrape URLs into JSON files |
-| `parse` | Ingestion | Parse local documents into JSON files |
-| `fetch` | Ingestion | Fetch REST API responses into JSON files |
-| `chunk` | Chunking | Chunk ingestion output JSON files |
-| `embed` | Embedding | Embed chunk JSON files and write to an output dir |
-| `store` | Storing | Store embedded chunk JSON files in a vector DB |
-| `edit` | Storing | Re-embed and replace stored chunks by ID |
-| `delete` | Storing | Delete stored chunks by ID |
-| `retrieve` | Retrieval | Retrieve chunks relevant to a query |
-| `ingest` | Pipeline | Run ingestion → chunk → embed → store in one command |
-| `query` | Pipeline | Run query embedding → retrieval in one command |
-| `chat` | Chat | Run a RAG chat turn, or start the interactive chat REPL |
+| `doctor` | Diagnose config, packages, keys, connectivity | none |
+| `setup-url` | Install the browser for URL ingestion (interactive) | `setup_url()` |
+| `scrape` | Scrape URLs | `scrape()` |
+| `parse` | Parse documents | `parse()` |
+| `fetch` | Fetch REST APIs | `fetch()` |
+| `chunk` | Chunk documents | `chunk()` |
+| `embed` | Embed chunks | `embedder()` + `embed()` |
+| `store` | Store embedded chunks | `store()` |
+| `edit` | Re-embed and replace chunks | `edit()` |
+| `delete` | Delete chunks by ID | `delete()` |
+| `retrieve` | Retrieve relevant chunks | `retrieve()` |
+| `ingest` | Full ingest pipeline | `ingest()` |
+| `query` | Query pipeline | `query()` |
+| `chat` | RAG chat turn or interactive REPL | `chat()` |
+
+<Tip>New to RAG? Read [How RAG works](/getting-started/concepts) first.</Tip>
 
 ## Stage-based workflow
 
-Stage commands pass data through JSON files, giving you full control over each step.
+Each stage reads JSON from `--input-dir` and writes JSON to `--output-dir`, so you control and inspect every step. With a `.ragrails.toml`, provider and vector-store flags are inherited, so commands stay short. Without one, pass the same `--vector-db`, `--collection`, `--url`, `--provider`, and `--model` flags through each stage.
 
 ```bash
 ragrails scrape https://example.com/docs --output-dir files/output/web/
 ragrails chunk --input-dir files/output/web/ --output-dir files/chunks/
-ragrails embed --input-dir files/chunks/ --output-dir files/embedded/ --provider voyage --model voyage-3
-ragrails store --input-dir files/embedded/ --vector-db qdrant --collection docs --url http://localhost:6333
-ragrails retrieve "How do I authenticate?" --vector-db qdrant --collection docs --url http://localhost:6333 --provider voyage --model voyage-3
+ragrails embed --input-dir files/chunks/ --output-dir files/embedded/
+ragrails store --input-dir files/embedded/
+ragrails retrieve "How do I authenticate?"
 ```
 
 ## One-command pipeline
 
 ```bash
-ragrails ingest --docs files/guide.pdf --vector-db qdrant --collection docs --url http://localhost:6333 --provider voyage --model voyage-3
-ragrails query "What does the guide cover?" --vector-db qdrant --collection docs --url http://localhost:6333 --provider voyage --model voyage-3
+ragrails ingest \
+  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase." \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3
+
+ragrails query "How long do I have to request a refund?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 5
 ```
+
+Pass `--vector-db`, `--collection`, `--provider`, etc. on any command to override the config for that run.
+
+<Note>Some SDK capabilities aren't exposed as CLI flags (the scrape dead-letter queue, query rewriting in retrieval, raw-bytes document input). Use the [SDK](/usage/sdk/overview) or [REST API](/usage/server/overview) for those.</Note>

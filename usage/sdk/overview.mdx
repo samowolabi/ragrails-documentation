@@ -4,15 +4,25 @@ icon: "list"
 description: "Use Ragrails from Python."
 ---
 
+Configure your providers once when you create `RagRails`, then call clean methods. Every method falls back to these defaults and lets you override per call.
+
 ```python
 from ragrails import RagRails
 
-rag = RagRails()
+rag = RagRails(
+    collection="docs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
+    reranker={"provider": "voyage", "model": "rerank-2-lite"},
+)
 ```
 
-The SDK is the primary interface for Python developers. All methods are in-memory: pass Python objects in, get typed result objects back.
+<Note>The constructor uses `vector_store={"provider": ...}` plus `collection=`. Per-call methods use `vector_db=`, `collection=`, and `url=` to override.</Note>
 
 ## Methods
+
+Provider, vector store, and model arguments are optional on every method; omit them to use the constructor defaults.
 
 | Method | Stage | Description |
 | --- | --- | --- |
@@ -21,17 +31,24 @@ The SDK is the primary interface for Python developers. All methods are in-memor
 | `parse(files, folder, ...)` | Ingestion | Parse local documents into document dicts |
 | `fetch(url, apis, ...)` | Ingestion | Fetch REST API responses into document dicts |
 | `chunk(markdown, ...)` | Chunking | Split documents into chunk dicts |
-| `embedder(provider, model, ...)` | Embedding | Create an embedder object |
-| `embed(chunks, embedder, ...)` | Embedding | Generate embedding vectors for chunks |
-| `store(embedded_chunks, ...)` | Storing | Upsert embedded chunks into a vector DB |
-| `edit(chunks, embedder, ...)` | Storing | Re-embed and replace chunks by ID |
-| `delete(ids, ...)` | Storing | Delete chunks by ID |
-| `reranker(provider, model, ...)` | Retrieval | Create a reranker object |
-| `retrieve(query, embedder, ...)` | Retrieval | Embed a query and retrieve relevant chunks |
-| `llm(provider, model, ...)` | Chat | Create an LLM object |
-| `chat(query, llm, embedder, ...)` | Chat | Run a stateless RAG chat turn |
-| `ingest(docs, urls, ...)` | Pipeline | Run ingestion → chunk → embed → store |
-| `query(query, embedding, ...)` | Pipeline | Run embed query → retrieve |
+| `embedder(...)` / `embed(chunks, ...)` | Embedding | Create an embedder / generate vectors |
+| `store(embedded_chunks, ...)` | Storing | Upsert embedded chunks |
+| `edit(chunks, ...)` / `delete(ids, ...)` | Storing | Update or remove chunks by ID |
+| `reranker(...)` / `retrieve(query, ...)` | Retrieval | Create a reranker / retrieve relevant chunks |
+| `llm(...)` / `chat(query, ...)` | Chat | Create an LLM / run a stateless chat turn |
+| `ingest(...)` / `query(query, ...)` | Pipeline | Run the full ingest or query pipeline |
+
+## Override per call
+
+Pass any provider argument to override the constructor default for a single call:
+
+```python
+# Use a different model for one query, without changing the default
+rag.chat("Summarize the policy", llm=rag.llm(model="gpt-4o"))
+
+# Retrieve from a different collection
+rag.retrieve("refunds", collection="legal")
+```
 
 ## Pages
 

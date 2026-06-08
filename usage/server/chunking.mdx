@@ -4,29 +4,60 @@ icon: "scissors"
 description: "Chunk documents over HTTP."
 ---
 
-## POST /v1/chunk
+`POST /v1/chunk` splits documents into stable, embedding-ready chunks, the same as the SDK [`chunk()`](/usage/sdk/chunking). Feed the result to [`/v1/embed`](/usage/server/embedding).
+
+## Request
 
 <CodeGroup>
-```json Request
-{
-  "markdown": [
-    {"id": "doc-1", "text": "# Guide\n\nContent.", "source": "files/guide.pdf", "metadata": {}}
-  ],
-  "chunk_size": 2000,
-  "chunk_overlap": 200,
-  "min_chunk_length": 100
-}
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/chunk \
+  -H "Content-Type: application/json" \
+  -d '{
+    "markdown": [
+      { "id": "doc-1", "text": "# Guide\n\nRagrails builds modular RAG workflows...", "source": "files/guide.pdf", "metadata": {"title": "Guide"} }
+    ],
+    "chunk_size": 2000,
+    "chunk_overlap": 200,
+    "min_chunk_length": 100
+  }'
 ```
 
 ```json Response
 {
   "inputs": 1,
-  "chunks": 4,
-  "items": [...],
+  "chunks": 3,
+  "items": [
+    { "id": "doc-1-0", "text": "Ragrails builds modular RAG workflows...", "source": "files/guide.pdf", "metadata": {"title": "Guide", "chunk_index": 0} }
+  ],
   "failed": 0,
   "errors": []
 }
 ```
 </CodeGroup>
 
-`markdown` accepts a string, list of strings, or list of document dicts with a `text` field.
+`markdown` accepts a plain string, a list of strings, or a list of document dicts with a `text` field (such as the `outputs` from an ingestion endpoint).
+
+## Choosing chunk size
+
+`chunk_size` is the main lever. Too small loses surrounding context; too large retrieves noise around the answer. Start at `2000` with `200` overlap (~10%), lower the size for dense factual content.
+
+## Request fields
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `markdown` | required | String, list of strings, or list of dicts with `text` |
+| `title` | `""` | Title (used when `markdown` is a plain string) |
+| `source` | `""` | Source (used when `markdown` is a plain string) |
+| `chunk_size` | `2000` | Max characters per chunk |
+| `chunk_overlap` | `200` | Character overlap between chunks |
+| `min_chunk_length` | `100` | Chunks shorter than this are dropped |
+
+## Response fields
+
+| Field | Description |
+| --- | --- |
+| `inputs` | Documents passed in |
+| `chunks` | Chunks produced |
+| `items` | Chunk dicts: `id`, `text`, `source`, `metadata` |
+| `failed` | Documents that failed |
+| `errors` | Error list |

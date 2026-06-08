@@ -8,38 +8,85 @@ description: "Build a RAG collection from a website, end to end."
 
 ```bash
 pip install "ragrails[url,voyage,qdrant]"
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-```python
+## 2. Crawl, query, and chat
+
+All three versions crawl `https://example.com` into the `website` collection.
+
+<CodeGroup>
+```python SDK
 from ragrails import RagRails
 
-rag = RagRails()
-rag.setup_url()   # one-time browser install
-```
+rag = RagRails(
+    collection="website",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
+)
+rag.setup_url()
 
-## 2. Ingest, chunk, embed, and store
-
-```python
 result = rag.ingest(
     urls="https://example.com",
-    ingestion={"mode": "full", "max_depth": 3, "max_pages": 200},
-    embedding={"provider": "voyage", "model": "voyage-3"},
-    storage={"vector_db": "qdrant", "collection": "website", "url": "http://localhost:6333"},
+    ingestion={"urls": {"mode": "full", "max_depth": 3, "max_pages": 200}},
 )
-
 print(f"Stored {result.stored} chunks from {result.sources} pages")
+
+rag.query("What does the site say about pricing?", retrieval={"top_k": 5})
+rag.chat("Summarize the pricing tiers", history=[])
 ```
 
-## 3. Query
+```bash CLI
+ragrails setup-url
 
-```python
-result = rag.query(
-    "What does the site say about pricing?",
-    embedding={"provider": "voyage", "model": "voyage-3"},
-    retrieval={"vector_db": "qdrant", "collection": "website", "url": "http://localhost:6333", "top_k": 5},
-)
+ragrails ingest \
+  --source-url https://example.com \
+  --vector-db qdrant --collection website --url http://localhost:6333 \
+  --provider voyage --model voyage-3
 
-for chunk in result.items:
-    print(chunk.text[:200])
+ragrails query "What does the site say about pricing?" \
+  --vector-db qdrant --collection website --url http://localhost:6333 \
+  --provider voyage --model voyage-3 --top-k 5
+
+ragrails chat "Summarize the pricing tiers" \
+  --vector-db qdrant --collection website --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
 ```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": "https://example.com",
+    "ingestion": {"urls": {"mode": "full", "max_depth": 3, "max_pages": 200}},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "website", "url": "http://localhost:6333"}
+  }'
+
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What does the site say about pricing?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {"vector_db": "qdrant", "collection": "website", "url": "http://localhost:6333", "top_k": 5}
+  }'
+
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Summarize the pricing tiers",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "website",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+</CodeGroup>

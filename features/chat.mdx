@@ -4,27 +4,190 @@ icon: "messages-square"
 description: "Answer questions grounded in your data."
 ---
 
-Chat runs retrieval and answer generation together, with conversation history.
+Chat is part of the [Query](/features/query) workflow. It runs retrieval and answer generation together, with conversation history.
 
-```python
-llm = rag.llm(provider="openai", model="gpt-4o-mini")
-embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="query")
+## Interface Docs
 
-result = rag.chat(
-    "How do I authenticate?",
-    llm=llm,
-    embedder=embedder,
-    vector_db="qdrant", collection="docs", url="http://localhost:6333",
-    history=[],
-)
+Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+
+- [SDK chat](/usage/sdk/chat)
+- [CLI chat](/usage/cli/chat)
+- [REST chat](/usage/server/chat)
+
+<CodeGroup>
+```python SDK
+result = rag.chat("How do I authenticate?", history=[])
 print(result.answer)
+
+for event in rag.chat_stream("How do I authenticate?", history=[]):
+    if event["type"] == "token":
+        print(event["data"]["text"], end="")
 ```
 
-<Note>**Chat is stateless.** Ragrails never stores conversations. You pass `history` in and get the updated `history` back, so you decide where it lives (session, database, memory). Safe for multi-user apps.</Note>
+```bash CLI
+ragrails chat "How do I authenticate?" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+
+curl -N -X POST http://127.0.0.1:8000/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"query":"How do I authenticate?","collection":"docs"}'
+```
+</CodeGroup>
+
+<Note>Streaming emits progress, token, error, and final events for normal RAG chat. Agentic tool-call streaming is not currently covered.</Note>
+
+
+
+<CodeGroup>
+```json Response
+{
+  "answer": "Create an API key and include it as a Bearer token in the Authorization header.",
+  "history": [
+    {"role": "user", "content": "How do I authenticate?"},
+    {"role": "assistant", "content": "Create an API key and include it as a Bearer token in the Authorization header."}
+  ],
+  "sources": [
+    {"id": "auth#overview", "score": 0.84, "metadata": {"title": "Authentication"}}
+  ],
+  "intent": "rag",
+  "answer_confidence": {"level": "high", "reason": "retrieval_quality_pass"}
+}
+```
+</CodeGroup>
+
+## Possible Errors
+
+Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+
+<CodeGroup>
+```json Validation
+{
+  "answer": "",
+  "sources": [],
+  "history": [],
+  "retrieval": {"retrieved": 0, "failed": 0, "outputs": [], "errors": []},
+  "llm": {},
+  "errors": [
+    {
+      "source": "",
+      "source_kind": "chat",
+      "stage": "validate",
+      "error": "query must be a non-empty string",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ],
+  "intent": "rag",
+  "retrieval_quality": {"status": "not_evaluated"},
+  "answer_confidence": {"level": "none", "reason": "errors"}
+}
+```
+
+```json Retrieval failure
+{
+  "answer": "",
+  "sources": [],
+  "history": [],
+  "retrieval": {
+    "retrieved": 0,
+    "failed": 1,
+    "outputs": [],
+    "errors": [
+      {
+        "source": "How do I authenticate?",
+        "source_kind": "query",
+        "stage": "retrieve",
+        "error": "Collection not found: docs",
+        "isRetryable": true,
+        "attempts": 1
+      }
+    ]
+  },
+  "llm": {},
+  "errors": [
+    {
+      "source": "How do I authenticate?",
+      "source_kind": "query",
+      "stage": "retrieve",
+      "error": "Collection not found: docs",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ],
+  "intent": "rag",
+  "retrieval_quality": {"status": "not_evaluated"},
+  "answer_confidence": {"level": "none", "reason": "errors"}
+}
+```
+
+```json Generation failure
+{
+  "answer": "",
+  "sources": [],
+  "history": [{"role": "user", "content": "How do I authenticate?"}],
+  "retrieval": {"retrieved": 1, "failed": 0, "outputs": [], "errors": []},
+  "llm": {},
+  "errors": [
+    {
+      "source": "",
+      "source_kind": "chat",
+      "stage": "generate",
+      "error": "OPENAI_API_KEY environment variable not set",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ],
+  "intent": "rag",
+  "retrieval_quality": {"status": "not_evaluated"},
+  "answer_confidence": {"level": "none", "reason": "errors"}
+}
+```
+
+```json Quality failure
+{
+  "answer": "",
+  "sources": [],
+  "history": [{"role": "user", "content": "Can I get a refund after 30 days?"}],
+  "retrieval": {"retrieved": 1, "failed": 0, "outputs": [], "errors": []},
+  "llm": {},
+  "errors": [
+    {
+      "source": "",
+      "source_kind": "chat",
+      "stage": "quality",
+      "error": "retrieval quality below configured threshold",
+      "isRetryable": false,
+      "attempts": 1
+    }
+  ],
+  "intent": "rag",
+  "retrieval_quality": {"status": "low_confidence", "mode": "return_no_answer", "passed_chunks": 0},
+  "answer_confidence": {"level": "none", "reason": "retrieval_quality_low_confidence"}
+}
+```
+</CodeGroup>
+
+<Note>**Chat is stateless.** Ragrails never stores conversations. You pass `history` in and get the updated `history` back, so you decide where it lives.</Note>
 
 ## Tuning knobs
-
-Each is a config object. Use them by symptom:
 
 | Symptom | Config | What it does |
 | --- | --- | --- |
@@ -35,42 +198,110 @@ Each is a config object. Use them by symptom:
 
 ### Query rewriting
 
-<Note>**Why:** *"what about the second one?"* is meaningless to search alone. Rewriting uses history to make it standalone.</Note>
-
-```python
+<CodeGroup>
+```python SDK
 from ragrails import QueryRewriteConfig
-rag.chat(..., query_rewrite=QueryRewriteConfig(enabled=True))
+rag.chat("What about the second step?", history=history, query_rewrite=QueryRewriteConfig(enabled=True))
 ```
 
-### History compaction
-
-<Note>**Why:** long conversations overflow the context window and cost more every turn. Compaction summarizes old messages and keeps recent ones verbatim.</Note>
-
-```python
-from ragrails import HistoryCompactionConfig
-rag.chat(..., history_compaction=HistoryCompactionConfig(history_limit=15, keep_recent=5))
+```bash CLI
+ragrails chat "What about the second step?" \
+  --history-file files/chat-history.json \
+  --rewrite-query \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
 ```
 
-### Intent routing
-
-<Note>**Why:** *"Thanks!"* doesn't need a database lookup. Routing skips retrieval for small talk, which is faster and avoids irrelevant context.</Note>
-
-```python
-from ragrails import IntentRoutingConfig
-rag.chat(..., intent_routing=IntentRoutingConfig(enabled=True))
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What about the second step?",
+    "query_rewrite": {"enabled": true},
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
 ```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "answer": "The second step is to invite your team.",
+  "history": [
+    {"role": "user", "content": "What about the second step?"},
+    {"role": "assistant", "content": "The second step is to invite your team."}
+  ],
+  "sources": [{"id": "onboarding#step-2", "score": 0.81}],
+  "intent": "rag",
+  "answer_confidence": {"level": "high", "reason": "retrieval_quality_pass"}
+}
+```
+</CodeGroup>
 
 ### Retrieval quality
 
-<Note>**Why:** sometimes your index just doesn't have the answer. Rather than hallucinate, Ragrails scores the retrieved context and can answer with caution or refuse.</Note>
-
-```python
+<CodeGroup>
+```python SDK
 from ragrails import ChatRetrievalQualityConfig
-rag.chat(..., retrieval_quality=ChatRetrievalQualityConfig(
-    min_retrieval_score=0.35,
-    low_confidence_mode="answer_with_caution",  # or "ask_clarifying_question", "refuse_grounded_answer"
-))
+rag.chat(
+    query,
+    history=history,
+    retrieval_quality=ChatRetrievalQualityConfig(
+        min_retrieval_score=0.35,
+        low_confidence_mode="answer_with_caution",
+    ),
+)
 ```
+
+```bash CLI
+ragrails chat "$QUERY" \
+  --vector-db qdrant --collection docs --url http://localhost:6333 \
+  --embedder-provider voyage --embedder-model voyage-3 \
+  --llm-provider openai --llm-model gpt-4o-mini
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Can I get a refund after 30 days?",
+    "retrieval_quality": {"min_retrieval_score": 0.35, "low_confidence_mode": "answer_with_caution"},
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+</CodeGroup>
+
+<CodeGroup>
+```json Response
+{
+  "answer": "I found related policy context, but it does not clearly confirm refunds after 30 days.",
+  "history": [
+    {"role": "user", "content": "Can I get a refund after 30 days?"},
+    {"role": "assistant", "content": "I found related policy context, but it does not clearly confirm refunds after 30 days."}
+  ],
+  "sources": [{"id": "refunds#policy", "score": 0.36}],
+  "intent": "rag",
+  "answer_confidence": {"level": "low", "reason": "retrieval_quality_low_confidence"}
+}
+```
+</CodeGroup>
+
+<Note>The CLI does not expose retrieval-quality thresholds yet; use SDK or REST when you need those controls.</Note>
 
 ## What you get back
 
@@ -81,7 +312,3 @@ rag.chat(..., retrieval_quality=ChatRetrievalQualityConfig(
 | `sources` | Show citations |
 | `intent` | `"rag"` or `"direct"` |
 | `answer_confidence` | Flag low-confidence answers in your UI |
-
-## Reference
-
-Full parameters: [SDK chat](/usage/sdk/chat) · [CLI](/usage/cli/chat) · [REST](/usage/server/chat).

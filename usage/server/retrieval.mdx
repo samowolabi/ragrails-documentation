@@ -1,53 +1,39 @@
 ---
 title: "REST Retrieval"
 icon: "search"
-description: "Retrieve chunks over HTTP."
+description: "Retrieve relevant chunks over HTTP."
 ---
 
-## POST /v1/retrieve
+`POST /v1/retrieve` embeds the query, searches the vector store, and returns the most relevant chunks. It can optionally rewrite the query and rerank results, the same as the SDK [`retrieve()`](/usage/sdk/retrieval).
 
-```json
-{
-  "query": "How do I authenticate?",
-  "provider": "voyage",
-  "model": "voyage-3",
-  "vector_db": "qdrant",
-  "collection": "docs",
-  "url": "http://localhost:6333",
-  "top_k": 10
-}
-```
-
-With reranking:
+## Basic retrieval
 
 <CodeGroup>
-```json Request
-{
-  "query": "How do I authenticate?",
-  "provider": "voyage",
-  "model": "voyage-3",
-  "vector_db": "qdrant",
-  "collection": "docs",
-  "url": "http://localhost:6333",
-  "top_k": 20,
-  "use_rerank": true,
-  "reranker_provider": "voyage",
-  "reranker_model": "rerank-2-lite",
-  "rerank_top_k": 5
-}
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "top_k": 10
+  }'
 ```
 
 ```json Response
 {
   "query": "How do I authenticate?",
   "search_query": "How do I authenticate?",
-  "retrieved": 5,
+  "retrieved": 10,
   "items": [
     {
-      "id": "chunk-id",
+      "id": "guide-3",
       "score": 0.87,
-      "text": "...",
-      "metadata": {"title": "Auth Guide"},
+      "text": "To authenticate, create an API key in settings...",
+      "metadata": { "title": "Authentication", "source": "files/guide.pdf" },
       "rerank_score": null
     }
   ],
@@ -56,3 +42,113 @@ With reranking:
 }
 ```
 </CodeGroup>
+
+## With reranking
+
+Vector search is fast but rough. Add a reranker to reorder the top candidates by true relevance. Retrieve wide (`top_k`), keep the best few (`rerank_top_k`).
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "top_k": 20,
+    "use_rerank": true,
+    "reranker": "voyage",
+    "reranker_model": "rerank-2-lite",
+    "rerank_top_k": 5
+  }'
+```
+
+```json Response
+{
+  "query": "How do I authenticate?",
+  "search_query": "How do I authenticate?",
+  "retrieved": 5,
+  "items": [
+    { "id": "guide-3", "score": 0.81, "text": "To authenticate, create an API key...", "metadata": {"title": "Authentication"}, "rerank_score": 0.93 }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## With query rewriting
+
+Turn a conversational follow-up into a standalone search query before retrieval. The `search_query` field shows what was actually searched.
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What about the second step?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "use_query_rewrite": true,
+    "session_context": "User is asking about the onboarding flow."
+  }'
+```
+
+```json Response
+{
+  "query": "What about the second step?",
+  "search_query": "What is the second step of the onboarding flow?",
+  "retrieved": 10,
+  "items": [ { "id": "onboarding-2", "score": 0.84, "text": "...", "metadata": {}, "rerank_score": null } ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Tune by symptom
+
+| Symptom | Fix |
+| --- | --- |
+| Not enough / too many results | Adjust `top_k` |
+| Right topic, wrong ranking | `use_rerank: true` with a higher `top_k` |
+| Conversational follow-ups miss | `use_query_rewrite: true` |
+
+## Request fields
+
+| Field | Default | Description |
+| --- | --- | --- |
+| `query` | required | Search query |
+| `provider` | `"voyage"` | Query embedding provider |
+| `model` | `"voyage-3"` | Query embedding model |
+| `embedder_options` | `null` | Provider-specific embedder options |
+| `vector_db` | `"qdrant"` | `qdrant`, `qdrant_cloud`, `pinecone`, or `weaviate` |
+| `collection` | `null` | Collection name |
+| `url` | `null` | Vector DB URL |
+| `options` | `null` | Vector DB options |
+| `top_k` | `10` | Candidates to retrieve |
+| `use_query_rewrite` | `false` | Rewrite the query before searching |
+| `rewrite_context` | `""` | Context hint for the rewriter |
+| `session_context` | `""` | Broader session context for rewriting |
+| `use_rerank` | `false` | Rerank results after retrieval |
+| `reranker` | `"voyage"` | Reranker provider (`voyage` or `bm25`) |
+| `reranker_model` | `"rerank-2-lite"` | Reranker model |
+| `reranker_options` | `null` | Provider-specific reranker options |
+| `rerank_top_k` | `5` | Results to keep after reranking |
+
+## Response fields
+
+| Field | Description |
+| --- | --- |
+| `query` | Original query |
+| `search_query` | Query used for search (differs if rewritten) |
+| `retrieved` | Number of results |
+| `items` | List of chunks: `id`, `score`, `text`, `metadata`, `rerank_score` |
+| `failed` | Retrieval failures |
+| `errors` | Error objects |

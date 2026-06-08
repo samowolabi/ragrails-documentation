@@ -4,54 +4,31 @@ icon: "terminal"
 description: "All ragrails commands."
 ---
 
-```bash
-ragrails --help
-```
+<Note>This page is generated from the Click command tree. Run `RAGRAILS_SOURCE=/path/to/ragrails uv run python scripts/generate-reference.py` from the docs repo after CLI changes.</Note>
 
-## Ingestion
+Commands read defaults from [`.ragrails.toml`](/getting-started/configuration); flags override per run. The setup wizard is launched by running bare `ragrails` with no subcommand; there is no `ragrails setup` command.
 
-| Command | Description |
-| --- | --- |
-| `ragrails setup-url [--browser]` | Install Playwright browser for URL ingestion |
-| `ragrails scrape URL... [options]` | Scrape one or more URLs |
-| `ragrails parse [--folder] [--files] [options]` | Parse local documents |
-| `ragrails fetch URL [options]` | Fetch a REST API endpoint |
-
-## Chunking
+## Setup
 
 | Command | Description |
 | --- | --- |
-| `ragrails chunk --input-dir --output-dir [options]` | Chunk ingestion output JSON files |
+| `ragrails` | Interactive setup wizard (writes `.ragrails.toml`) |
 
-## Embedding
-
-| Command | Description |
-| --- | --- |
-| `ragrails embed --input-dir --output-dir [options]` | Embed chunk JSON files |
-
-## Storing
+## Commands
 
 | Command | Description |
 | --- | --- |
-| `ragrails store --input-dir --vector-db --collection [options]` | Store embedded chunks |
-| `ragrails edit --input-dir --vector-db --collection [options]` | Re-embed and replace stored chunks |
-| `ragrails delete --id --vector-db --collection [options]` | Delete stored chunks by ID |
-
-## Retrieval
-
-| Command | Description |
-| --- | --- |
-| `ragrails retrieve QUERY --vector-db --collection [options]` | Retrieve relevant chunks |
-
-## Pipeline
-
-| Command | Description |
-| --- | --- |
-| `ragrails ingest [--docs] [--folder] [--source-url] [options]` | Full ingest pipeline |
-| `ragrails query QUERY --vector-db --collection [options]` | Query pipeline |
-
-## Chat
-
-| Command | Description |
-| --- | --- |
-| `ragrails chat [QUERY] [options]` | One-shot chat turn, or interactive REPL if no query given |
+| `ragrails chat` | Run one SDK chat turn, or start the interactive chat CLI with no query. |
+| `ragrails chunk` | Chunk ingestion output JSON files into smaller pieces. |
+| `ragrails delete` | Delete stored chunks by exact chunk ID. |
+| `ragrails doctor` | Inspect local Ragrails setup and report missing production prerequisites. |
+| `ragrails edit` | Replace stored chunks by exact chunk ID. |
+| `ragrails embed` | Embed chunk JSON files and write vectors to an output directory. |
+| `ragrails fetch` | Fetch a REST API endpoint into markdown output. |
+| `ragrails ingest` | Run ingestion, chunking, embedding, and storage in one command. |
+| `ragrails parse` | Convert local documents into markdown output. |
+| `ragrails query` | Run query embedding and vector retrieval through the SDK pipeline. |
+| `ragrails retrieve` | Retrieve chunks relevant to a query. |
+| `ragrails scrape` | Scrape one or more URLs into markdown output. |
+| `ragrails setup-url` | Install the Playwright browser required for URL ingestion. |
+| `ragrails store` | Store embedded chunk JSON files in a vector database. |
