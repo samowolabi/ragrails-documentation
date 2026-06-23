@@ -1,16 +1,22 @@
 ---
 title: "SDK Overview"
-icon: "list"
-description: "Use Ragrails from Python."
+icon: "layers"
+description: "Understand the SDK workflows and the pipeline stages behind them."
 ---
 
-Configure your providers once when you create `RagRails`, then call clean methods. Every method falls back to these defaults and lets you override per call.
+The Ragrails SDK has two main workflows.
+
+`rag.ingest()` builds a searchable knowledge base from your sources. `rag.query()` searches that knowledge base. `rag.chat()` builds on retrieval by sending retrieved context to your configured LLM and returning a grounded answer.
+
+Start with the workflows when you want the shortest path. Use the pipeline stage pages when you need to inspect output, tune behavior, or run one part directly.
+
+## Configure Once
 
 ```python
 from ragrails import RagRails
 
 rag = RagRails(
-    collection="docs",
+    collection="support",
     vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
     llm={"provider": "openai", "model": "gpt-4o-mini"},
@@ -18,46 +24,113 @@ rag = RagRails(
 )
 ```
 
-<Note>The constructor uses `vector_store={"provider": ...}` plus `collection=`. Per-call methods use `vector_db=`, `collection=`, and `url=` to override.</Note>
+Constructor defaults are SDK-only. They do not write `.ragrails.toml` and they do not affect CLI or REST defaults.
 
-## Methods
+<Note>The constructor uses `vector_store={"provider": ...}` plus top-level `collection=`. Per-call stage methods use `vector_db=`, `collection=`, `url=`, and `options=` when overriding one call.</Note>
 
-Provider, vector store, and model arguments are optional on every method; omit them to use the constructor defaults.
-
-| Method | Stage | Description |
-| --- | --- | --- |
-| `setup_url(browser)` | Ingestion | Install Playwright browser for URL ingestion |
-| `scrape(url, ...)` | Ingestion | Scrape URLs into document dicts |
-| `parse(files, folder, ...)` | Ingestion | Parse local documents into document dicts |
-| `fetch(url, apis, ...)` | Ingestion | Fetch REST API responses into document dicts |
-| `chunk(markdown, ...)` | Chunking | Split documents into chunk dicts |
-| `embedder(...)` / `embed(chunks, ...)` | Embedding | Create an embedder / generate vectors |
-| `store(embedded_chunks, ...)` | Storing | Upsert embedded chunks |
-| `edit(chunks, ...)` / `delete(ids, ...)` | Storing | Update or remove chunks by ID |
-| `reranker(...)` / `retrieve(query, ...)` | Retrieval | Create a reranker / retrieve relevant chunks |
-| `llm(...)` / `chat(query, ...)` | Chat | Create an LLM / run a stateless chat turn |
-| `ingest(...)` / `query(query, ...)` | Pipeline | Run the full ingest or query pipeline |
-
-## Override per call
-
-Pass any provider argument to override the constructor default for a single call:
-
-```python
-# Use a different model for one query, without changing the default
-rag.chat("Summarize the policy", llm=rag.llm(model="gpt-4o"))
-
-# Retrieve from a different collection
-rag.retrieve("refunds", collection="legal")
-```
-
-## Pages
+## Workflows
 
 <CardGroup cols={2}>
-  <Card title="Ingestion" href="/usage/sdk/ingestion">scrape, parse, fetch</Card>
-  <Card title="Chunking" href="/usage/sdk/chunking">chunk</Card>
-  <Card title="Embedding" href="/usage/sdk/embedding">embedder, embed</Card>
-  <Card title="Storing" href="/usage/sdk/storing">store, edit, delete</Card>
-  <Card title="Retrieval" href="/usage/sdk/retrieval">reranker, retrieve</Card>
-  <Card title="Chat" href="/usage/sdk/chat">llm, chat</Card>
-  <Card title="Pipeline" href="/usage/sdk/pipeline">ingest, query</Card>
+  <Card title="Ingest" icon="package-plus" href="/usage/sdk/ingest">
+    Extract sources, chunk them, embed them, and store them in a vector database.
+  </Card>
+  <Card title="Query" icon="search-check" href="/usage/sdk/query">
+    Retrieve matching chunks or generate grounded answers from the indexed knowledge base.
+  </Card>
 </CardGroup>
+
+```python
+# Ingest builds the index.
+rag.ingest(docs=["files/refund-policy.pdf"])
+
+# Query returns matching chunks.
+matches = rag.query("How long do refunds take?", retrieval={"top_k": 5})
+
+# Chat returns a grounded answer.
+answer = rag.chat("How long do refunds take?", history=[])
+```
+
+## Pipeline
+
+The pipeline stages are the lower-level building blocks behind the workflows.
+
+<CardGroup cols={2}>
+  <Card title="Overview" icon="route" href="/usage/sdk/pipeline-overview">
+    See how extraction, chunking, embedding, storing, retrieval, chat, and maintenance fit together.
+  </Card>
+  <Card title="Extraction" icon="file-input" href="/usage/sdk/extraction">
+    Load documents, websites, APIs, or direct Markdown before indexing.
+  </Card>
+  <Card title="Chunking" icon="scissors" href="/usage/sdk/chunking">
+    Split normalized Markdown into searchable passages.
+  </Card>
+  <Card title="Embedding" icon="binary" href="/usage/sdk/embedding">
+    Convert chunks into vectors with your embedding model.
+  </Card>
+  <Card title="Storing" icon="database" href="/usage/sdk/storing">
+    Write embedded chunks to the configured vector database.
+  </Card>
+  <Card title="Retrieval" icon="search" href="/usage/sdk/retrieval">
+    Find the chunks most relevant to a user query.
+  </Card>
+  <Card title="Chat" icon="messages-square" href="/usage/sdk/chat">
+    Use retrieved context to answer with an LLM.
+  </Card>
+  <Card title="Knowledge Base Maintenance" icon="refresh-cw" href="/usage/sdk/knowledge-base-maintenance">
+    Update or remove stored chunks so answers stay current.
+  </Card>
+</CardGroup>
+
+## Stage Flow
+
+```python
+# Extraction
+sources = rag.parse(files=["files/refund-policy.pdf"])
+
+# Chunking
+chunks = rag.chunk(markdown=sources.outputs)
+
+# Embedding
+embedded = rag.embed(chunks=chunks.items)
+
+# Storing
+rag.store(embedded_chunks=embedded.items)
+
+# Retrieval
+matches = rag.retrieve("How long do refunds take?", top_k=5)
+
+# Chat
+answer = rag.chat("How long do refunds take?", history=[])
+```
+
+## Result Objects
+
+Ragrails returns dataclass result objects. The data flowing between stages is plain dictionaries so you can inspect, persist, or transform it.
+
+| Stage | SDK method | Result object |
+| --- | --- | --- |
+| Extraction | `scrape`, `parse`, `fetch` | `ScrapeResult`, `ParseResult`, `ApiIngestResult` |
+| Chunking | `chunk` | `ChunkResult` |
+| Embedding | `embed` | `EmbedResult` |
+| Storing | `store`, `edit`, `delete` | `StoreResult`, `EditResult`, `DeleteResult` |
+| Retrieval | `retrieve`, `query` | `RetrieveResult` |
+| Chat | `chat` | `ChatResult` |
+| Ingest workflow | `ingest` | `IngestPipelineResult` |
+
+## Install
+
+```bash
+pip install "ragrails[store-qdrant]"
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+For website extraction:
+
+```bash
+pip install "ragrails[url,store-qdrant]"
+ragrails setup-url --browser chromium
+```
+
+<Tip>Use [SDK Quickstart](/usage/sdk/quickstart) for a copy-paste run, then use [Pipeline Overview](/usage/sdk/pipeline-overview) to choose the right SDK entry point.</Tip>

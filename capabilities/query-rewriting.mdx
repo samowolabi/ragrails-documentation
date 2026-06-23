@@ -1,0 +1,159 @@
+---
+title: "Query Rewriting"
+icon: "wand-sparkles"
+description: "Turn conversational follow-ups into standalone search queries."
+---
+
+Follow-ups like "what about the second one?" are clear to a person but weak as vector-search queries. Query rewriting uses an LLM plus optional context to produce a standalone `search_query` before embedding and retrieval.
+
+Use rewriting for multi-turn search and chat. Skip it for one-shot, self-contained queries because it adds an LLM call.
+
+## Retrieval rewriting
+
+<CodeGroup>
+```python SDK
+result = rag.retrieve(
+    "What about the second step?",
+    use_query_rewrite=True,
+    rewrite_llm=rag.llm(provider="openai", model="gpt-4o-mini"),
+    rewrite_context="Product onboarding docs.",
+    session_context="The user is asking about setup steps.",
+)
+
+print(result.search_query)
+```
+
+```bash CLI
+# The CLI retrieval command does not expose query rewrite flags yet.
+ragrails retrieve "What about the second step?" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What about the second step?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "use_query_rewrite": true,
+    "rewrite_context": "Product onboarding docs.",
+    "session_context": "The user is asking about setup steps."
+  }'
+```
+</CodeGroup>
+
+`result.search_query` shows what was embedded and searched. If rewriting fails, retrieval falls back to the original query and returns a retryable `rewrite` error.
+
+## Query pipeline rewriting
+
+<CodeGroup>
+```python SDK
+result = rag.query(
+    "What about the second step?",
+    retrieval={
+        "top_k": 10,
+        "query_rewrite": {
+            "enabled": True,
+            "llm": rag.llm(provider="openai", model="gpt-4o-mini"),
+            "context": "Product onboarding docs.",
+            "session_context": "The user is asking about setup steps.",
+        },
+    },
+)
+```
+
+```bash CLI
+# The CLI query command does not expose query rewrite flags yet.
+ragrails query "What about the second step?" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What about the second step?",
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "docs",
+      "url": "http://localhost:6333",
+      "top_k": 10,
+      "query_rewrite": {
+        "enabled": true,
+        "context": "Product onboarding docs.",
+        "session_context": "The user is asking about setup steps."
+      }
+    }
+  }'
+```
+</CodeGroup>
+
+## Chat rewriting
+
+Chat rewriting uses `QueryRewriteConfig`. If you do not pass a separate rewrite LLM, chat falls back to the chat LLM. Use [Streaming](/capabilities/streaming) when you want to see the rewritten `search_query` in progress events.
+
+<CodeGroup>
+```python SDK
+from ragrails import QueryRewriteConfig
+
+result = rag.chat(
+    "What about the second step?",
+    history=history,
+    query_rewrite=QueryRewriteConfig(
+        enabled=True,
+        session_context="The user is asking about setup steps.",
+    ),
+)
+```
+
+```bash CLI
+ragrails chat "What about the second step?" \
+  --history-file files/chat-history.json \
+  --rewrite-query \
+  --rewrite-session-context "The user is asking about setup steps." \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What about the second step?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "query_rewrite": {
+      "enabled": true,
+      "session_context": "The user is asking about setup steps."
+    },
+    "history": []
+  }'
+```
+</CodeGroup>
+
+## When to use it
+
+| Query | Rewrite? | Reason |
+| --- | --- | --- |
+| "How do I authenticate?" | Usually no | Already standalone. |
+| "What about annual plans?" | Yes | Needs previous topic to search accurately. |
+| "Compare the first two options" | Yes | Needs conversation context. |
+| "refund policy" | No | Short but already searchable. |
+
+<Tip>Use a small, inexpensive LLM for rewriting. Rewriting is short, structured, and usually does not need the same model as final answer generation.</Tip>
+
+## Related pages
+
+- [Retrieval](/features/retrieval)
+- [Chat Tuning](/capabilities/chat-tuning)
+- [Streaming](/capabilities/streaming)
+- [Cost Optimization](/capabilities/cost-optimization)

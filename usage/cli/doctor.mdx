@@ -6,9 +6,16 @@ description: "Diagnose your Ragrails setup before you run anything."
 
 `ragrails doctor` is a production-readiness check. It validates your `.ragrails.toml`, the provider packages you've installed, your API keys, and (optionally) vector database connectivity, then reports what's wrong and how to fix it.
 
+## Start with the Setup Wizard
+
+`doctor` is most useful after the setup wizard has written `.ragrails.toml`. Run bare `ragrails` first:
+
 ```bash
+ragrails
 ragrails doctor
 ```
+
+There is no `ragrails setup` subcommand. The setup wizard is the bare `ragrails` command.
 
 ## What it checks
 

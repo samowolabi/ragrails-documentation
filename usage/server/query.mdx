@@ -1,0 +1,63 @@
+---
+title: "REST Query"
+icon: "search-check"
+description: "Search a knowledge base over HTTP."
+---
+
+`POST /v1/pipelines/query` embeds a user query and retrieves matching chunks from the configured vector database. Use [`POST /v1/chat`](/usage/server/chat) when you also want an LLM answer.
+
+## Request
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do refunds take?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "top_k": 20,
+      "use_rerank": true,
+      "reranker": "voyage",
+      "reranker_model": "rerank-2-lite",
+      "rerank_top_k": 5
+    }
+  }'
+```
+
+```json Response
+{
+  "query": "How long do refunds take?",
+  "search_query": "How long do refunds take?",
+  "retrieved": 5,
+  "items": [
+    {
+      "id": "refund-policy-0",
+      "chunk_id": "refund-policy-0",
+      "score": 0.83,
+      "text": "Refunds are returned to the original payment method within 5 business days.",
+      "metadata": {"source": "refund-policy.md"},
+      "rerank_score": 0.91
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Config Blocks
+
+| Block | Controls |
+| --- | --- |
+| `embedding` | Query embedding provider, model, and provider options. |
+| `retrieval` | Vector database connection, `top_k`, query rewriting, reranking, and provider options. |
+
+## Query Or Retrieve
+
+`/v1/pipelines/query` is the workflow endpoint. It accepts grouped `embedding` and `retrieval` blocks.
+
+`/v1/retrieve` is the stage endpoint. It accepts the flattened retrieval fields directly, which is useful when you are documenting or testing the retrieval stage by itself.

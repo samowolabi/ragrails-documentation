@@ -13,6 +13,15 @@
     "light": "#7856FF",
     "dark": "#7856FF"
   },
+  "navbar": {
+    "links": [
+      {
+        "label": "Star on GitHub",
+        "href": "https://github.com/samowolabi/ragrails",
+        "icon": "github"
+      }
+    ]
+  },
   "navigation": {
     "tabs": [
       {
@@ -46,6 +55,7 @@
                 "group": "Pipeline",
                 "expanded": true,
                 "pages": [
+                  "features/pipeline-overview",
                   "features/extraction",
                   "features/chunking",
                   "features/embedding",
@@ -59,17 +69,18 @@
             ]
           },
           {
-            "group": "Advanced",
+            "group": "Capabilities",
             "pages": [
-              "advanced/overview",
-              "advanced/reranking",
-              "advanced/query-rewriting",
-              "advanced/chat-tuning",
-              "advanced/resilient-ingestion",
-              "advanced/agentic-tools",
-              "advanced/tool-calling",
-              "advanced/custom-providers",
-              "advanced/cost-optimization"
+              "capabilities/overview",
+              "capabilities/reranking",
+              "capabilities/query-rewriting",
+              "capabilities/chat-tuning",
+              "capabilities/streaming",
+              "capabilities/resilient-ingestion",
+              "capabilities/agentic-tools",
+              "capabilities/tool-calling",
+              "capabilities/custom-providers",
+              "capabilities/cost-optimization"
             ]
           },
           {
@@ -80,15 +91,11 @@
               "use-cases/documentation-assistant",
               "use-cases/internal-knowledge-base",
               "use-cases/ai-search-engine",
-              "use-cases/research-assistant",
-              "use-cases/developer-api-copilot",
-              "use-cases/competitive-intelligence",
-              "use-cases/grounded-content-generation",
-              "use-cases/ecommerce-assistant"
+              "use-cases/developer-api-copilot"
             ]
           },
           {
-            "group": "Guides",
+            "group": "Walkthroughs",
             "pages": [
               "guides/website-to-rag",
               "guides/docs-to-rag",
@@ -109,15 +116,29 @@
             ]
           },
           {
-            "group": "Stages",
+            "group": "Workflows",
             "pages": [
-              "usage/sdk/ingestion",
+              "usage/sdk/ingest",
+              "usage/sdk/query"
+            ]
+          },
+          {
+            "group": "Pipeline",
+            "expanded": true,
+            "pages": [
+              "usage/sdk/pipeline-overview",
+              "usage/sdk/extraction",
               "usage/sdk/chunking",
               "usage/sdk/embedding",
               "usage/sdk/storing",
               "usage/sdk/retrieval",
-              "usage/sdk/chat",
-              "usage/sdk/pipeline"
+              "usage/sdk/chat"
+            ]
+          },
+          {
+            "group": "Maintenance",
+            "pages": [
+              "usage/sdk/knowledge-base-maintenance"
             ]
           }
         ]
@@ -134,15 +155,29 @@
             ]
           },
           {
-            "group": "Stages",
+            "group": "Workflows",
             "pages": [
-              "usage/cli/ingestion",
+              "usage/cli/ingest",
+              "usage/cli/query"
+            ]
+          },
+          {
+            "group": "Pipeline",
+            "expanded": true,
+            "pages": [
+              "usage/cli/pipeline-overview",
+              "usage/cli/extraction",
               "usage/cli/chunking",
               "usage/cli/embedding",
               "usage/cli/storing",
               "usage/cli/retrieval",
-              "usage/cli/chat",
-              "usage/cli/pipeline"
+              "usage/cli/chat"
+            ]
+          },
+          {
+            "group": "Maintenance",
+            "pages": [
+              "usage/cli/knowledge-base-maintenance"
             ]
           }
         ]
@@ -158,15 +193,29 @@
             ]
           },
           {
-            "group": "Stages",
+            "group": "Workflows",
             "pages": [
-              "usage/server/ingestion",
+              "usage/server/ingest",
+              "usage/server/query"
+            ]
+          },
+          {
+            "group": "Pipeline",
+            "expanded": true,
+            "pages": [
+              "usage/server/pipeline-overview",
+              "usage/server/extraction",
               "usage/server/chunking",
               "usage/server/embedding",
               "usage/server/storing",
               "usage/server/retrieval",
-              "usage/server/chat",
-              "usage/server/pipeline"
+              "usage/server/chat"
+            ]
+          },
+          {
+            "group": "Maintenance",
+            "pages": [
+              "usage/server/knowledge-base-maintenance"
             ]
           }
         ]

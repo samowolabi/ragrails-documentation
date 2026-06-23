@@ -4,7 +4,7 @@ icon: "zap"
 description: "Build a knowledge base and chat over HTTP."
 ---
 
-## 1. Install and run
+## 1. Install and Run
 
 ```bash
 pip install "ragrails[server-qdrant]"
@@ -14,11 +14,13 @@ docker run -p 6333:6333 qdrant/qdrant
 ragrails-api
 ```
 
-The server starts on `http://127.0.0.1:8000`. Explore it at `/docs`.
+The API starts on `http://127.0.0.1:8000`. Open `http://127.0.0.1:8000/docs` for Swagger UI.
 
-REST defaults are request payload fields. The server does not inherit SDK constructor defaults or CLI `.ragrails.toml` values from these examples.
+REST defaults live in request payloads. These examples pass the vector database, embedding model, and LLM model explicitly.
 
-## 2. Build the index
+## 2. Ingest
+
+`POST /v1/pipelines/ingest` extracts, chunks, embeds, and stores content.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
@@ -32,6 +34,8 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
 
 ## 3. Query
 
+`POST /v1/pipelines/query` embeds the question and retrieves matching chunks.
+
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
   -H "Content-Type: application/json" \
@@ -43,6 +47,8 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
 ```
 
 ## 4. Chat
+
+`POST /v1/chat` retrieves context and asks the configured LLM for an answer.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/chat \
@@ -60,11 +66,23 @@ curl -X POST http://127.0.0.1:8000/v1/chat \
   }'
 ```
 
-Pass the returned `history` back on the next request to keep context.
+Pass the returned `history` array back on the next chat request to keep conversation context.
 
-## Next
+## 5. Stream Chat
 
-<CardGroup cols={2}>
-  <Card title="REST Overview" icon="list" href="/usage/server/overview">Every endpoint.</Card>
-  <Card title="Generate a client" icon="code" href="/usage/server/overview">Use the OpenAPI schema at /v1/openapi.json.</Card>
-</CardGroup>
+```bash
+curl -N -X POST http://127.0.0.1:8000/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How long do I have to request a refund?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333"
+  }'
+```
+
+Next, use [REST Ingest](/usage/server/ingest) for full ingest options, [REST Query](/usage/server/query) for retrieval options, or [Pipeline Overview](/usage/server/pipeline-overview) to run each stage separately.

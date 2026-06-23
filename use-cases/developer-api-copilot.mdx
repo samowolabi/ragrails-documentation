@@ -1,19 +1,26 @@
 ---
 title: "Developer / API Copilot"
 icon: "code"
-description: "Answer questions about your API, and act on them."
+description: "Answer questions about your API docs, then use interactive tools when users want to act."
 ---
 
 ## The problem
 
-Developers ask the same integration questions, and they want more than an answer. They want to try the call.
+Developers ask the same integration questions, then immediately want to try the API call. Static docs can explain the endpoint, but they cannot help the user assemble or execute a request.
 
-## How Ragrails solves it
+## Why Ragrails fits
 
-Build a knowledge base from your API and SDK docs, then run an interactive assistant that can fetch live pages and make real API calls.
+Ragrails can ingest API responses and SDK docs, answer questions from that context, and use the interactive CLI tool loop for live page fetches or confirmed API calls.
 
-1. **Fetch** API reference + **scrape** SDK docs into a collection.
-2. Run the **interactive chat** with agentic tools enabled.
+| Need | Ragrails capability |
+| --- | --- |
+| Ingest API reference and SDK docs | [Extraction](/features/extraction) |
+| Answer integration questions | [Chat](/features/chat) |
+| Fetch live external docs | [Agentic Tools](/capabilities/agentic-tools) |
+| Build your own tool loop | [Tool Calling](/capabilities/tool-calling) |
+| Stream chat progress | [Streaming](/capabilities/streaming) |
+
+## Sample
 
 <CodeGroup>
 ```python SDK
@@ -25,42 +32,77 @@ rag = RagRails(
     embedding={"provider": "voyage", "model": "voyage-3"},
     llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-rag.setup_url()
-rag.ingest(api={"url": "https://api.example.com/openapi.json", "title": "API Reference"}, urls="https://docs.example.com/sdk")
-rag.chat("How do I create a customer?", history=[])
+
+rag.ingest(
+    api={"url": "https://api.example.com/openapi.json", "title": "API Reference"},
+    urls="https://docs.example.com/sdk",
+    storage={"collection": "devdocs"},
+)
+
+result = rag.chat("How do I create a customer?", history=[])
+print(result.answer)
 ```
 
 ```bash CLI
-ragrails setup-url
+ragrails setup-url --browser chromium
+
 ragrails ingest \
   --api-url https://api.example.com/openapi.json \
   --source-url https://docs.example.com/sdk \
-  --vector-db qdrant --collection devdocs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
+  --vector-db qdrant \
+  --collection devdocs \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
 
 ragrails chat "How do I create a customer?" \
-  --vector-db qdrant --collection devdocs --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+  --vector-db qdrant \
+  --collection devdocs \
+  --url http://localhost:6333 \
+  --embedder-provider voyage \
+  --embedder-model voyage-3 \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini
 ```
 
 ```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
-  -d '{"api": {"url": "https://api.example.com/openapi.json", "title": "API Reference"}, "urls": "https://docs.example.com/sdk", "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "devdocs", "url": "http://localhost:6333"}}' 
+  -d '{
+    "api": {"url": "https://api.example.com/openapi.json", "title": "API Reference"},
+    "urls": "https://docs.example.com/sdk",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "devdocs", "url": "http://localhost:6333"}
+  }'
 
 curl -X POST http://127.0.0.1:8000/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"query": "How do I create a customer?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "devdocs", "url": "http://localhost:6333", "history": []}' 
+  -d '{
+    "query": "How do I create a customer?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "devdocs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
 ```
 </CodeGroup>
 
+## Interactive tool mode
 
-Run `ragrails chat` with no query to use the interactive CLI. Ask: `How do I create a customer? Then call the endpoint with my test key.`
+Run the interactive CLI when the user wants to act, not just ask:
 
+```bash CLI
+ragrails chat
+```
 
-<Warning>Agentic tools (`web_fetch`, `api_call`) run in the **interactive CLI** and confirm before each call. See [agentic tools](/advanced/agentic-tools).</Warning>
+Example prompt:
 
-## Features used
+```text
+How do I create a customer? Then call the endpoint with my test key.
+```
 
-[API ingestion](/usage/sdk/ingestion#api-ingestion-fetch) · [Agentic tools](/advanced/agentic-tools) · [Chat](/features/chat)
+<Warning>Agentic tools (`web_fetch`, `api_call`) run in the interactive CLI and confirm side-effecting API calls before execution.</Warning>

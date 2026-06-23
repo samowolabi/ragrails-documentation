@@ -1,17 +1,45 @@
 ---
-title: "Hosted REST API"
+title: "Run the REST API"
 icon: "server"
-description: "Run Ragrails as a hosted HTTP service."
+description: "Expose Ragrails workflows over HTTP."
 ---
 
-## Run the server
+Use this walkthrough when another service, frontend, worker, or non-Python client needs to call Ragrails over HTTP.
 
-```bash REST API
+## What you will run
+
+A FastAPI server with endpoints for ingestion, chunking, embedding, storage, retrieval, pipelines, chat, and streaming.
+
+## 1. Install server extras
+
+Choose the vector database stack you need:
+
+```bash
 pip install "ragrails[server-qdrant]"
-ragrails-api
+# or: pip install "ragrails[server-pinecone]"
+# or: pip install "ragrails[server-weaviate]"
 ```
 
-The server listens on `http://127.0.0.1:8000`.
+Set provider credentials before starting the server:
+
+```bash
+export VOYAGE_API_KEY="..."
+export OPENAI_API_KEY="..."
+```
+
+## 2. Start the server
+
+```bash REST API
+ragrails-api --host 127.0.0.1 --port 8000
+```
+
+For local development:
+
+```bash REST API
+ragrails-api --reload
+```
+
+The server listens on `http://127.0.0.1:8000` by default.
 
 | Resource | URL |
 | --- | --- |
@@ -19,11 +47,56 @@ The server listens on `http://127.0.0.1:8000`.
 | Swagger UI | `GET /docs` |
 | OpenAPI schema | `GET /v1/openapi.json` |
 
+## 3. Smoke test
+
+```bash
+curl http://127.0.0.1:8000/v1/health
+```
+
+Then run a small pipeline request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What does this knowledge base cover?",
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "docs",
+      "url": "http://localhost:6333",
+      "top_k": 5
+    }
+  }'
+```
+
+## Common endpoints
+
+| Need | Endpoint |
+| --- | --- |
+| Scrape URLs | `POST /v1/ingest/url` |
+| Stream URL scraping | `POST /v1/ingest/url/stream` |
+| Parse server-side files | `POST /v1/ingest/docs` |
+| Upload files | `POST /v1/ingest/docs/upload` |
+| Fetch REST APIs | `POST /v1/ingest/api` |
+| Run full ingest pipeline | `POST /v1/pipelines/ingest` |
+| Run query pipeline | `POST /v1/pipelines/query` |
+| Retrieve chunks | `POST /v1/retrieve` |
+| Chat | `POST /v1/chat` |
+| Stream chat | `POST /v1/chat/stream` |
+| Store, edit, delete vectors | `POST /v1/store`, `/v1/edit`, `/v1/delete` |
+
 ## Production checklist
 
-- Provide provider credentials (`VOYAGE_API_KEY`, `OPENAI_API_KEY`, vector DB keys) as environment variables
-- Put the service behind your API gateway, auth layer, and rate limiting
-- Use a managed vector database (Qdrant Cloud, Pinecone, or Weaviate Cloud) for persistence
-- Generate typed clients from `/v1/openapi.json`
+- Put the service behind your auth layer, gateway, and rate limits.
+- Use managed vector storage or persistent volumes for production indexes.
+- Keep API keys in environment variables or your secret manager.
+- Generate typed clients from `/v1/openapi.json`.
+- Prefer streaming endpoints for long crawls and responsive chat UIs.
+- Add request logging and audit logging around ingestion, chat, and tool-using workflows.
 
-See the [REST API reference](/reference/rest-api) for the full endpoint list.
+## Next steps
+
+- [REST API overview](/usage/server/overview)
+- [REST API reference](/reference/rest-api)
+- [Streaming](/capabilities/streaming)
+- [Website walkthrough](/guides/website-to-rag)

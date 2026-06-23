@@ -4,30 +4,75 @@ icon: "scissors"
 description: "Split content into searchable passages."
 ---
 
-Chunking is part of the [Ingest](/features/ingest) workflow. It splits documents into small passages before embedding.
+Chunking is part of the [Ingest](/features/ingest) workflow. It turns extracted Markdown documents into smaller passages before embedding and storage.
 
-## Interface Docs
-
-Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+Use this page to choose the right chunking shape. Use the interface-specific pages when you need exact parameters, flags, request fields, or response shapes.
 
 - [SDK chunking](/usage/sdk/chunking)
 - [CLI chunking](/usage/cli/chunking)
 - [REST chunking](/usage/server/chunking)
 
-<Note>**Why:** search works best on focused passages, not whole files. Chunking lets a query match the one paragraph that answers it, not a 50-page document.</Note>
+<Note>Search works best on focused passages, not whole files. Chunking lets a query match the paragraph or table row range that answers it instead of retrieving a 50-page document.</Note>
+
+## What the chunker preserves
+
+Ragrails chunks Markdown semantically before embedding:
+
+| Behavior | What happens |
+| --- | --- |
+| Heading-aware splitting | `#`, `##`, and `###` headings become chunk metadata, so retrieval can cite section context. |
+| Recursive long-section splitting | Oversized sections are split by paragraph and sentence boundaries. |
+| Code block protection | Fenced code blocks stay intact when possible. |
+| Table handling | Markdown tables are kept together when possible; large tables are split with headers repeated. |
+| Link repair | Markdown links split across boundaries are repaired. |
+| Cleanup | Tracking-pixel images, trailing navigation, and trailing horizontal rules are removed. |
+| Stable IDs | Chunk IDs are derived from source plus normalized chunk text, so unchanged content keeps stable identity. |
+
+## Inputs
+
+The SDK and REST API accept a Markdown string or a list of document dictionaries. The CLI reads JSON document files from an input directory.
 
 <CodeGroup>
 ```python SDK
-result = rag.chunk(
-    markdown=docs.outputs,
-    chunk_size=2000,
-    chunk_overlap=200,
-    min_chunk_length=100,
+from ragrails import RagRails
+
+rag = RagRails()
+
+# Direct Markdown string
+single = rag.chunk(
+    markdown="# Refund policy\n\nRefunds are available within 30 days.",
+    title="Refund policy",
+    source="policy.md",
 )
-result.items  # list of chunk dicts
+
+# Documents returned by parse(), scrape(), fetch(), or ingest source stages
+parsed = rag.parse(files="files/refund-policy.pdf")
+from_parse = rag.chunk(markdown=parsed.outputs)
+
+scraped = rag.scrape("https://example.com/docs")
+from_scrape = rag.chunk(markdown=scraped.outputs)
+
+api_docs = rag.fetch("https://api.example.com/articles", title="Articles")
+from_api = rag.chunk(markdown=api_docs.outputs)
+
+# Multiple explicit documents
+many = rag.chunk(markdown=[
+    {
+        "text": "# Auth\n\nUse bearer tokens for API requests.",
+        "source": "docs/auth.md",
+        "title": "Auth",
+        "metadata": {"source_kind": "docs", "description": "API authentication"},
+    },
+    {
+        "text": "# Billing\n\nInvoices are generated monthly.",
+        "source": "docs/billing.md",
+        "metadata": {"title": "Billing"},
+    },
+])
 ```
 
 ```bash CLI
+# input-dir must contain JSON files from parse, scrape, or fetch output
 ragrails chunk \
   --input-dir files/output/docs/ \
   --output-dir files/chunks/ \
@@ -40,7 +85,13 @@ ragrails chunk \
 curl -X POST http://127.0.0.1:8000/v1/chunk \
   -H "Content-Type: application/json" \
   -d '{
-    "markdown": [{"text": "# Refund policy\n\nRefunds are available within 30 days.", "source": "policy.md", "metadata": {}}],
+    "markdown": [
+      {
+        "text": "# Refund policy\n\nRefunds are available within 30 days.",
+        "source": "policy.md",
+        "metadata": {"title": "Refund policy", "source_kind": "docs"}
+      }
+    ],
     "chunk_size": 2000,
     "chunk_overlap": 200,
     "min_chunk_length": 100
@@ -48,24 +99,47 @@ curl -X POST http://127.0.0.1:8000/v1/chunk \
 ```
 </CodeGroup>
 
+<Warning>SDK and REST document dictionaries must include a non-empty `text` field. The SDK does not accept `markdown` or `content` aliases in document dictionaries.</Warning>
 
+## Configuration
 
-<CodeGroup>
-```json Response
+The same three sizing controls exist across SDK, CLI, REST, and the high-level ingest pipeline.
+
+| Option | Default | Meaning | Validation |
+| --- | --- | --- | --- |
+| `chunk_size` | `2000` | Target maximum chunk size in characters | Must be greater than `0` |
+| `chunk_overlap` | `200` | Characters repeated between adjacent prose chunks | Must be `>= 0` and smaller than `chunk_size` |
+| `min_chunk_length` | `100` | Drop chunks shorter than this after cleanup | Must be greater than `0` |
+
+<Tip>Start with `chunk_size=2000`, `chunk_overlap=200`, and `min_chunk_length=100`. Lower the size for dense factual content such as FAQs, API references, and policies. Raise it for narrative content where surrounding context matters.</Tip>
+
+Overlap helps when a sentence or thought lands near a boundary. Keep it around 10% of `chunk_size` unless retrieval quality tests show a reason to change it.
+
+## Metadata and output shape
+
+Every chunk includes text for display, enriched text for embedding, and metadata for filtering, citations, and maintenance.
+
+```json
 {
   "inputs": 1,
-  "chunks": 3,
+  "chunks": 1,
   "items": [
     {
-      "id": "policy#refunds-0",
-      "text": "Refunds are available within 30 days.",
+      "id": "0eac4e39-8e92-5f54-bb4d-2c2e1e6c9d49",
       "source": "policy.md",
+      "text": "# Refund policy\n\nRefunds are available within 30 days.",
+      "embed_text": "Refund policy\nRefund policy\n\n# Refund policy\n\nRefunds are available within 30 days.",
       "metadata": {
         "source": "policy.md",
+        "source_kind": "docs",
         "title": "Refund policy",
+        "description": "",
+        "original_type": "docs",
         "heading": {"h1": "Refund policy"},
-        "chunk_id": "chk_abc123",
-        "content_hash": "abc123"
+        "chunk_index": "0_0",
+        "chunk_id": "chk_abc123def4567890",
+        "content_hash": "abc123def4567890",
+        "id": "0eac4e39-8e92-5f54-bb4d-2c2e1e6c9d49"
       }
     }
   ],
@@ -73,22 +147,88 @@ curl -X POST http://127.0.0.1:8000/v1/chunk \
   "errors": []
 }
 ```
-</CodeGroup>
 
-## Possible Errors
+`embed_text` prepends available `title`, heading path, and `description` to the visible chunk text. Use `text` for citations and UI display; use `embed_text` when sending chunks to embedding providers.
 
-Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+<Note>Chunking does not parse YAML frontmatter. Pass `title`, `description`, `source_kind`, and other metadata explicitly, or preserve them from extraction outputs.</Note>
+
+## Tables
+
+Markdown tables get table-specific metadata. If a table is larger than `chunk_size`, Ragrails splits it into row groups and repeats the table header in each chunk.
+
+```json
+{
+  "text": "| Plan | Price |\n| --- | --- |\n| Basic | 10 |\n| Pro | 20 |",
+  "metadata": {
+    "columns": ["Plan", "Price"],
+    "table_id": "tbl_abc123def4567890",
+    "row_start": 1,
+    "row_end": 2
+  }
+}
+```
+
+Use `table_id`, `row_start`, and `row_end` when you need table-aware citations or when you want to merge adjacent retrieved table chunks in an answer layer.
+
+## Ingest pipeline
+
+When you call high-level ingestion, chunking is the stage between extraction and embedding. Pass chunking options through the `chunking` object.
 
 <CodeGroup>
-```json Validation
+```python SDK
+result = rag.ingest(
+    docs={"files": "files/refund-policy.pdf"},
+    chunking={"chunk_size": 1200, "chunk_overlap": 120, "min_chunk_length": 80},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    storage={"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"},
+)
+```
+
+```bash CLI
+ragrails ingest \
+  --docs files/refund-policy.pdf \
+  --chunk-size 1200 \
+  --chunk-overlap 120 \
+  --min-chunk-length 80 \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"files": "files/refund-policy.pdf"},
+    "chunking": {"chunk_size": 1200, "chunk_overlap": 120, "min_chunk_length": 80},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+```
+</CodeGroup>
+
+## Possible errors
+
+Interface validation errors raise immediately in SDK and REST. Per-document core failures are returned in the result `errors` list when some inputs can still be processed. See [Errors](/reference/errors) for the shared shapes.
+
+<CodeGroup>
+```json Missing text
 {
-  "inputs": 1,
-  "chunks": 0,
-  "items": [],
+  "inputs": 2,
+  "chunks": 1,
+  "items": [
+    {
+      "id": "chunk-1",
+      "source": "good.md",
+      "text": "# Good\n\nEnough content to keep."
+    }
+  ],
   "failed": 1,
   "errors": [
     {
-      "source": "policy.md",
+      "source": "bad.md",
       "source_kind": "markdown",
       "stage": "validate",
       "error": "chunk item text must be a non-empty string",
@@ -99,7 +239,7 @@ Most stage-level failures are returned in the result `errors` list instead of ra
 }
 ```
 
-```json REST exception
+```json Invalid sizing
 {
   "error": {
     "type": "ValueError",
@@ -107,19 +247,14 @@ Most stage-level failures are returned in the result `errors` list instead of ra
   }
 }
 ```
+
+```text CLI
+Error: No JSON files found in files/output/docs/
+```
 </CodeGroup>
 
-## Choosing chunk size
+## Next steps
 
-`chunk_size` is the main lever. It's a tradeoff:
-
-| Too small | Too large |
-| --- | --- |
-| Loses surrounding context | Retrieves noise around the answer |
-| More chunks, higher cost | Weaker similarity matching |
-
-<Tip>Start at `chunk_size=2000`, `chunk_overlap=200`. Lower the size for dense, factual content (specs, FAQs); raise it for narrative content where context matters.</Tip>
-
-**Overlap** repeats a little text between adjacent chunks so a sentence split across a boundary isn't lost. Keep it ~10% of `chunk_size`.
-
-**`min_chunk_length`** drops tiny fragments (stray headings, footers) that add noise.
+- Use [Embedding](/features/embedding) to turn chunks into vectors.
+- Use [Storing](/features/storing) to write embedded chunks to a vector database.
+- Use [Ingest](/features/ingest) to run extraction, chunking, embedding, and storage together.

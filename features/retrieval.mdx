@@ -4,70 +4,277 @@ icon: "search"
 description: "Find the chunks relevant to a query."
 ---
 
-Retrieval is part of the [Query](/features/query) workflow. It embeds the query, searches the vector store, and returns the closest chunks.
+Retrieval is part of the [Query](/features/query) workflow. It embeds a user query with `input_type="query"`, searches the vector database, and returns the closest stored chunks.
 
-## Interface Docs
-
-Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+Use this page to understand the retrieval stage. Use the interface-specific pages when you need exact parameters, flags, request fields, or response shapes.
 
 - [SDK retrieval](/usage/sdk/retrieval)
 - [CLI retrieval](/usage/cli/retrieval)
 - [REST retrieval](/usage/server/retrieval)
 
+<Note>Retrieval does not generate an answer. It returns chunks and scores. Use [Chat](/features/chat) when you want answer generation over retrieved context.</Note>
+
+## Basic retrieval
+
 <CodeGroup>
 ```python SDK
-result = rag.retrieve("How do I authenticate?", top_k=10)
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.retrieve("How do refunds work?", top_k=10)
+
 for chunk in result.items:
-    print(chunk.score, chunk.text)
+    print(chunk.score, chunk.chunk_id, chunk.text)
 ```
 
 ```bash CLI
-ragrails retrieve "How do I authenticate?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3 \
-  --top-k 10
+ragrails retrieve "How do refunds work?"   --vector-db qdrant   --collection support   --url http://localhost:6333   --provider voyage   --model voyage-3   --top-k 10
 ```
 
 ```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/retrieve \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "How do I authenticate?",
+curl -X POST http://127.0.0.1:8000/v1/retrieve   -H "Content-Type: application/json"   -d '{
+    "query": "How do refunds work?",
     "provider": "voyage",
     "model": "voyage-3",
     "vector_db": "qdrant",
-    "collection": "docs",
+    "collection": "support",
     "url": "http://localhost:6333",
     "top_k": 10
   }'
 ```
 </CodeGroup>
 
+Result:
 
-
-<CodeGroup>
-```json Response
+```json
 {
-  "query": "How do I authenticate?",
-  "search_query": "How do I authenticate?",
-  "retrieved": 1,
+  "query": "How do refunds work?",
+  "search_query": "How do refunds work?",
+  "retrieved": 2,
   "items": [
     {
-      "id": "auth#overview",
+      "id": "chunk-1",
+      "chunk_id": "chk_refunds",
       "score": 0.84,
-      "text": "Create an API key and send it as a Bearer token.",
-      "metadata": {"title": "Authentication"}
+      "text": "Refunds are available within 30 days.",
+      "metadata": {
+        "title": "Refund policy",
+        "source": "policy.md"
+      },
+      "rerank_score": null
     }
   ],
   "failed": 0,
   "errors": []
 }
 ```
+
+| Key | Meaning |
+| --- | --- |
+| `query` | Original user query. |
+| `search_query` | Query actually embedded and searched; differs when query rewriting is enabled. |
+| `retrieved` | Number of vector-store candidates returned before optional rerank trimming. |
+| `items` | Retrieved chunks with text, scores, metadata, and optional rerank scores. |
+| `items[].id` | Stored vector ID. Use this for edit and delete operations. |
+| `items[].chunk_id` | Original chunk ID carried from chunking and storage. |
+| `items[].score` | Vector similarity score from the store. |
+| `items[].rerank_score` | Reranker score when reranking is enabled; otherwise `null`. |
+| `failed` | Number of retrieval-stage failures. |
+| `errors` | Structured validation, query embedding, vector-store, rewrite, or rerank errors. |
+
+## Query embeddings
+
+Retrieval uses the configured embedding model with `input_type="query"`. This must match the model used during indexing, but not the input type.
+
+```python
+# Indexing uses document embeddings.
+embedded = rag.embed(chunks=chunks.items, input_type="document")
+
+# Retrieval uses query embeddings automatically.
+results = rag.retrieve("refund window", top_k=10)
+```
+
+<Warning>Use the same embedding provider and model for indexing and retrieval. Document and query vectors from different models are not comparable.</Warning>
+
+## Tuning knobs
+
+| Symptom | Adjustment |
+| --- | --- |
+| Too few or too many candidates | Change `top_k`. |
+| Right topic appears but order is weak | Enable reranking. |
+| Follow-up questions miss context | Enable query rewriting with session context. |
+| Wrong knowledge base searched | Check `vector_db`, `collection`, and `url`. |
+
+## Reranking
+
+Reranking takes vector-search candidates and reorders them with a reranker. Retrieve wide, then rerank down.
+
+<CodeGroup>
+```python SDK
+result = rag.retrieve(
+    "How do refunds work?",
+    top_k=20,
+    use_rerank=True,
+    rerank_top_k=5,
+)
+```
+
+```bash CLI
+ragrails retrieve "How do refunds work?"   --vector-db qdrant   --collection support   --url http://localhost:6333   --provider voyage   --model voyage-3   --top-k 20   --rerank   --reranker voyage   --reranker-model rerank-2-lite   --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve   -H "Content-Type: application/json"   -d '{
+    "query": "How do refunds work?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "top_k": 20,
+    "use_rerank": true,
+    "reranker": "voyage",
+    "reranker_model": "rerank-2-lite",
+    "rerank_top_k": 5
+  }'
+```
 </CodeGroup>
 
-## Possible Errors
+Result:
 
-Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+```json
+{
+  "query": "How do refunds work?",
+  "search_query": "How do refunds work?",
+  "retrieved": 20,
+  "items": [
+    {
+      "id": "chunk-1",
+      "chunk_id": "chk_refunds",
+      "score": 0.77,
+      "rerank_score": 0.94,
+      "text": "Refunds are available within 30 days.",
+      "metadata": {"title": "Refund policy"}
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+
+<Tip>Start with `top_k=20` and `rerank_top_k=5`. The reranker needs enough candidates to improve ordering.</Tip>
+
+## Query rewriting
+
+Query rewriting turns a follow-up into a standalone search query before embedding. It needs an LLM.
+
+<CodeGroup>
+```python SDK
+result = rag.retrieve(
+    "What about annual plans?",
+    use_query_rewrite=True,
+    session_context="The user is asking about refund policy.",
+)
+
+print(result.search_query)
+```
+
+```bash CLI
+# The CLI retrieval command does not expose query rewriting flags yet.
+ragrails retrieve "What about annual plans?"   --vector-db qdrant   --collection support   --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve   -H "Content-Type: application/json"   -d '{
+    "query": "What about annual plans?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "use_query_rewrite": true,
+    "session_context": "The user is asking about refund policy."
+  }'
+```
+</CodeGroup>
+
+Result:
+
+```json
+{
+  "query": "What about annual plans?",
+  "search_query": "What is the refund policy for annual plans?",
+  "retrieved": 1,
+  "items": [
+    {
+      "id": "chunk-annual-refunds",
+      "chunk_id": "chk_annual_refunds",
+      "score": 0.81,
+      "text": "Annual plans are refundable within 30 days.",
+      "metadata": {"title": "Refund policy"},
+      "rerank_score": null
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+
+<Note>The SDK can use a configured LLM for rewriting. REST exposes rewrite flags, but the server still needs a usable LLM provider configured.</Note>
+
+## Query pipeline
+
+`query()` is the high-level query helper. It wraps embedding and retrieval settings in stable nested objects and returns the same `RetrieveResult` shape.
+
+<CodeGroup>
+```python SDK
+result = rag.query(
+    "How do refunds work?",
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    retrieval={
+        "top_k": 20,
+        "rerank": {"enabled": True, "top_k": 5},
+        "query_rewrite": {
+            "enabled": True,
+            "session_context": "The user is asking about billing policy.",
+        },
+    },
+)
+```
+
+```bash CLI
+ragrails query "How do refunds work?"   --vector-db qdrant   --collection support   --url http://localhost:6333   --provider voyage   --model voyage-3   --top-k 20   --rerank   --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query   -H "Content-Type: application/json"   -d '{
+    "query": "How do refunds work?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "top_k": 20,
+      "rerank": {"enabled": true, "top_k": 5},
+      "query_rewrite": {
+        "enabled": true,
+        "session_context": "The user is asking about billing policy."
+      }
+    }
+  }'
+```
+</CodeGroup>
+
+<Note>The CLI `query` command supports reranking, but it does not expose query rewrite flags yet. Use SDK or REST for query rewriting in the high-level query pipeline.</Note>
+
+## Possible errors
+
+Interface validation errors raise immediately in SDK and REST. Core retrieval failures are returned in the result `errors` list when processing can continue. See [Errors](/reference/errors) for the shared shapes.
 
 <CodeGroup>
 ```json Validation
@@ -90,39 +297,19 @@ Most stage-level failures are returned in the result `errors` list instead of ra
 }
 ```
 
-```json Rewrite setup
-{
-  "query": "What about the second step?",
-  "search_query": "What about the second step?",
-  "retrieved": 0,
-  "items": [],
-  "failed": 1,
-  "errors": [
-    {
-      "source": "What about the second step?",
-      "source_kind": "query",
-      "stage": "rewrite",
-      "error": "rewrite_llm is required when use_query_rewrite is True",
-      "isRetryable": false,
-      "attempts": 1
-    }
-  ]
-}
-```
-
 ```json Retrieve failure
 {
-  "query": "How do I authenticate?",
-  "search_query": "How do I authenticate?",
+  "query": "How do refunds work?",
+  "search_query": "How do refunds work?",
   "retrieved": 0,
   "items": [],
   "failed": 1,
   "errors": [
     {
-      "source": "How do I authenticate?",
+      "source": "How do refunds work?",
       "source_kind": "query",
       "stage": "retrieve",
-      "error": "Collection not found: docs",
+      "error": "Collection not found: support",
       "isRetryable": true,
       "attempts": 1
     }
@@ -132,14 +319,14 @@ Most stage-level failures are returned in the result `errors` list instead of ra
 
 ```json Rerank failure
 {
-  "query": "How do I authenticate?",
-  "search_query": "How do I authenticate?",
-  "retrieved": 0,
+  "query": "How do refunds work?",
+  "search_query": "How do refunds work?",
+  "retrieved": 10,
   "items": [],
-  "failed": 1,
+  "failed": 10,
   "errors": [
     {
-      "source": "How do I authenticate?",
+      "source": "How do refunds work?",
       "source_kind": "query",
       "stage": "rerank",
       "error": "reranker returned a different number of scores than input results",
@@ -151,124 +338,8 @@ Most stage-level failures are returned in the result `errors` list instead of ra
 ```
 </CodeGroup>
 
-## Tune it by symptom
+## Next steps
 
-| Symptom | Fix |
-| --- | --- |
-| Not enough / too many results | Adjust `top_k` |
-| Right topic, wrong ranking | Turn on **reranking** |
-| Conversational follow-ups miss | Turn on **query rewriting** |
-
-### Reranking
-
-<CodeGroup>
-```python SDK
-result = rag.retrieve(
-    "How do I authenticate?",
-    top_k=20,
-    use_rerank=True,
-    rerank_top_k=5,
-)
-```
-
-```bash CLI
-ragrails retrieve "How do I authenticate?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3 \
-  --top-k 20 --rerank --rerank-top-k 5
-```
-
-```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/retrieve \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "How do I authenticate?",
-    "provider": "voyage",
-    "model": "voyage-3",
-    "vector_db": "qdrant",
-    "collection": "docs",
-    "url": "http://localhost:6333",
-    "top_k": 20,
-    "use_rerank": true,
-    "rerank_top_k": 5
-  }'
-```
-</CodeGroup>
-
-<CodeGroup>
-```json Response
-{
-  "query": "How do I authenticate?",
-  "retrieved": 5,
-  "items": [
-    {
-      "id": "auth#overview",
-      "score": 0.77,
-      "rerank_score": 0.94,
-      "text": "Create an API key and send it as a Bearer token.",
-      "metadata": {"title": "Authentication"}
-    }
-  ],
-  "failed": 0,
-  "errors": []
-}
-```
-</CodeGroup>
-
-<Tip>Retrieve wide (`top_k=20`), rerank down (`rerank_top_k=5`). The reranker needs candidates to choose from.</Tip>
-
-### Query rewriting
-
-<CodeGroup>
-```python SDK
-result = rag.retrieve(
-    "What about the second step?",
-    use_query_rewrite=True,
-    session_context="User is asking about the onboarding flow.",
-)
-result.search_query
-```
-
-```bash CLI
-ragrails retrieve "What about the second step?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-```
-
-```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/retrieve \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "What about the second step?",
-    "provider": "voyage",
-    "model": "voyage-3",
-    "vector_db": "qdrant",
-    "collection": "docs",
-    "url": "http://localhost:6333",
-    "use_query_rewrite": true,
-    "session_context": "User is asking about the onboarding flow."
-  }'
-```
-</CodeGroup>
-
-<CodeGroup>
-```json Response
-{
-  "query": "What about the second step?",
-  "search_query": "What is the second step in the onboarding flow?",
-  "retrieved": 1,
-  "items": [
-    {
-      "id": "onboarding#step-2",
-      "score": 0.81,
-      "text": "Step two is to invite your team.",
-      "metadata": {"title": "Onboarding"}
-    }
-  ],
-  "failed": 0,
-  "errors": []
-}
-```
-</CodeGroup>
-
-<Note>The CLI retrieval command does not currently expose query rewriting flags; use SDK or REST when you need rewrite controls.</Note>
+- Use [Chat](/features/chat) to generate grounded answers from retrieved chunks.
+- Use [Pipeline Overview](/features/pipeline-overview) to see how retrieval fits into the full RAG flow.
+- Use [Vector Databases](/reference/vector-databases) to verify provider names and collection settings.

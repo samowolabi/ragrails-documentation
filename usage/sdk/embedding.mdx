@@ -1,72 +1,99 @@
 ---
-title: "SDK Embedding"
+title: "Embedding"
 icon: "binary"
-description: "Generate vector representations for chunks."
+description: "Generate vectors for SDK chunk dictionaries."
 ---
 
-Embedding converts chunks into vectors. With an embedding provider configured on `RagRails`, `embed()` works without any extra setup.
+Embedding adds vector representations to chunks so the vector database can perform semantic search. In the full SDK workflow, `rag.ingest()` embeds chunks for you. Use `rag.embed()` directly when you need to inspect vectors or control batching/model choice.
 
 ```bash
 pip install "ragrails[voyage]"
+export VOYAGE_API_KEY="..."
 ```
 
 ```python
 from ragrails import RagRails
 
 rag = RagRails(embedding={"provider": "voyage", "model": "voyage-3"})
-
-result = rag.embed(chunks=chunk_result.items)
 ```
 
-<CodeGroup>
-```python Request
-result = rag.embed(chunks=chunk_result.items, batch_size=64)
-```
-
-```python Response
-result.embedded  # 64
-result.items[0]  # {
-                 #   "id": "guide-0",
-                 #   "text": "Ragrails builds modular RAG workflows...",
-                 #   "embedding": [0.0132, -0.0719, 0.0241],  # 1024 floats
-                 #   "metadata": {"title": "Guide", "chunk_index": 0},
-                 # }
-```
-</CodeGroup>
-
-## Override the embedder per call
-
-`embed()` creates the embedder from the constructor `embedding` config. Pass an explicit `embedder` to override:
+## Embed Chunks
 
 ```python
-result = rag.embed(
-    chunks=chunk_result.items,
-    embedder=rag.embedder(provider="voyage", model="voyage-3-large"),
+embedded = rag.embed(
+    chunks=chunks.items,
+    batch_size=64,
 )
 ```
 
-## `embedder()` parameters
+## Result
+
+```python
+embedded.inputs
+embedded.embedded
+embedded.items
+embedded.failed
+embedded.errors
+```
+
+An embedded chunk keeps the chunk fields and adds `embedding`:
+
+```json
+{
+  "id": "refund-policy-0",
+  "text": "Customers can request a refund within 30 days of purchase.",
+  "source": "files/refund-policy.pdf",
+  "metadata": {"title": "Refund policy", "chunk_index": 0},
+  "embedding": [0.0132, -0.0719, 0.0241]
+}
+```
+
+## Create an Embedder
+
+```python
+embedder = rag.embedder(provider="voyage", model="voyage-3", input_type="document")
+embedded = rag.embed(chunks=chunks.items, embedder=embedder)
+```
+
+Use `input_type="document"` while indexing and `input_type="query"` for retrieval. `rag.query()`, `rag.retrieve()`, and `rag.chat()` create query embedders automatically from constructor defaults.
+
+## Override the Model
+
+```python
+embedded = rag.embed(
+    chunks=chunks.items,
+    embedder=rag.embedder(model="voyage-3-large"),
+    batch_size=32,
+)
+```
+
+## Parameters
+
+### `embedder()`
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `provider` | constructor default, else `"voyage"` | Embedding provider |
-| `model` | constructor default, else `"voyage-3"` | Model name |
-| `input_type` | `"document"` | `"document"` for indexing, `"query"` for retrieval |
-| `options` | `None` | Provider-specific options dict |
+| `provider` | constructor default, else `"voyage"` | Embedding provider. |
+| `model` | constructor default, else `"voyage-3"` | Embedding model. |
+| `input_type` | `"document"` | `"document"` or `"query"`. |
+| `options` | `None` | Provider-specific options. |
 
-## `embed()` parameters
+### `embed()`
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `chunks` | required | List of chunk dicts; each needs `id` and `text` |
-| `embedder` | inherits constructor embedding | Embedder object; auto-created when omitted |
-| `input_type` | `"document"` | Used when `embed` creates the embedder |
-| `batch_size` | `64` | Chunks per embedding API request |
+| `chunks` | required | List of chunk dicts with `id` and `text`. |
+| `embedder` | auto-created | Explicit embedding model object. |
+| `input_type` | `"document"` | Used only when `embed()` creates the embedder. |
+| `batch_size` | `64` | Chunks per embedding batch. |
 
-## Supported providers
+## Next Stage
 
-| Provider | Extra | Models |
-| --- | --- | --- |
-| Voyage | `ragrails[voyage]` | `voyage-3` (default), `voyage-3-lite`, `voyage-3-large` |
+```python
+stored = rag.store(embedded_chunks=embedded.items)
+```
 
-<Note>Bring your own provider with `register_embedder()`. See [extending providers](/reference/sdk#extending-providers).</Note>
+<CardGroup cols={2}>
+  <Card title="Chunking" icon="scissors" href="/usage/sdk/chunking">Create chunks.</Card>
+  <Card title="Storing" icon="database" href="/usage/sdk/storing">Store embedded chunks.</Card>
+</CardGroup>

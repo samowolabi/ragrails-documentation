@@ -1,10 +1,10 @@
 ---
 title: "Installation"
 icon: "download"
-description: "Install Ragrails and optional extras."
+description: "Install Ragrails and choose the extras for your RAG stack."
 ---
 
-Ragrails requires Python 3.10 or newer. Python 3.12 or 3.13 is recommended when installing provider extras.
+Ragrails requires Python 3.10 or newer and installs with `pip`.
 
 <CodeGroup>
 ```bash SDK
@@ -22,26 +22,108 @@ ragrails-api --help
 ```
 </CodeGroup>
 
-The base install includes the SDK, CLI, REST API server, all LLM providers (OpenAI, Anthropic, Google), document ingestion, API ingestion, chunking, embedding orchestration, vector storage orchestration, retrieval, chat, and pipeline helpers.
+The base install includes the SDK, CLI, REST API command, OpenAI, Anthropic, Google, document ingestion, API ingestion, chunking, embedding orchestration, vector storage orchestration, retrieval, chat, and pipeline helpers.
 
-<Note>LLM providers are built in. You don't need an extra for OpenAI, Anthropic, or Google, just set the matching API key.</Note>
+<Note>OpenAI, Anthropic, and Google clients are included in the base package. Set the matching API key before using the provider.</Note>
+
+## Common installs
+
+Choose the smallest install that matches the thing you are running.
+
+| Goal | Install |
+| --- | --- |
+| SDK, CLI, docs/API ingestion, chunking, retrieval, chat | `pip install ragrails` |
+| SDK pipeline with Voyage + local or cloud Qdrant | `pip install "ragrails[store-qdrant]"` |
+| SDK pipeline with Voyage + Pinecone | `pip install "ragrails[store-pinecone]"` |
+| SDK pipeline with Voyage + Weaviate | `pip install "ragrails[store-weaviate]"` |
+| REST API backed by Qdrant | `pip install "ragrails[server-qdrant]"` |
+| REST API backed by Pinecone | `pip install "ragrails[server-pinecone]"` |
+| REST API backed by Weaviate | `pip install "ragrails[server-weaviate]"` |
+| Website scraping | `pip install "ragrails[url]"` |
+| Local reranking | `pip install "ragrails[rerank]"` |
+| Everything | `pip install "ragrails[all]"` |
+
+For website scraping, install the browser runtime once in the environment that will scrape pages:
+
+<CodeGroup>
+```bash CLI
+ragrails setup-url --browser chromium
+```
+
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails()
+rag.setup_url(browser="chromium")
+```
+</CodeGroup>
 
 ## Extras
 
-Optional installs cover integrations that pull in heavier dependencies or browser runtimes: an embedder, a vector database client, URL scraping, or local reranking. Install only what you need.
+Extras add integrations that are optional at runtime. Combine extras with commas when you need more than one.
 
-| Need | Install |
+| Extra | Adds |
 | --- | --- |
-| Voyage embeddings | `pip install "ragrails[voyage]"` |
-| URL ingestion | `pip install "ragrails[url]"` |
-| Qdrant (local or cloud) | `pip install "ragrails[qdrant]"` |
-| Pinecone | `pip install "ragrails[pinecone]"` |
-| Weaviate | `pip install "ragrails[weaviate]"` |
-| Local reranking | `pip install "ragrails[rerank]"` |
-| SDK + Qdrant stack | `pip install "ragrails[store-qdrant]"` |
-| REST API + Qdrant stack | `pip install "ragrails[server-qdrant]"` |
-| REST API + Pinecone stack | `pip install "ragrails[server-pinecone]"` |
-| REST API + Weaviate stack | `pip install "ragrails[server-weaviate]"` |
-| Everything | `pip install "ragrails[all]"` |
+| `url` | Crawl4AI website scraping support |
+| `voyage` | Voyage embeddings and Voyage reranking credentials/client support |
+| `qdrant` | Qdrant vector database client |
+| `pinecone` | Pinecone vector database client |
+| `weaviate` | Weaviate vector database client |
+| `rerank` | Local reranking dependencies |
+| `store-qdrant` | Voyage + Qdrant for SDK/CLI storage pipelines |
+| `store-pinecone` | Voyage + Pinecone for SDK/CLI storage pipelines |
+| `store-weaviate` | Voyage + Weaviate for SDK/CLI storage pipelines |
+| `server` | REST server dependencies only |
+| `server-qdrant` | REST server + Voyage + Qdrant |
+| `server-pinecone` | REST server + Voyage + Pinecone |
+| `server-weaviate` | REST server + Voyage + Weaviate |
+| `all` | All optional integrations |
 
-<Note>Qdrant Cloud uses the same `qdrant` extra. Point `url` at your cloud endpoint and set `QDRANT_API_KEY`. See [vector databases](/reference/vector-databases) for provider names and defaults.</Note>
+```bash Combined extras
+pip install "ragrails[url,store-qdrant,rerank]"
+```
+
+## Provider keys
+
+Set credentials in environment variables, not in docs examples, source files, or `.ragrails.toml`.
+
+```bash OpenAI chat + Voyage embeddings
+export OPENAI_API_KEY="sk-..."
+export VOYAGE_API_KEY="pa-..."
+```
+
+```bash Vector database keys
+export QDRANT_API_KEY="..."
+export PINECONE_API_KEY="..."
+export WEAVIATE_API_KEY="..."
+```
+
+Qdrant Cloud uses the same `qdrant`, `store-qdrant`, and `server-qdrant` extras as local Qdrant. Point the provider URL at your cloud endpoint and set `QDRANT_API_KEY`.
+
+## Local Qdrant
+
+The quickstart path uses local Qdrant:
+
+```bash Docker
+docker run -p 6333:6333 qdrant/qdrant
+```
+
+## Verify
+
+Check the import, CLI, and REST command before building a pipeline:
+
+<CodeGroup>
+```bash SDK
+python -c "from ragrails import RagRails; print(RagRails.__name__)"
+```
+
+```bash CLI
+ragrails --help
+```
+
+```bash REST API
+ragrails-api --help
+```
+</CodeGroup>
+
+Then continue with the [quickstart](/getting-started/quickstart), [environment variables](/getting-started/env-examples), or [vector databases](/reference/vector-databases).

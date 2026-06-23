@@ -1,70 +1,98 @@
 ---
 title: "CLI Overview"
-icon: "list"
-description: "Run Ragrails from the terminal."
+icon: "layers"
+description: "Understand the CLI workflows and pipeline stages."
 ---
 
-```bash
-ragrails --help
-```
+The Ragrails CLI is the terminal interface for building, querying, and maintaining a knowledge base.
 
-The CLI is a thin layer over the SDK: every command calls `RagRails()` internally, but CLI defaults come from `.ragrails.toml`, not from SDK constructor examples. Stage commands pass data through JSON files, so you can inspect each step; pipeline commands run the whole flow in one call.
+Use workflow commands when you want the shortest path: `ingest`, `query`, and `chat`. Use stage commands when you want JSON artifacts between steps that you can inspect, commit, diff, or hand off to another process.
 
-## Project setup
+## Setup Wizard
 
-Run `ragrails` with no subcommand once to launch the [setup wizard](/getting-started/configuration), which writes a `.ragrails.toml`. After that, commands read their defaults (vector store, providers, models, chunking, retrieval) from that file, so you can drop most flags. A flag always overrides the config for a single run.
+Run `ragrails` with no subcommand to launch the setup wizard before using the CLI regularly.
 
 ```bash
-ragrails          # interactive setup wizard, writes .ragrails.toml
-ragrails doctor   # check your config, packages, and API keys
+ragrails
 ```
 
-## Commands
+The wizard writes `.ragrails.toml` in the current directory. CLI commands then inherit vector database, embedding, LLM, reranker, chunking, storage, retrieval, and chat defaults from that file. A flag always overrides `.ragrails.toml` for one run.
 
-| Command | Purpose | SDK method |
+| Wizard section | Defaults it captures |
+| --- | --- |
+| Vector store | Provider, collection, URL |
+| Embedding | Provider and model |
+| LLM | Provider, model, max tokens |
+| Reranking | Whether reranking is enabled, provider, model |
+| Advanced defaults | Chunking, batch sizes, retrieval limits, query rewrite, intent routing, history compaction |
+
+If `.ragrails.toml` already exists, bare `ragrails` shows the current config and lets you `edit`, `reset`, or `exit`.
+
+```bash
+ragrails doctor
+```
+
+<Note>There is no `ragrails setup` subcommand. `ragrails setup-url` only installs the browser runtime used by website extraction.</Note>
+
+## Workflows
+
+| Workflow | Use it for | Details |
 | --- | --- | --- |
-| `doctor` | Diagnose config, packages, keys, connectivity | none |
-| `setup-url` | Install the browser for URL ingestion (interactive) | `setup_url()` |
-| `scrape` | Scrape URLs | `scrape()` |
-| `parse` | Parse documents | `parse()` |
-| `fetch` | Fetch REST APIs | `fetch()` |
-| `chunk` | Chunk documents | `chunk()` |
-| `embed` | Embed chunks | `embedder()` + `embed()` |
-| `store` | Store embedded chunks | `store()` |
-| `edit` | Re-embed and replace chunks | `edit()` |
-| `delete` | Delete chunks by ID | `delete()` |
-| `retrieve` | Retrieve relevant chunks | `retrieve()` |
-| `ingest` | Full ingest pipeline | `ingest()` |
-| `query` | Query pipeline | `query()` |
-| `chat` | RAG chat turn or interactive REPL | `chat()` |
-
-<Tip>New to RAG? Read [How RAG works](/getting-started/concepts) first.</Tip>
-
-## Stage-based workflow
-
-Each stage reads JSON from `--input-dir` and writes JSON to `--output-dir`, so you control and inspect every step. With a `.ragrails.toml`, provider and vector-store flags are inherited, so commands stay short. Without one, pass the same `--vector-db`, `--collection`, `--url`, `--provider`, and `--model` flags through each stage.
+| [`ingest`](/usage/cli/ingest) | Build a searchable knowledge base from sources. | Extracts, chunks, embeds, and stores content. |
+| [`query`](/usage/cli/query) | Search the indexed knowledge base. | Embeds the query and retrieves matching chunks. |
+| [`chat`](/usage/cli/chat) | Ask grounded questions over the knowledge base. | Retrieves context and asks an LLM for an answer. |
 
 ```bash
-ragrails scrape https://example.com/docs --output-dir files/output/web/
-ragrails chunk --input-dir files/output/web/ --output-dir files/chunks/
-ragrails embed --input-dir files/chunks/ --output-dir files/embedded/
-ragrails store --input-dir files/embedded/
-ragrails retrieve "How do I authenticate?"
+ragrails ingest --docs files/refund-policy.pdf \
+  --vector-db qdrant --collection support --url http://localhost:6333
+
+ragrails query "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333
+
+ragrails chat "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333
 ```
 
-## One-command pipeline
+## Pipeline
+
+Start with the [pipeline overview](/usage/cli/pipeline-overview), or jump directly to a stage:
+
+| Stage | Commands | Details |
+| --- | --- | --- |
+| [Extraction](/usage/cli/extraction) | `scrape`, `parse`, `fetch` | Turn websites, files, and APIs into extraction JSON. |
+| [Chunking](/usage/cli/chunking) | `chunk` | Split extraction JSON into retrievable chunks. |
+| [Embedding](/usage/cli/embedding) | `embed` | Generate vectors for chunk JSON. |
+| [Storing](/usage/cli/storing) | `store`, `edit`, `delete` | Upsert, replace, and remove stored chunks. |
+| [Retrieval](/usage/cli/retrieval) | `retrieve` | Search and optionally rerank stored chunks. |
+| [Maintenance](/usage/cli/knowledge-base-maintenance) | `edit`, `delete`, re-ingest | Refresh or remove stale knowledge base content. |
 
 ```bash
-ragrails ingest \
-  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase." \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-
-ragrails query "How long do I have to request a refund?" \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --provider voyage --model voyage-3 --top-k 5
+ragrails parse --files files/refund-policy.pdf --output-dir files/output/docs/
+ragrails chunk --input-dir files/output/docs/ --output-dir files/output/chunks/
+ragrails embed --input-dir files/output/chunks/ --output-dir files/output/embedded/
+ragrails store --input-dir files/output/embedded/ \
+  --vector-db qdrant --collection support --url http://localhost:6333
+ragrails retrieve "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333
 ```
 
-Pass `--vector-db`, `--collection`, `--provider`, etc. on any command to override the config for that run.
+## Command Index
 
-<Note>Some SDK capabilities aren't exposed as CLI flags (the scrape dead-letter queue, query rewriting in retrieval, raw-bytes document input). Use the [SDK](/usage/sdk/overview) or [REST API](/usage/server/overview) for those.</Note>
+| Command | Purpose |
+| --- | --- |
+| `doctor` | Diagnose config, packages, keys, and optional vector DB connectivity. |
+| `setup-url` | Install the browser runtime for URL scraping. |
+| `scrape` | Extract website pages. |
+| `parse` | Extract documents. |
+| `fetch` | Extract REST API responses. |
+| `chunk` | Split extraction JSON into chunks. |
+| `embed` | Generate vectors for chunk JSON. |
+| `store` | Upsert embedded chunks. |
+| `edit` | Re-embed and replace chunks by ID. |
+| `delete` | Delete chunks by exact ID. |
+| `retrieve` | Search stored chunks. |
+| `ingest` | Full ingest workflow. |
+| `query` | Query embedding plus retrieval workflow. |
+| `chat` | One-shot chat or interactive REPL. |
+
+<Note>Some SDK capabilities are not exposed as CLI flags: scrape DLQ retry, raw bytes document input, full API pagination/body config, and query rewriting in `retrieve`. Use [SDK](/usage/sdk/overview) or [REST API](/usage/server/overview) for those.</Note>

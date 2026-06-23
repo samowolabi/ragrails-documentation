@@ -1,92 +1,106 @@
 ---
-title: "SDK Retrieval"
+title: "Retrieval"
 icon: "search"
-description: "Retrieve relevant chunks for a query."
+description: "Retrieve, rerank, and rewrite queries with the SDK."
 ---
 
-Retrieval embeds the query, searches the vector store, and returns the closest chunks. With providers configured on `RagRails`, `retrieve()` is a one-liner; it creates the query embedder for you.
+Retrieval embeds a user query, searches the vector database, and returns the closest chunks. Use `rag.query()` for the workflow-level API and `rag.retrieve()` when you want direct control over retrieval objects.
 
 ```python
 from ragrails import RagRails
 
 rag = RagRails(
-    collection="docs",
+    collection="support",
     vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
     reranker={"provider": "voyage", "model": "rerank-2-lite"},
 )
 ```
 
-<CodeGroup>
-```python Request
-result = rag.retrieve("How do I authenticate?", top_k=10)
+## Workflow Retrieval: `query()`
 
-for chunk in result.items:
-    print(chunk.score, chunk.text)
+```python
+result = rag.query("How long do refunds take?", retrieval={"top_k": 5})
 ```
 
-```python Response
-result.retrieved  # 10
-result.items[0]   # RetrievedChunk(
-                  #   id="guide-3",
-                  #   score=0.87,
-                  #   text="To authenticate, create an API key in settings...",
-                  #   metadata={"title": "Authentication"},
-                  #   rerank_score=None,
-                  # )
+`query()` returns `query`, `search_query`, `retrieved`, `items`, `failed`, and `errors`.
+
+## Direct Retrieval: `retrieve()`
+
+```python
+result = rag.retrieve("How long do refunds take?", top_k=5)
+
+for item in result.items:
+    print(item.score, item.text)
 ```
-</CodeGroup>
 
-## With reranking
+Each retrieved item has `id`, `chunk_id`, `score`, `text`, `metadata`, and optional `rerank_score`.
 
-Set `use_rerank=True`. The reranker is created from the constructor `reranker` config (or pass one explicitly). Retrieve wide, keep the best few.
+## Reranking
+
+Retrieve more candidates than you show, then rerank down to the best few.
 
 ```python
 result = rag.retrieve(
-    "How do I authenticate?",
+    "How long do refunds take?",
     top_k=20,
     use_rerank=True,
     rerank_top_k=5,
 )
 ```
 
-## With query rewriting
+Or use the workflow config shape:
 
-Turn a conversational follow-up into a standalone query before searching. The rewrite LLM falls back to the constructor `llm`.
+```python
+result = rag.query(
+    "How long do refunds take?",
+    retrieval={"top_k": 20, "rerank": {"enabled": True, "top_k": 5}},
+)
+```
+
+## Query Rewriting
+
+Query rewriting turns follow-up questions into standalone search queries. It requires an LLM.
 
 ```python
 result = rag.retrieve(
     "What about the second step?",
     use_query_rewrite=True,
-    session_context="User is asking about the onboarding flow.",
+    session_context="The user is asking about refund setup.",
 )
 
-result.search_query  # the rewritten query that was searched
+print(result.search_query)
 ```
 
-## `retrieve()` parameters
+Workflow config:
+
+```python
+result = rag.query(
+    "What about the second step?",
+    retrieval={"query_rewrite": {"enabled": True, "session_context": "Refund policy thread"}},
+)
+```
+
+## Parameters
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `query` | required | Search query string |
-| `embedder` | inherits constructor (`input_type="query"`) | Query embedder; auto-created when omitted |
-| `vector_db` | inherits constructor | `qdrant`, `qdrant_cloud`, `pinecone`, `weaviate` |
-| `collection` | inherits constructor | Collection name |
-| `url` | inherits constructor | Vector DB URL |
-| `top_k` | `10` | Candidates to retrieve |
-| `use_query_rewrite` | `False` | Rewrite the query before searching |
-| `rewrite_llm` | inherits constructor `llm` | LLM used for rewriting |
-| `rewrite_context` / `session_context` | `""` | Context hints for the rewriter |
-| `use_rerank` | `False` | Rerank results after retrieval |
-| `reranker` | inherits constructor | Reranker object; auto-created when omitted |
-| `rerank_top_k` | `5` | Results to keep after reranking |
+| `query` | required | Non-empty search query. |
+| `embedder` | auto-created | Query embedder. |
+| `vector_db` | constructor default, else `"qdrant"` | Vector DB provider. |
+| `collection` | constructor default | Collection, index, or class name. |
+| `url` | constructor default | Vector DB URL. |
+| `options` | `None` | Provider-specific vector DB options. |
+| `top_k` | `10` | Candidates to retrieve. |
+| `use_query_rewrite` | `False` | Rewrite query before search. |
+| `rewrite_llm` | constructor LLM | LLM used for rewriting. |
+| `rewrite_context` / `session_context` | `""` | Context hints for rewriting. |
+| `use_rerank` | `False` | Rerank results after retrieval. |
+| `reranker` | constructor reranker | Explicit reranker object. |
+| `rerank_top_k` | `5` | Results kept after reranking. |
 
-## `reranker()` parameters
-
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `provider` | constructor default, else `"voyage"` | `"voyage"` (API) or `"bm25"` (local) |
-| `model` | constructor default, else `"rerank-2-lite"` | Voyage: `rerank-2-lite`, `rerank-2`; BM25: `bm25` |
-| `options` | `None` | Provider-specific options |
-
-<Note>`bm25` is a local, keyword-based reranker with no API key. Use Voyage when meaning matters; BM25 for offline or cost-sensitive setups. Register others with `register_reranker()`.</Note>
+<CardGroup cols={2}>
+  <Card title="Query" icon="search-check" href="/usage/sdk/query">Use retrieval in the query workflow.</Card>
+  <Card title="Chat" icon="messages-square" href="/usage/sdk/chat">Generate answers from retrieved context.</Card>
+</CardGroup>

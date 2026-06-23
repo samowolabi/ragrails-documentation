@@ -1,33 +1,45 @@
 ---
 title: "Quickstart"
 icon: "zap"
-description: "Build a knowledge base and chat over it in a few minutes."
+description: "Build a small knowledge base, query it, and chat over it."
 ---
 
-This example builds a small support knowledge base, then chats over it. Run it as-is, then swap in your own content.
+This quickstart creates a small support knowledge base, stores it in Qdrant, retrieves the matching chunk, then asks an LLM for a grounded answer. It starts with inline markdown because it is the fastest copy-paste path, then shows the same pipeline with documents, websites, and REST API sources.
 
-## 1. Install and start Qdrant
+The example uses Voyage for embeddings, Qdrant for vector storage, and OpenAI `gpt-4o-mini` for chat.
+
+## 1. Install
+
+<CodeGroup>
+```bash SDK / CLI
+pip install "ragrails[store-qdrant]"
+```
+
+```bash REST API
+pip install "ragrails[server-qdrant]"
+```
+</CodeGroup>
+
+Set the provider keys used by this example:
 
 ```bash
-pip install "ragrails[voyage,qdrant]"
 export VOYAGE_API_KEY="..."
 export OPENAI_API_KEY="..."
+```
+
+Start local Qdrant:
+
+```bash
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-<Note>
-LLM providers (OpenAI, Anthropic, Google) are built in, so there's no LLM extra.
+<Note>OpenAI, Anthropic, and Google clients are included in the base package. There is no separate LLM extra.</Note>
 
-This quickstart uses `openai` with `gpt-4o-mini`.
-</Note>
+<Tip>Website scraping also needs the `url` extra and a one-time browser setup: `pip install "ragrails[url,store-qdrant]"` for SDK/CLI or `pip install "ragrails[url,server-qdrant]"` for REST, then run `ragrails setup-url --browser chromium`.</Tip>
 
-<Tip>
-See [models](/reference/models) for other supported LLM providers and model names, [vector databases](/reference/vector-databases) for supported vector stores, and [environment variables](/getting-started/env-examples) for provider keys.
-</Tip>
+## 2. Ingest
 
-## 2. Build and chat
-
-Each example creates the same `support` collection from the same refund-policy text, runs one retrieval query, then runs one chat turn.
+The ingest pipeline runs extraction, chunking, embedding, and storage in one call.
 
 <CodeGroup>
 ```python SDK
@@ -40,39 +52,33 @@ rag = RagRails(
     llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
 
-rag.ingest(docs=["files/refund-policy.pdf"])
+ingested = rag.ingest(
+    markdown="# Refund policy\n\nCustomers can request a refund within 30 days of purchase. Refunds are returned to the original payment method within 5 business days.",
+)
 
-# Other source forms use the same pipeline:
-# rag.ingest(urls="https://example.com/help/refunds")  # Scrape Website
-# rag.ingest(api={"url": "https://api.example.com/refund-policy"})  # Fetch API responses
-# rag.ingest(markdown="# Refund policy\n\nCustomers can request a refund within 30 days of purchase.")  # Pass Markdown directly
-
-# Query retrieves matching chunks from the collection.
-query_result = rag.query("How long do I have to request a refund?", retrieval={"top_k": 5})
-print(query_result.items)
-
-# Chat retrieves context and asks the configured LLM for a grounded answer.
-chat_result = rag.chat("How long do I have to request a refund?", history=[])
-print(chat_result.answer)
+print({
+    "sources": ingested.sources,
+    "chunks": ingested.chunks,
+    "embedded": ingested.embedded,
+    "stored": ingested.stored,
+    "failed": ingested.failed,
+})
 ```
 
 ```bash CLI
 ragrails ingest \
   --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase. Refunds are returned to the original payment method within 5 business days." \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-
-ragrails query "How long do I have to request a refund?" \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --provider voyage --model voyage-3 --top-k 5
-
-ragrails chat "How long do I have to request a refund?" \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
 ```
 
 ```bash REST API
+# Start this in a separate terminal.
+ragrails-api --host 127.0.0.1 --port 8000
+
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
   -d '{
@@ -80,7 +86,103 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
     "embedding": {"provider": "voyage", "model": "voyage-3"},
     "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
   }'
+```
+</CodeGroup>
 
+You can swap the source input without changing the rest of the pipeline. Documents use `docs`, websites use `urls`, and REST endpoints use `api`.
+
+<CodeGroup>
+```python SDK sources
+# Documents: parse local files or folders.
+rag.ingest(docs=["files/refund-policy.pdf"])
+rag.ingest(docs={"folder": "files/policies"})
+
+# Websites: scrape one page or crawl a site.
+rag.setup_url(browser="chromium")
+rag.ingest(urls="https://example.com/help/refunds")
+rag.ingest(urls={"url": "https://example.com/docs", "mode": "full", "max_pages": 25})
+
+# REST APIs: fetch an endpoint response into the same pipeline.
+rag.ingest(api={"url": "https://api.example.com/refund-policy", "title": "Refund policy"})
+```
+
+```bash CLI sources
+# Documents
+ragrails ingest --docs files/refund-policy.pdf \
+  --vector-db qdrant --collection support --url http://localhost:6333
+
+# Folder
+ragrails ingest --folder files/policies \
+  --vector-db qdrant --collection support --url http://localhost:6333
+
+# Website
+ragrails setup-url --browser chromium
+ragrails ingest --source-url https://example.com/help/refunds \
+  --vector-db qdrant --collection support --url http://localhost:6333
+
+# REST API
+ragrails ingest --api-url https://api.example.com/refund-policy \
+  --vector-db qdrant --collection support --url http://localhost:6333
+```
+
+```bash REST API sources
+# Documents must be readable by the server process. For browser uploads, use /v1/ingest/docs/upload.
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": ["files/refund-policy.pdf"],
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+
+# Website
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "urls": {"url": "https://example.com/help/refunds"},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+
+# REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api": {"url": "https://api.example.com/refund-policy", "title": "Refund policy"},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+```
+</CodeGroup>
+
+The ingest result reports how many sources, chunks, embeddings, and stored records were produced. A successful run should have `failed: 0`.
+
+## 3. Query
+
+Query embeds your question and retrieves matching chunks from the collection.
+
+<CodeGroup>
+```python SDK
+query_result = rag.query(
+    "How long do I have to request a refund?",
+    retrieval={"top_k": 5},
+)
+
+for item in query_result.items:
+    print(item.score, item.text)
+```
+
+```bash CLI
+ragrails query "How long do I have to request a refund?" \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --top-k 5
+```
+
+```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
   -H "Content-Type: application/json" \
   -d '{
@@ -88,7 +190,38 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
     "embedding": {"provider": "voyage", "model": "voyage-3"},
     "retrieval": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333", "top_k": 5}
   }'
+```
+</CodeGroup>
 
+The query result includes `query`, `search_query`, `retrieved`, `items`, `failed`, and `errors`. Each item contains the retrieved text, metadata, chunk ID, and score.
+
+## 4. Chat
+
+Chat retrieves context from the same collection, sends it to the configured LLM, and returns an answer with sources and updated history.
+
+<CodeGroup>
+```python SDK
+chat_result = rag.chat(
+    "How long do I have to request a refund?",
+    history=[],
+)
+
+print(chat_result.answer)
+print(chat_result.sources)
+```
+
+```bash CLI
+ragrails chat "How long do I have to request a refund?" \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --embedder-provider voyage \
+  --embedder-model voyage-3 \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini
+```
+
+```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/chat \
   -H "Content-Type: application/json" \
   -d '{
@@ -105,29 +238,21 @@ curl -X POST http://127.0.0.1:8000/v1/chat \
 ```
 </CodeGroup>
 
-<Tip>
-SDK defaults live in `RagRails(...)`.
+Expected answer:
 
-CLI defaults live in `.ragrails.toml` or explicit flags.
+```text
+You can request a refund within 30 days of purchase.
+```
 
-REST defaults live in request payload fields.
-
-Chat is stateless: save the returned history and pass it to the next turn.
-</Tip>
+<Tip>Chat is stateless. Save the returned `history` and pass it into the next turn when you want conversation memory.</Tip>
 
 ## Use Your Own Data
 
-The markdown example proves the full loop works. Next, swap in a real source:
+Once the smoke test works, point the same ingest, query, and chat flow at your real source. Use [Extraction](/features/extraction) for source-specific options such as folder parsing, site crawling, API headers, pagination, and output formats.
 
 <CardGroup cols={2}>
-  <Card title="Documents" icon="file-text" href="/guides/docs-to-rag">Ingest PDFs, DOCX, spreadsheets, Markdown, and folders.</Card>
-  <Card title="Scrape Website" icon="globe" href="/guides/website-to-rag">Crawl a docs site or support center.</Card>
-  <Card title="REST APIs" icon="plug" href="/guides/api-to-rag">Fetch and index API responses.</Card>
-</CardGroup>
-
-## Next
-
-<CardGroup cols={2}>
-  <Card title="How RAG works" icon="book" href="/getting-started/concepts">Understand the pipeline.</Card>
-  <Card title="Configuration" icon="gear" href="/getting-started/configuration">Set defaults with .ragrails.toml.</Card>
+  <Card title="Extraction" icon="file-input" href="/features/extraction">Parse documents, scrape websites, and fetch APIs.</Card>
+  <Card title="Overview" icon="route" href="/features/overview">See how the full pipeline fits together.</Card>
+  <Card title="Configuration" icon="gear" href="/getting-started/configuration">Set defaults with `.ragrails.toml`.</Card>
+  <Card title="Vector Databases" icon="database" href="/reference/vector-databases">Choose Qdrant, Pinecone, or Weaviate.</Card>
 </CardGroup>

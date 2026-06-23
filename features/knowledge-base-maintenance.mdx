@@ -4,9 +4,9 @@ icon: "refresh-cw"
 description: "Update and remove stored data so answers stay accurate."
 ---
 
-Source content changes: docs get revised, pages get deleted, products get discontinued. If your vector index doesn't keep up, your chatbot answers from stale data.
+Source content changes: docs get revised, pages get deleted, products get discontinued. If your vector index does not keep up, retrieval and chat can answer from stale chunks.
 
-## Interface Docs
+Ragrails maintenance is chunk-level today. You update stored chunks with `edit()` and remove exact chunk IDs with `delete()`.
 
 Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
 
@@ -14,37 +14,71 @@ Use the interface-specific docs when you need exact parameters, flags, request f
 - [CLI storing](/usage/cli/storing)
 - [REST storing](/usage/server/storing)
 
-Two operations keep it current:
-
-| Task | Method | What it does |
+| Task | Operation | What it does |
 | --- | --- | --- |
-| Content changed | `edit()` | Re-embeds the updated chunk and replaces it by ID |
-| Content removed | `delete()` | Removes chunks by ID |
+| Source text changed | `edit()` | Embeds replacement text and upserts it at the same ID. |
+| Source was removed | `delete()` | Deletes exact stored IDs from the vector database. |
+| Whole source refreshed | Re-ingest plus diff | Upsert new chunks, then delete old IDs that disappeared. |
 
-<Note>Both target chunks by **`id`**. Give chunks stable IDs at chunk time so you can update or remove them later. Derive the ID from the source (e.g. file path + section) rather than letting it be random.</Note>
+<Warning>Maintenance depends on stable chunk IDs. Derive IDs from source identity and section location, then keep a manifest that maps each source to the chunk IDs currently stored for it.</Warning>
 
-## Update changed content
+## Stable IDs
+
+A stable ID lets a later run replace or delete the same stored vector.
+
+```json
+{
+  "source": "docs/refunds.md",
+  "version": "2026-06-23",
+  "chunk_ids": [
+    "docs/refunds.md#refund-window",
+    "docs/refunds.md#annual-plans"
+  ]
+}
+```
+
+Use IDs that survive normal edits. A file path plus heading slug is usually better than a random UUID. If a heading moves but still means the same thing, keep the ID.
+
+## Update changed chunks
+
+`edit()` accepts unembedded replacement chunks. Ragrails embeds each replacement with `input_type="document"` and upserts it into the configured vector store.
 
 <CodeGroup>
 ```python SDK
-# rag configured with your embedding + vector store (see Quickstart)
-rag.edit(chunks=[
-    {"id": "guide#refunds", "text": "Refunds now take 3 to 5 business days.", "source": "files/guide.pdf", "metadata": {"title": "Refunds"}},
-])
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="docs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.edit(
+    chunks=[
+        {
+            "id": "docs/refunds.md#refund-window",
+            "text": "Refunds now take 3 to 5 business days.",
+            "source": "docs/refunds.md",
+            "metadata": {"title": "Refund window"},
+        }
+    ]
+)
 ```
 
 ```bash CLI
-ragrails edit \
-  --input-dir files/updated/ \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
+ragrails edit   --input-dir files/updated/   --vector-db qdrant   --collection docs   --url http://localhost:6333   --provider voyage   --model voyage-3
 ```
 
 ```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/edit \
-  -H "Content-Type: application/json" \
-  -d '{
-    "chunks": [{"id": "guide#refunds", "text": "Refunds now take 3-5 business days.", "source": "files/guide.pdf", "metadata": {}}],
+curl -X POST http://127.0.0.1:8000/v1/edit   -H "Content-Type: application/json"   -d '{
+    "chunks": [
+      {
+        "id": "docs/refunds.md#refund-window",
+        "text": "Refunds now take 3 to 5 business days.",
+        "source": "docs/refunds.md",
+        "metadata": {"title": "Refund window"}
+      }
+    ],
     "provider": "voyage",
     "model": "voyage-3",
     "vector_db": "qdrant",
@@ -54,23 +88,128 @@ curl -X POST http://127.0.0.1:8000/v1/edit \
 ```
 </CodeGroup>
 
+Result:
 
-
-<CodeGroup>
-```json Response
+```json
 {
   "requested": 1,
   "edited": 1,
-  "items": [{"id": "guide#refunds"}],
+  "items": [{"id": "docs/refunds.md#refund-window"}],
   "failed": 0,
   "provider": "qdrant",
   "collection": "docs",
   "errors": []
 }
 ```
+
+| Key | Meaning |
+| --- | --- |
+| `requested` | Number of replacement chunks submitted. |
+| `edited` | Number of chunks embedded and upserted successfully. |
+| `items` | IDs that were replaced. |
+| `failed` | Number of chunks that failed validation, embedding, or storage. |
+| `provider` | Vector database provider used for the operation. |
+| `collection` | Collection, index, or class that was updated. |
+| `errors` | Structured validation, embedding, or vector-store errors. |
+
+## Delete stale chunks
+
+`delete()` removes exact IDs. It does not delete by metadata filter or by source path.
+
+<CodeGroup>
+```python SDK
+result = rag.delete(
+    ids=[
+        "docs/refunds.md#legacy-pricing",
+        "docs/refunds.md#old-plan",
+    ]
+)
+```
+
+```bash CLI
+ragrails delete   --id docs/refunds.md#legacy-pricing   --id docs/refunds.md#old-plan   --vector-db qdrant   --collection docs   --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/delete   -H "Content-Type: application/json"   -d '{
+    "ids": ["docs/refunds.md#legacy-pricing", "docs/refunds.md#old-plan"],
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333"
+  }'
+```
 </CodeGroup>
 
-## Possible Errors
+Result:
+
+```json
+{
+  "requested": 2,
+  "deleted": 2,
+  "items": [
+    {"id": "docs/refunds.md#legacy-pricing"},
+    {"id": "docs/refunds.md#old-plan"}
+  ],
+  "failed": 0,
+  "provider": "qdrant",
+  "collection": "docs",
+  "errors": []
+}
+```
+
+## Refresh one source
+
+A full source refresh is a small reconciliation loop:
+
+1. Load the old manifest entry for the source.
+2. Parse, chunk, embed, and store the current source content.
+3. Collect the new chunk IDs from the store result.
+4. Delete `old_ids - new_ids`.
+5. Save the new manifest entry.
+
+```python
+old_ids = set(manifest["docs/refunds.md"]["chunk_ids"])
+
+result = rag.ingest(
+    docs="docs/refunds.md",
+    chunking={"chunk_size": 800, "chunk_overlap": 120},
+    storage={"collection": "docs"},
+)
+
+new_ids = {item["id"] for item in result.store_result.items}
+stale_ids = sorted(old_ids - new_ids)
+
+if stale_ids:
+    rag.delete(ids=stale_ids)
+
+manifest["docs/refunds.md"] = {
+    "chunk_ids": sorted(new_ids),
+    "version": "2026-06-23",
+}
+```
+
+<Note>`store()` and `edit()` upsert by ID. If a refreshed source produces the same IDs, the new vectors replace the previous vectors.</Note>
+
+## Operational checklist
+
+| Check | Why it matters |
+| --- | --- |
+| Keep a source-to-IDs manifest | Ragrails deletes exact IDs, so your app needs to know which IDs belonged to a removed source. |
+| Use one embedding model per collection | Edited chunks must stay in the same vector space as existing chunks. |
+| Use one ID scheme across ingest and refresh | Random IDs create duplicates instead of replacements. |
+| Delete stale IDs after refresh | Upserts do not remove chunks that disappeared from the source. |
+| Test retrieval after maintenance | Verify changed content is retrieved and deleted content no longer appears. |
+
+## Current boundaries
+
+| Boundary | Practical workaround |
+| --- | --- |
+| No document-level delete API | Track chunk IDs per document and call `delete(ids=...)`. |
+| No metadata-filter delete API | Query your own manifest or source inventory, then delete exact IDs. |
+| No automatic source diffing | Re-ingest the source and compare old/new chunk IDs in your application. |
+| No automatic scheduling | Run refresh jobs from your own worker, cron, or CI system. |
+
+## Possible errors
 
 Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
 
@@ -85,7 +224,7 @@ Most stage-level failures are returned in the result `errors` list instead of ra
   "collection": "docs",
   "errors": [
     {
-      "source": "guide#refunds",
+      "source": "docs/refunds.md#refund-window",
       "source_kind": "stored_chunk",
       "stage": "validate",
       "error": "chunk text must be a non-empty string",
@@ -139,48 +278,8 @@ Most stage-level failures are returned in the result `errors` list instead of ra
 ```
 </CodeGroup>
 
-## Remove stale content
+## Next steps
 
-<CodeGroup>
-```python SDK
-rag.delete(ids=["guide#old-pricing", "blog#discontinued"])
-```
-
-```bash CLI
-ragrails delete \
-  --id guide#old-pricing \
-  --id blog#discontinued \
-  --vector-db qdrant --collection docs --url http://localhost:6333
-```
-
-```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/delete \
-  -H "Content-Type: application/json" \
-  -d '{
-    "ids": ["guide#old-pricing", "blog#discontinued"],
-    "vector_db": "qdrant",
-    "collection": "docs",
-    "url": "http://localhost:6333"
-  }'
-```
-</CodeGroup>
-
-<CodeGroup>
-```json Response
-{
-  "requested": 2,
-  "deleted": 2,
-  "items": [{"id": "guide#old-pricing"}, {"id": "blog#discontinued"}],
-  "failed": 0,
-  "provider": "qdrant",
-  "collection": "docs",
-  "errors": []
-}
-```
-</CodeGroup>
-
-## Re-indexing a source
-
-To refresh a whole document, re-ingest it. New chunks with the same IDs overwrite the old ones; chunks that no longer exist should be deleted.
-
-<Tip>A simple refresh loop: re-ingest the source, then `delete()` any IDs that were in the old version but not the new one.</Tip>
+- Use [Storing](/features/storing) for the initial store operation.
+- Use [Pipeline Overview](/features/pipeline-overview) to place maintenance after ingestion and query workflows.
+- Use [Retrieval](/features/retrieval) to verify maintained content is searchable.

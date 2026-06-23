@@ -1,0 +1,127 @@
+---
+title: "Tool Calling"
+icon: "wrench"
+description: "Build provider-neutral LLM tool loops."
+---
+
+Ragrails exposes tool calling at the LLM provider layer through `complete_with_tools()`. This is the lower-level mechanism used by the interactive CLI's [agentic tools](/capabilities/agentic-tools).
+
+Use this page when you are building your own tool loop. Use [Agentic Tools](/capabilities/agentic-tools) when you want the ready-made interactive CLI experience. Tool calling is separate from [Streaming](/capabilities/streaming): streamed chat events do not execute custom tools for you.
+
+
+## Why tools are not automatic in `rag.chat()`
+
+Built-in tools are not automatically available through SDK `rag.chat()` because tool execution is not just model output. A real application must decide:
+
+| Concern | Owned by your SDK app |
+| --- | --- |
+| Authorization | Which user is allowed to call which API. |
+| Confirmation | Whether a human must approve a proposed action. |
+| Allowlists | Which domains, endpoints, methods, and headers are allowed. |
+| Secrets | How API keys and user tokens are supplied without exposing them to prompts. |
+| Side effects | Whether a request can create, update, delete, or charge anything. |
+| Audit logging | What request was proposed, approved, denied, and executed. |
+
+The SDK gives you provider-neutral tool calls with `complete_with_tools()`. Your app validates and runs the tools, then feeds results back to the model.
+
+## Core API
+
+```python SDK
+from ragrails.models.llm import ChatMessage, AssistantToolCallMessage, ToolResultMessage
+
+messages = [ChatMessage(role="user", content="What is the weather in Lagos?")]
+
+response = llm.complete_with_tools(
+    messages=messages,
+    system="You are a helpful assistant.",
+    tools=[
+        {
+            "name": "get_weather",
+            "description": "Get current weather for a city.",
+            "input_schema": {
+                "type": "object",
+                "properties": {"city": {"type": "string"}},
+                "required": ["city"],
+                "additionalProperties": False,
+            },
+        }
+    ],
+)
+
+if response.tool_calls:
+    messages.append(AssistantToolCallMessage(content=response.text, tool_calls=response.tool_calls))
+    for call in response.tool_calls:
+        tool_output = run_my_tool(call.name, call.arguments)
+        messages.append(ToolResultMessage(tool_call_id=call.id, content=tool_output))
+else:
+    print(response.text)
+```
+
+Call `complete_with_tools()` again after appending tool results. Continue until `response.tool_calls` is empty.
+
+## Provider-neutral types
+
+| Type | Fields | Purpose |
+| --- | --- | --- |
+| `ChatMessage` | `role`, `content` | Plain user or assistant text. |
+| `ToolCall` | `id`, `name`, `arguments` | One requested tool call; `arguments` is parsed JSON. |
+| `AssistantToolCallMessage` | `tool_calls`, `content` | Assistant message that requested tool calls. |
+| `ToolResultMessage` | `tool_call_id`, `content` | Tool output linked back to one tool call. |
+| `LLMToolResponse` | `text`, `tool_calls`, `input_tokens`, `output_tokens`, `model`, `provider` | Response from a tool-capable LLM call. |
+
+## Tool schema shape
+
+Ragrails uses provider-neutral tool definitions and each provider adapter converts them to its own wire format.
+
+```json
+{
+  "name": "get_weather",
+  "description": "Get current weather for a city.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "city": {"type": "string"}
+    },
+    "required": ["city"],
+    "additionalProperties": false
+  }
+}
+```
+
+## Loop pattern
+
+1. Start with provider-neutral `ChatMessage` objects.
+2. Call `llm.complete_with_tools(messages=..., system=..., tools=...)`.
+3. If there are tool calls, validate the name and arguments in your application.
+4. Run the approved tools.
+5. Append one `AssistantToolCallMessage` and one `ToolResultMessage` per result.
+6. Call again until the model returns final text.
+
+<Warning>Ragrails does not execute your custom tools for you at this layer. Your application owns validation, authorization, confirmation, side effects, rate limits, and audit logging.</Warning>
+
+## Provider support
+
+| Provider | Tool calling |
+| --- | --- |
+| OpenAI | Supported. |
+| Anthropic | Supported. |
+| Google Gemini | Not implemented; `complete_with_tools()` raises `NotImplementedError`. |
+
+Use [Model Reference](/reference/models) to check `supports_tools` before selecting a model for a tool loop.
+
+## Relation to chat
+
+| Surface | Tool behavior |
+| --- | --- |
+| `rag.chat()` | Retrieval plus generation only; no tool execution. |
+| `rag.chat_stream()` | Streaming retrieval/generation events; no tool execution. |
+| Interactive `ragrails chat` | Uses the built-in agentic loop and built-in tools. |
+| LLM provider object | Exposes `complete_with_tools()` so you can build your own loop. |
+
+## Related pages
+
+- [Agentic Tools](/capabilities/agentic-tools)
+- [Streaming](/capabilities/streaming)
+- [Chat](/features/chat)
+- [Model Reference](/reference/models)
+

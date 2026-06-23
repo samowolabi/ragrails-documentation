@@ -1,0 +1,122 @@
+---
+title: "Resilient Ingestion"
+icon: "refresh-cw"
+description: "Recover failed crawls and safely page through large APIs."
+---
+
+Large ingestion jobs often partly fail because of timeouts, rate limits, empty pages, or API pagination. Ragrails exposes retry metadata and streaming crawl events so you can recover failed pieces and watch long jobs while they run.
+
+## Dead-letter queue for scraping
+
+A `DLQ` captures retryable scrape failures. You can keep it in memory, save it to a file, pass a previous result's DLQ back in, or retry from a saved path.
+
+```python SDK
+from ragrails import RagRails, DLQ
+
+rag = RagRails()
+
+result = rag.scrape(
+    "https://example.com/docs",
+    mode="full",
+    max_depth=2,
+    max_pages=200,
+    dlq=DLQ("files/dlq/web.json"),
+)
+
+retry = rag.scrape(dlq="files/dlq/web.json")
+```
+
+| `dlq` value | Behavior |
+| --- | --- |
+| `DLQ()` | Collect retryable failures in memory. |
+| `DLQ("path.json")` | Collect retryable failures and write them to JSON. |
+| `result.dlq` | Retry failures from a previous scrape result. |
+| `"path.json"` | Retry failures from a saved DLQ file. |
+
+Retryable scrape errors include crawl failures and transient page failures. Cleanup failures such as empty extracted content are returned as errors but are not added to the DLQ.
+
+## API retry metadata
+
+`fetch()` returns retryable request failures with `retry_input`. Store those errors if you want to resubmit failed API requests later.
+
+```json
+{
+  "source": "https://api.example.com/products",
+  "source_kind": "api",
+  "stage": "request",
+  "error": "Request timed out",
+  "isRetryable": true,
+  "attempts": 1,
+  "retry_input": {
+    "url": "https://api.example.com/products",
+    "title": "Products",
+    "description": "",
+    "method": "GET",
+    "max_pages": 20,
+    "timeout": 30,
+    "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100}
+  }
+}
+```
+
+## API pagination
+
+Use pagination config when the API returns more than one page. Always set a `max_pages` safety cap.
+
+| Strategy | Use when | Config shape |
+| --- | --- | --- |
+| `page` | API uses page numbers | `{"type": "page", "param": "page", "size_param": "per_page", "size": 100}` |
+| `offset` | API uses row offsets | `{"type": "offset", "param": "offset", "size_param": "limit", "size": 100}` |
+| `cursor` | API returns a next cursor | `{"type": "cursor", "param": "cursor", "cursor_path": "meta.next_cursor"}` |
+
+```python SDK
+result = rag.fetch(
+    url="https://api.example.com/products",
+    title="Products",
+    headers={"Authorization": "Bearer sk_live_..."},
+    pagination={
+        "type": "page",
+        "param": "page",
+        "size_param": "per_page",
+        "size": 100,
+    },
+    max_pages=20,
+    timeout=30,
+)
+```
+
+Each successful API page becomes one normalized document with metadata such as `source_kind`, `method`, `page`, `item_count`, `max_pages`, `timeout`, and `elapsed_seconds`.
+
+## Batch source patterns
+
+For larger jobs, submit multiple URLs or API specs and keep partial successes.
+
+```python
+result = rag.fetch(
+    apis=[
+        {"url": "https://api.example.com/products", "title": "Products", "max_pages": 20},
+        {"url": "https://api.example.com/prices", "title": "Prices", "max_pages": 10},
+    ]
+)
+
+retry_inputs = [e["retry_input"] for e in result.errors if e.get("isRetryable")]
+```
+
+## Operational guidance
+
+| Practice | Why |
+| --- | --- |
+| Set `max_pages` | Prevents accidental unbounded ingestion. |
+| Persist DLQ files | Lets production jobs retry exactly what failed. |
+| Track `errors` and `failed` | Partial success is normal for large crawls. |
+| Use `scrape_stream()` for long crawls | Lets a UI or worker observe page progress before the final result. |
+| Retry transient failures separately | Avoids re-crawling successful pages. |
+| Use [knowledge-base maintenance](/features/knowledge-base-maintenance) after refresh | Deletes chunks that disappeared from the source. |
+
+## Related pages
+
+- [Extraction](/features/extraction)
+- [Streaming](/capabilities/streaming)
+- [Knowledge Base Maintenance](/features/knowledge-base-maintenance)
+- [SDK ingestion](/usage/sdk/extraction)
+

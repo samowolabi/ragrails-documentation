@@ -6,55 +6,96 @@ description: "Private Q&A over scattered company files."
 
 ## The problem
 
-Company knowledge lives in PDFs, decks, spreadsheets, and wikis nobody can search across. New hires ask the same questions in Slack for months.
+Company knowledge lives in PDFs, spreadsheets, decks, wikis, and policy folders. People cannot search across it, and new hires ask the same questions for months.
 
-## How Ragrails solves it
+## Why Ragrails fits
 
-Parse everything into one private, self-hosted collection. No documents leave your infrastructure.
+Ragrails parses mixed documents, chunks them, embeds them, and stores them in the vector database you choose. Your app controls the vector store, history persistence, permissions, and refresh schedule.
 
-1. **Parse** folders of mixed file types, or accept **uploads as bytes** (no disk write).
-2. **Store** in a vector database you host.
-3. **Retrieve or chat** privately.
+| Need | Ragrails capability |
+| --- | --- |
+| Parse folders of internal files | [Extraction](/features/extraction) |
+| Store in your own vector database | [Storing](/features/storing) |
+| Ask private questions over files | [Chat](/features/chat) |
+| Keep answers cautious | [Chat Tuning](/capabilities/chat-tuning) |
+| Refresh changed documents | [Knowledge Base Maintenance](/features/knowledge-base-maintenance) |
+
+## Sample
 
 <CodeGroup>
 ```python SDK
-from ragrails import RagRails
+from ragrails import ChatRetrievalQualityConfig, RagRails
 
 rag = RagRails(
-    collection="wiki",
+    collection="company_kb",
     vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
     llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-rag.ingest(docs={"folder": "files/company/"})
-print(rag.chat("How many vacation days do new hires get?", history=[]).answer)
+
+rag.ingest(
+    docs={"folder": "files/company/"},
+    chunking={"chunk_size": 900, "chunk_overlap": 120},
+    storage={"collection": "company_kb"},
+)
+
+result = rag.chat(
+    "How many vacation days do new hires get?",
+    history=[],
+    retrieval_quality=ChatRetrievalQualityConfig(low_confidence_mode="answer_with_caution"),
+)
+
+print(result.answer)
+print(result.sources)
 ```
 
 ```bash CLI
 ragrails ingest \
   --folder files/company/ \
-  --vector-db qdrant --collection wiki --url http://localhost:6333 \
-  --provider voyage --model voyage-3
+  --vector-db qdrant \
+  --collection company_kb \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
 
 ragrails chat "How many vacation days do new hires get?" \
-  --vector-db qdrant --collection wiki --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+  --vector-db qdrant \
+  --collection company_kb \
+  --url http://localhost:6333 \
+  --embedder-provider voyage \
+  --embedder-model voyage-3 \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini
 ```
 
 ```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
-  -d '{"docs": {"folder": "files/company/"}, "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "wiki", "url": "http://localhost:6333"}}' 
+  -d '{
+    "docs": {"folder": "files/company/"},
+    "chunking": {"chunk_size": 900, "chunk_overlap": 120},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "company_kb", "url": "http://localhost:6333"}
+  }'
 
 curl -X POST http://127.0.0.1:8000/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"query": "How many vacation days do new hires get?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "wiki", "url": "http://localhost:6333", "history": []}' 
+  -d '{
+    "query": "How many vacation days do new hires get?",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "company_kb",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
 ```
 </CodeGroup>
 
-<Note>Uploads can be ingested as raw bytes. See [parse input forms](/usage/sdk/ingestion#input-forms). Everything runs against your own vector database, so data stays in-house.</Note>
+## Production notes
 
-## Features used
-
-[Document ingestion](/usage/sdk/ingestion#document-ingestion-parse) · [Storing](/features/storing) · [Chat](/features/chat)
+- Apply authorization in your application before calling chat or retrieval.
+- Keep separate collections for teams or permission boundaries when needed.
+- Keep a source-to-chunk manifest so removed files can be deleted cleanly.

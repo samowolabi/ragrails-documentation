@@ -1,0 +1,139 @@
+---
+title: "Overview"
+icon: "route"
+description: "How SDK extraction, chunking, embedding, storing, retrieval, chat, and maintenance fit together."
+---
+
+The SDK has an ingest pipeline that builds a searchable knowledge base, a query pipeline that searches it, and a chat path that answers with retrieved context. Maintenance keeps stored chunks aligned with changing sources.
+
+## Pipeline Map
+
+| Stage | SDK input | SDK output | Use it when |
+| --- | --- | --- | --- |
+| [Extraction](/usage/sdk/extraction) | Files, URLs, APIs, or Markdown | Normalized document dicts | You need source content in a common shape. |
+| [Chunking](/usage/sdk/chunking) | Document dicts or Markdown | Chunk dicts with IDs and metadata | You need retrieval-sized units. |
+| [Embedding](/usage/sdk/embedding) | Chunk dicts | Embedded chunk dicts | You need vectors for semantic search. |
+| [Storing](/usage/sdk/storing) | Embedded chunks | Stored vector IDs | You need a vector database index. |
+| [Retrieval](/usage/sdk/retrieval) | User query | Relevant chunks and scores | You need search results without generation. |
+| [Chat](/usage/sdk/chat) | User query and optional history | Grounded answer, sources, updated history | You need an answer over retrieved context. |
+| [Maintenance](/usage/sdk/knowledge-base-maintenance) | Changed or deleted source content | Replaced or removed chunk IDs | You need to keep the index fresh. |
+
+## Ingest Pipeline
+
+`rag.ingest()` runs extraction, chunking, embedding, and storage in one call.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="docs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.ingest(
+    docs="files/handbook.pdf",
+    urls={"url": "https://example.com/docs", "mode": "full", "max_pages": 25},
+    markdown=[{"text": "# Refunds\n\nRefunds are available within 30 days.", "source": "policy.md"}],
+    chunking={"chunk_size": 800, "chunk_overlap": 120},
+    embedding={"batch_size": 64},
+    storage={"collection": "docs", "batch_size": 64},
+)
+```
+
+Result summary:
+
+```python
+result.sources
+result.chunks
+result.embedded
+result.stored
+result.failed
+result.errors
+```
+
+## Manual Stage Pipeline
+
+Use the stage methods when you need to inspect or modify intermediate data.
+
+```python
+# Extraction
+sources = rag.parse(files=["files/refund-policy.pdf"])
+
+# Chunking
+chunks = rag.chunk(markdown=sources.outputs)
+
+# Embedding
+embedded = rag.embed(chunks=chunks.items)
+
+# Storing
+stored = rag.store(embedded_chunks=embedded.items)
+
+# Retrieval
+matches = rag.retrieve("How long do refunds take?", top_k=5)
+
+# Chat
+answer = rag.chat("How long do refunds take?", history=[])
+```
+
+## Query Pipeline
+
+`rag.query()` embeds the query and retrieves chunks. It does not generate an answer.
+
+```python
+result = rag.query(
+    "How do refunds work?",
+    retrieval={
+        "top_k": 20,
+        "rerank": {"enabled": True, "top_k": 5},
+    },
+)
+```
+
+The result is a retrieval result: `query`, `search_query`, `retrieved`, `items`, `failed`, and `errors`.
+
+## Chat Pipeline
+
+`rag.chat()` runs retrieval and generation together.
+
+```python
+history = []
+result = rag.chat(
+    "How do refunds work?",
+    history=history,
+    persona="Answer only from the provided support policy context.",
+)
+history = result.history
+```
+
+The result is a chat result: `answer`, `sources`, `history`, `retrieval`, `llm`, `errors`, `retrieval_quality`, `answer_confidence`, `compacted`, and `intent`.
+
+## Maintenance Loop
+
+Store a source-to-chunk manifest when you index long-lived content. On refresh, compare old IDs with new IDs and delete stale chunks.
+
+```python
+old_ids = set(manifest["policy.md"]["chunk_ids"])
+result = rag.ingest(markdown=[{"text": updated_policy, "source": "policy.md"}])
+new_ids = {item["id"] for item in result.store_result.items}
+
+if old_ids - new_ids:
+    rag.delete(ids=sorted(old_ids - new_ids))
+
+manifest["policy.md"] = {"chunk_ids": sorted(new_ids)}
+```
+
+## Choose the Entry Point
+
+| Need | Use |
+| --- | --- |
+| Build or refresh an index quickly | `rag.ingest()` |
+| Search without generation | `rag.query()` or `rag.retrieve()` |
+| Answer with sources and history | `rag.chat()` or `rag.chat_stream()` |
+| Maximum control over one stage | Stage methods: `parse`, `scrape`, `fetch`, `chunk`, `embed`, `store`, `retrieve`, `chat` |
+| Replace or remove stale chunks | `rag.edit()` and `rag.delete()` |
+
+<CardGroup cols={2}>
+  <Card title="Extraction" icon="file-input" href="/usage/sdk/extraction">Start with source inputs.</Card>
+  <Card title="Maintenance" icon="refresh-cw" href="/usage/sdk/knowledge-base-maintenance">Keep stored chunks fresh.</Card>
+</CardGroup>

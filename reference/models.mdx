@@ -4,13 +4,19 @@ icon: "table"
 description: "Every model Ragrails recognizes, with pricing and tool support."
 ---
 
-These are the built-in models. Pass any model name to `rag.llm(model=...)`; the provider is inferred from the name. Pricing is USD per 1M tokens.
+These are the models in Ragrails' built-in LLM catalog. For catalog models, `rag.llm(model=...)` can infer the provider from the model name. For a custom or newly released provider model, pass both `provider=` and `model=`.
 
-<Note>Models marked **Tools = ✗** don't support tool calling, so they can't be used with the interactive CLI's [agentic tools](/advanced/agentic-tools). This includes all Google Gemini models and the OpenAI `o`-series reasoning models.</Note>
+Pricing is USD per 1M tokens and reflects the package catalog, not a live provider lookup.
+
+<Warning>Provider model names, prices, and availability change. Verify this catalog against provider docs before publishing release material or quoting prices externally.</Warning>
+
+<Note>Models marked **Tools = ✗** don't support tool calling, so they can't be used with the interactive CLI's [agentic tools](/capabilities/agentic-tools). This includes all Google Gemini models and the OpenAI `o`-series reasoning models.</Note>
 
 ## OpenAI
 
 Built in. Set `OPENAI_API_KEY`.
+
+<Note>The default LLM model in the implementation is `gpt-4o`. Examples may choose `gpt-4o-mini` for lower-cost quickstarts.</Note>
 
 | Model | Input / 1M | Output / 1M | Tools |
 | --- | --- | --- | --- |
@@ -94,4 +100,4 @@ Set `VOYAGE_API_KEY`. Install with `pip install "ragrails[voyage]"`.
 | `voyage` | `rerank-2-lite` (default), `rerank-2` | API, set `VOYAGE_API_KEY` |
 | `bm25` | `bm25` | Local, no API key |
 
-<Note>Add your own models with `register_embedder()` / `register_reranker()`. See [extending providers](/reference/sdk#extending-providers).</Note>
+<Note>Embedding and reranker providers can be extended with `register_embedder()` and `register_reranker()`. Unknown LLM model names can be used when a supported `provider` is supplied explicitly.</Note>

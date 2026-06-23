@@ -1,0 +1,60 @@
+---
+title: "Knowledge Base Maintenance"
+icon: "refresh-cw"
+description: "Refresh and remove stored chunks over HTTP."
+---
+
+Use maintenance endpoints when source content changes and you do not want to rebuild the whole collection.
+
+| Operation | Endpoint | Use it for |
+| --- | --- | --- |
+| Re-ingest | `POST /v1/pipelines/ingest` | Refresh a whole source or collection slice. |
+| Edit | `POST /v1/edit` | Replace known chunk IDs after text changes. |
+| Delete | `POST /v1/delete` | Remove stale chunk IDs. |
+
+## Edit Chunks
+
+`POST /v1/edit` re-embeds updated chunk text and replaces existing points by ID.
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/edit \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chunks": [
+      {
+        "id": "refund-policy-0",
+        "text": "Customers can request a refund within 30 days of purchase.",
+        "metadata": {"source": "refund-policy.md"}
+      }
+    ],
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333"
+  }'
+```
+
+## Delete Chunks
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/delete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ids": ["refund-policy-0", "refund-policy-1"],
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333"
+  }'
+```
+
+## Maintenance Rules
+
+| Rule | Reason |
+| --- | --- |
+| Keep stable chunk IDs | `edit` and `delete` target exact IDs. |
+| Use the same embedding model for edits | Mixed embedding spaces reduce retrieval quality. |
+| Re-ingest when chunk boundaries change | Editing works best when IDs and chunk structure are stable. |
+| Delete removed source content | Retrieval can still surface stale chunks until they are removed. |
+
+See [REST Storing](/usage/server/storing) for the complete `store`, `edit`, and `delete` request fields.

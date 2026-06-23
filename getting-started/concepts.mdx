@@ -50,7 +50,7 @@ content → chunks → embeddings → vector store → retrieval → answer
 | **Reranking** | A second, smarter pass that reorders retrieved chunks by true relevance. |
 | **Grounding** | Forcing the LLM to answer from retrieved chunks, not its own memory. |
 
-## When you need the advanced features
+## When you need capabilities
 
 The basic pipeline works out of the box. Reach for these when you hit the matching problem:
 
@@ -60,7 +60,7 @@ The basic pipeline works out of the box. Reach for these when you hit the matchi
 | Chat follow-ups return nothing | [Query rewriting](/features/chat) | Expands *"what about the second one?"* into a standalone question. |
 | Long chats get slow or expensive | [History compaction](/features/chat) | Summarizes old turns, keeps recent ones. |
 | *"Thanks!"* triggers a pointless search | [Intent routing](/features/chat) | Skips retrieval for small talk. |
-| Crawls partly fail | [Dead-letter queue](/usage/sdk/ingestion#dead-letter-queue-dlq) | Records failures so you retry only those. |
+| Crawls partly fail | [Dead-letter queue](/usage/sdk/extraction#dead-letter-queue-dlq) | Records failures so you retry only those. |
 
 ## Next
 

@@ -1,24 +1,30 @@
 ---
 title: "AI Support Agent"
 icon: "headset"
-description: "A support bot that answers from your help docs and refuses when it shouldn't guess."
+description: "A support bot that answers from your help docs and refuses when it should not guess."
 ---
 
 ## The problem
 
-Support teams field the same questions over and over. Generic chatbots make it worse. They hallucinate answers that aren't in your policies, creating wrong expectations and more tickets.
+Support teams answer the same questions repeatedly. Generic chatbots make the problem worse when they invent refund rules, pricing terms, or policy exceptions that are not in your docs.
 
-## How Ragrails solves it
+## Why Ragrails fits
 
-Ground the bot in your real help content, and make it honest when it doesn't know.
+Ragrails gives you a grounded support workflow: ingest help content, retrieve the right chunks, rewrite follow-ups, and tune low-confidence behavior so the bot can answer carefully or refuse.
 
-1. **Ingest** your help center and policy docs into one collection.
-2. **Chat** with retrieval-quality guardrails so weak matches get a careful answer or a refusal, never a hallucination.
-3. **Rewrite** follow-up questions so multi-turn conversations stay on track.
+| Need | Ragrails capability |
+| --- | --- |
+| Help center plus policy files in one index | [Extraction](/features/extraction) and [Pipeline Overview](/features/pipeline-overview) |
+| Multi-turn support questions | [Query Rewriting](/capabilities/query-rewriting) |
+| Avoid hallucinated policy answers | [Chat Tuning](/capabilities/chat-tuning) |
+| Stream a responsive support UI | [Streaming](/capabilities/streaming) |
+| Keep policies current | [Knowledge Base Maintenance](/features/knowledge-base-maintenance) |
+
+## Sample
 
 <CodeGroup>
 ```python SDK
-from ragrails import RagRails
+from ragrails import ChatRetrievalQualityConfig, QueryRewriteConfig, RagRails
 
 rag = RagRails(
     collection="support",
@@ -26,44 +32,83 @@ rag = RagRails(
     embedding={"provider": "voyage", "model": "voyage-3"},
     llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-from ragrails import ChatRetrievalQualityConfig, QueryRewriteConfig
-rag.setup_url()
-rag.ingest(urls="https://help.example.com", docs={"folder": "files/policies/"})
+
+rag.ingest(
+    urls="https://help.example.com",
+    docs={"folder": "files/policies/"},
+    ingestion={"urls": {"mode": "full", "max_pages": 200}},
+    storage={"collection": "support"},
+)
+
 result = rag.chat(
     "Can I get a refund after 30 days?",
     history=[],
     query_rewrite=QueryRewriteConfig(enabled=True),
-    retrieval_quality=ChatRetrievalQualityConfig(low_confidence_mode="refuse_grounded_answer"),
+    retrieval_quality=ChatRetrievalQualityConfig(
+        low_confidence_mode="refuse_grounded_answer",
+        min_retrieval_score=0.35,
+    ),
 )
-print(result.answer, result.answer_confidence)
+
+print(result.answer)
+print(result.answer_confidence)
 ```
 
 ```bash CLI
-ragrails setup-url
+ragrails setup-url --browser chromium
+
 ragrails ingest \
   --source-url https://help.example.com \
   --folder files/policies/ \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --provider voyage --model voyage-3
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
 
 ragrails chat "Can I get a refund after 30 days?" \
   --rewrite-query \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --embedder-provider voyage \
+  --embedder-model voyage-3 \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini
 ```
 
 ```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
-  -d '{"urls": "https://help.example.com", "docs": {"folder": "files/policies/"}, "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}}' 
+  -d '{
+    "urls": "https://help.example.com",
+    "docs": {"folder": "files/policies/"},
+    "ingestion": {"urls": {"mode": "full", "max_pages": 200}},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
 
 curl -X POST http://127.0.0.1:8000/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{"query": "Can I get a refund after 30 days?", "query_rewrite": {"enabled": true}, "retrieval_quality": {"low_confidence_mode": "refuse_grounded_answer"}, "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333", "history": []}' 
+  -d '{
+    "query": "Can I get a refund after 30 days?",
+    "query_rewrite": {"enabled": true},
+    "retrieval_quality": {"low_confidence_mode": "refuse_grounded_answer", "min_retrieval_score": 0.35},
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "embedder_provider": "voyage",
+    "embedder_model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
 ```
 </CodeGroup>
 
-## Features used
+## Production notes
 
-[Extraction](/features/extraction) · [Chat](/features/chat) · [Answer quality](/advanced/chat-tuning#answer-quality) · [Query rewriting](/advanced/query-rewriting)
+- Persist `result.history` per customer session.
+- Display `result.sources` so agents and customers can inspect the policy source.
+- Use `answer_confidence` and `retrieval_quality` to route weak answers to a human.
+- Refresh changed policies with [Knowledge Base Maintenance](/features/knowledge-base-maintenance).

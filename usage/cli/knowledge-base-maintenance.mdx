@@ -1,0 +1,92 @@
+---
+title: "Knowledge Base Maintenance"
+icon: "refresh-cw"
+description: "Refresh, edit, and delete CLI-managed chunks as source content changes."
+---
+
+A CLI-managed RAG index goes stale when source content changes. Use `ragrails ingest` to rebuild sources, `ragrails edit` to replace known chunk IDs, and `ragrails delete` to remove stale IDs.
+
+## Refresh a Source
+
+For simple refreshes, run `ingest` again against the changed source. New chunks are upserted by ID.
+
+```bash
+ragrails ingest --docs files/refund-policy.pdf \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333
+```
+
+For long-lived indexes, keep your own manifest of source files and chunk IDs so you can delete IDs that are no longer produced.
+
+## Edit Known Chunks
+
+`edit` reads chunk dictionaries from JSON files, re-embeds them, and replaces stored chunks by exact ID.
+
+```bash
+ragrails edit \
+  --input-dir files/updated-chunks/ \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
+```
+
+Output:
+
+```text
+Requested  : 1
+Edited     : 1
+Failed     : 0
+Provider   : qdrant
+Collection : support
+```
+
+## Delete Stale Chunks
+
+```bash
+ragrails delete \
+  --id refund-policy-0 \
+  --id refund-policy-1 \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333
+```
+
+Deletes are exact-ID operations. They do not perform semantic matching.
+
+## Practical Manifest Pattern
+
+1. Save extraction/chunking output during ingest when you need auditability.
+2. Store the produced chunk IDs in your own manifest by source path or URL.
+3. On refresh, ingest or edit the changed source.
+4. Delete IDs from the old manifest that no longer exist in the new output.
+5. Run `ragrails query` to verify the expected chunks are retrieved.
+
+## Options
+
+### `edit`
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input-dir` | required | Folder containing edited chunk JSON files. |
+| `--vector-db` | `qdrant` | Vector DB provider. |
+| `--collection` | config or none | Collection, index, or class name. |
+| `--url` | config or none | Vector DB URL. |
+| `--provider` / `--model` | `voyage` / `voyage-3` | Embedding provider/model for re-embedding. |
+| `--batch-size` | `64` | Chunks per edit batch. |
+
+### `delete`
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--id` | required | Chunk ID to delete. Repeatable. |
+| `--vector-db` | `qdrant` | Vector DB provider. |
+| `--collection` | config or none | Collection, index, or class name. |
+| `--url` | config or none | Vector DB URL. |
+
+<CardGroup cols={2}>
+  <Card title="Storing" icon="database" href="/usage/cli/storing">Use store, edit, and delete directly.</Card>
+  <Card title="Retrieval" icon="search" href="/usage/cli/retrieval">Verify updated chunks.</Card>
+</CardGroup>

@@ -1,0 +1,108 @@
+---
+title: "Custom Providers"
+icon: "puzzle"
+description: "Register embedding and reranking providers that Ragrails does not bundle."
+---
+
+Ragrails ships with Voyage embeddings and Voyage/BM25 reranking. You can register additional embedding or reranking providers at application startup.
+
+## Register an embedder
+
+A custom embedder factory must return an object that implements the embedding model interface used by Ragrails. The factory receives `model_name`, `input_type`, and any provider options.
+
+```python SDK
+from ragrails.models.embedder.registry import register_embedder
+
+class MyEmbedder:
+    def __init__(self, model_name: str, input_type: str = "document", **options):
+        self.model_name = model_name
+        self.input_type = input_type
+        self.options = options
+
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        return my_embedding_api.embed(texts, model=self.model_name, input_type=self.input_type)
+
+register_embedder(
+    "my-provider",
+    MyEmbedder,
+    default_model="my-model",
+    models=("my-model", "my-model-large"),
+)
+```
+
+Use it anywhere an embedding provider is accepted:
+
+```python
+rag = RagRails(embedding={"provider": "my-provider", "model": "my-model"})
+embedded = rag.embed(chunks=chunks.items)
+results = rag.retrieve("refund policy")
+```
+
+## Register a reranker
+
+A custom reranker factory must return an object with `rerank(query, texts) -> list[float]`.
+
+```python SDK
+from ragrails.models.reranker.registry import register_reranker
+
+class MyReranker:
+    def __init__(self, model_name: str, **options):
+        self.model_name = model_name
+        self.options = options
+
+    def rerank(self, query: str, texts: list[str]) -> list[float]:
+        return my_rerank_api.score(query=query, documents=texts, model=self.model_name)
+
+register_reranker(
+    "my-reranker",
+    MyReranker,
+    default_model="my-rerank-model",
+    models=("my-rerank-model",),
+)
+```
+
+Use it in retrieval, query, or chat reranking:
+
+```python
+result = rag.retrieve(
+    "How do refunds work?",
+    top_k=20,
+    use_rerank=True,
+    reranker=rag.reranker(provider="my-reranker"),
+    rerank_top_k=5,
+)
+```
+
+## Replacement behavior
+
+Provider names must be unique unless you explicitly replace an existing registration.
+
+```python
+register_embedder(
+    "voyage",
+    MyVoyageCompatibleEmbedder,
+    default_model="voyage-3",
+    models=("voyage-3",),
+    replace=True,
+)
+```
+
+<Warning>Only use `replace=True` when you intentionally want to override a provider for the whole process.</Warning>
+
+## Built-ins
+
+| Type | Provider | Models |
+| --- | --- | --- |
+| Embedder | `voyage` | `voyage-3-lite`, `voyage-3`, `voyage-3-large` |
+| Reranker | `voyage` | `rerank-2-lite`, `rerank-2` |
+| Reranker | `bm25` | `bm25` |
+
+Register providers once at startup, before creating `RagRails` clients, embedders, rerankers, or long-running workers.
+
+## Related pages
+
+- [Reranking](/capabilities/reranking)
+- [Embedding](/features/embedding)
+- [Model Reference](/reference/models)
+- [Vector Databases](/reference/vector-databases)
+

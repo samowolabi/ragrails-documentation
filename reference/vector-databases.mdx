@@ -10,10 +10,10 @@ Ragrails stores embedded chunks in a vector database. Use the same provider, col
 
 | Provider | Use this value | Install extra | Default URL | Default collection | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Qdrant local | `qdrant` | `ragrails[qdrant]` | `http://localhost:6333` | `rag_chunks` | Good local default and quickstart path |
-| Qdrant Cloud | `qdrant_cloud` | `ragrails[qdrant]` | none | `rag_chunks` | Set `url` to your cloud endpoint and `QDRANT_API_KEY` |
-| Pinecone | `pinecone` | `ragrails[pinecone]` | none | `rag-chunks` | Uses `PINECONE_API_KEY` |
-| Weaviate | `weaviate` | `ragrails[weaviate]` | `http://localhost:8080` | `RagChunks` | Works with local or hosted Weaviate |
+| Qdrant local | `qdrant` | `ragrails[qdrant]` or `ragrails[store-qdrant]` | `http://localhost:6333` | `rag_chunks` | Good local default and quickstart path |
+| Qdrant Cloud | `qdrant_cloud` | `ragrails[qdrant]` or `ragrails[store-qdrant]` | none | `rag_chunks` | Set `url` to your cloud endpoint and `QDRANT_API_KEY` |
+| Pinecone | `pinecone` | `ragrails[pinecone]` or `ragrails[store-pinecone]` | none | `rag-chunks` | Uses `PINECONE_API_KEY` |
+| Weaviate | `weaviate` | `ragrails[weaviate]` or `ragrails[store-weaviate]` | `http://localhost:8080` | `RagChunks` | Works with local or hosted Weaviate |
 
 ## Where The Name Goes
 

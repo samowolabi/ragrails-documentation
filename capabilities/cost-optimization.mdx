@@ -1,0 +1,118 @@
+---
+title: "Cost Optimization"
+icon: "coins"
+description: "Reduce embedding, reranking, and LLM spend without giving up answer quality."
+---
+
+RAG cost comes from ingestion-time work and query-time work. Optimize them separately: ingestion cost is mostly embedding and storage, while query cost is retrieval, optional reranking, query rewriting, history compaction, and answer generation.
+
+<Note>Model prices and availability change. Treat the local [model catalog](/reference/models) as package metadata, then verify provider pricing before publishing a production cost estimate.</Note>
+
+## Query-time cost
+
+| Lever | How it saves cost | Tradeoff |
+| --- | --- | --- |
+| Intent routing | Skips retrieval and context construction for small talk. | Keep enabled unless you want every turn grounded. |
+| Query rewriting | Can improve follow-up retrieval. | Adds one LLM call when enabled. |
+| Reranking | Improves context precision. | Adds a reranker call unless using local `bm25`. |
+| `max_context_chunks` | Sends fewer chunks to the LLM. | Too low can omit needed evidence. |
+| `rerank_top_k` | Keeps only the best reranked chunks. | Requires a good initial `top_k`. |
+| History compaction | Summarizes old turns instead of resending long history. | Adds summarization when compaction triggers. |
+| `max_tokens` | Caps answer length. | Too low can truncate useful answers. |
+| Streaming | Improves perceived latency. | Does not reduce provider cost by itself. |
+
+Example chat config that keeps context bounded:
+
+```python SDK
+from ragrails import ChatRetrievalQualityConfig, HistoryCompactionConfig
+
+result = rag.chat(
+    "How do refunds work?",
+    history=history,
+    history_compaction=HistoryCompactionConfig(enabled=True, history_limit=15, keep_recent=5),
+    retrieval_quality=ChatRetrievalQualityConfig(
+        max_context_chunks=5,
+        low_confidence_mode="answer_with_caution",
+    ),
+)
+```
+
+## Ingestion-time cost
+
+| Lever | How it saves cost | Watch for |
+| --- | --- | --- |
+| Chunk size | Larger chunks reduce the number of embeddings. | Too large makes retrieval noisy. |
+| Chunk overlap | Lower overlap reduces duplicate tokens. | Too little overlap can split useful context. |
+| Embedding model | Lighter models usually cost less. | Quality may drop on nuanced domains. |
+| Batch size | Fewer API round trips. | Provider rate limits and payload limits. |
+| Stable IDs plus `edit()` | Re-embed only changed chunks. | Requires a source-to-chunk manifest. |
+| Source filters | Avoid indexing pages you never query. | Bad filters can omit needed content. |
+
+```python
+result = rag.ingest(
+    docs="files/handbook.pdf",
+    chunking={"chunk_size": 900, "chunk_overlap": 100},
+    embedding={"provider": "voyage", "model": "voyage-3-lite", "batch_size": 128},
+    storage={"collection": "docs"},
+)
+```
+
+## Reranking cost choices
+
+| Choice | Cost profile | Use when |
+| --- | --- | --- |
+| No reranking | Lowest query cost | Vector search quality is already acceptable. |
+| `bm25` reranking | Local, no provider call | Keyword match is important or budget is tight. |
+| Hosted semantic reranker | Extra model call | Relevance quality matters more than latency/cost. |
+
+```python
+# Local reranker option.
+result = rag.retrieve(
+    "refund window",
+    top_k=20,
+    use_rerank=True,
+    reranker=rag.reranker(provider="bm25"),
+    rerank_top_k=5,
+)
+```
+
+## Rewrite cost choices
+
+Query rewriting is useful for ambiguous follow-ups, but unnecessary for standalone questions.
+
+| Question shape | Rewrite? |
+| --- | --- |
+| "How do I authenticate?" | No. |
+| "What about annual plans?" | Yes, in multi-turn context. |
+| "Compare the first two options" | Yes. |
+| "refund policy" | Usually no. |
+
+Use a smaller LLM for rewrite when your final answer model is larger.
+
+## Maintenance savings
+
+Do not re-ingest everything for every source change. Use stable IDs and a source manifest.
+
+1. Re-ingest the changed source.
+2. Upsert new chunks by ID.
+3. Delete old IDs that disappeared.
+4. Leave unchanged sources untouched.
+
+See [Knowledge Base Maintenance](/features/knowledge-base-maintenance) for the full refresh loop.
+
+## Practical baseline
+
+| Workload | Baseline |
+| --- | --- |
+| Documentation assistant | `top_k=10`, no rerank initially, history compaction on. |
+| Support bot with strict answer quality | `top_k=20`, rerank to `5`, cap context chunks, cautious low-confidence mode. |
+| High-volume internal search | Start without chat generation; use [Retrieval](/features/retrieval) or [Query](/features/query). |
+| Long-lived index | Track source manifests and use `edit()` / `delete()` for deltas. |
+
+## Related pages
+
+- [Chat Tuning](/capabilities/chat-tuning)
+- [Reranking](/capabilities/reranking)
+- [Query Rewriting](/capabilities/query-rewriting)
+- [Knowledge Base Maintenance](/features/knowledge-base-maintenance)
+

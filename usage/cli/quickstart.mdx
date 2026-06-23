@@ -1,54 +1,143 @@
 ---
 title: "CLI Quickstart"
 icon: "zap"
-description: "Build a knowledge base and chat from the terminal."
+description: "Build a knowledge base, query it, and chat from the terminal."
 ---
 
-## 1. Install and start Qdrant
+This quickstart creates a small support knowledge base, stores it in Qdrant, retrieves the matching chunk, and asks an LLM for a grounded answer.
+
+Run the setup wizard early. The wizard is bare `ragrails` and writes `.ragrails.toml`; the workflow commands below use those saved defaults.
+
+## 1. Install
 
 ```bash
-pip install "ragrails[voyage,qdrant]"
+pip install "ragrails[store-qdrant]"
 export VOYAGE_API_KEY="..."
 export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-CLI defaults live in `.ragrails.toml` when you run the setup wizard (`ragrails` with no subcommand). The examples below pass explicit flags so they work without a config file.
+## 2. Run the Setup Wizard
 
-## 2. Build the index
+Run `ragrails` with no subcommand to save CLI defaults in `.ragrails.toml`:
+
+```bash
+ragrails
+```
+
+There is no `ragrails setup` subcommand. The setup wizard is the bare `ragrails` command. After it writes `.ragrails.toml`, you can omit repeated flags such as `--vector-db`, `--collection`, `--url`, `--provider`, and `--model`.
+
+For the quickstart stack, answer the wizard like this. Press Enter to accept blank defaults.
+
+<div style={{ background: "#0b0a0f", border: "1px solid #2a2a2a", borderRadius: "8px", padding: "16px", marginTop: "16px", marginBottom: "16px", overflowX: "auto", fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: "13px", lineHeight: "1.75", color: "#e5e7eb" }}>
+  <div style={{ minWidth: "720px" }}>
+    <div><span style={{ color: "#67e8f9", fontWeight: 700 }}>Ragrails setup</span></div>
+    <div><span style={{ color: "#94a3b8" }}>Configure project defaults for SDK-backed CLI commands.</span></div>
+    <div>&nbsp;</div>
+    <div><span style={{ color: "#60a5fa", fontWeight: 700 }}>1. Vector store</span></div>
+    <div><span>Vector database provider </span><span style={{ color: "#a78bfa" }}>(qdrant, qdrant_cloud, pinecone, weaviate)</span><span> </span><span style={{ color: "#facc15" }}>[qdrant]</span><span>:</span></div>
+    <div><span>Collection name </span><span style={{ color: "#facc15" }}>[docs]</span><span>: </span><span style={{ color: "#86efac" }}>support</span></div>
+    <div><span>Vector database URL: </span><span style={{ color: "#86efac" }}>http://localhost:6333</span></div>
+    <div>&nbsp;</div>
+    <div><span style={{ color: "#60a5fa", fontWeight: 700 }}>2. Embedding</span></div>
+    <div><span>Embedding provider </span><span style={{ color: "#facc15" }}>[voyage]</span><span>:</span></div>
+    <div><span>Embedding model </span><span style={{ color: "#facc15" }}>[voyage-3]</span><span>:</span></div>
+    <div>&nbsp;</div>
+    <div><span style={{ color: "#60a5fa", fontWeight: 700 }}>3. LLM</span></div>
+    <div><span>LLM provider </span><span style={{ color: "#a78bfa" }}>(openai, anthropic, google)</span><span> </span><span style={{ color: "#facc15" }}>[openai]</span><span>:</span></div>
+    <div><span>LLM model </span><span style={{ color: "#facc15" }}>[package default]</span><span>: </span><span style={{ color: "#86efac" }}>gpt-4o-mini</span></div>
+    <div><span>LLM max tokens </span><span style={{ color: "#facc15" }}>[1024]</span><span>:</span></div>
+    <div>&nbsp;</div>
+    <div><span style={{ color: "#60a5fa", fontWeight: 700 }}>4. Reranking</span></div>
+    <div><span>Enable reranker? </span><span style={{ color: "#facc15" }}>[y/N]</span><span>:</span></div>
+    <div>&nbsp;</div>
+    <div><span>Configure advanced defaults? </span><span style={{ color: "#facc15" }}>[y/N]</span><span>:</span></div>
+  </div>
+</div>
+
+Your installed package may display a concrete default in the `LLM model` prompt; type `gpt-4o-mini` for this quickstart.
+
+The wizard previews the config, writes `.ragrails.toml`, and prints the environment variables needed by the selected providers. With the answers above, the saved config is:
+
+```toml
+[vector_store]
+provider = "qdrant"
+collection = "support"
+url = "http://localhost:6333"
+
+[embedding]
+provider = "voyage"
+model = "voyage-3"
+
+[llm]
+provider = "openai"
+model = "gpt-4o-mini"
+max_tokens = 1024
+
+[reranker]
+enabled = false
+provider = "voyage"
+model = "rerank-2-lite"
+```
+
+For website extraction, `setup-url` is separate browser setup:
+
+```bash
+pip install "ragrails[url,store-qdrant]"
+ragrails setup-url --browser chromium
+```
+
+## 3. Ingest
 
 ```bash
 ragrails ingest \
-  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase. Refunds are returned to the original payment method within 5 business days." \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --provider voyage --model voyage-3
+  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase. Refunds are returned to the original payment method within 5 business days."
 ```
 
-<Tip>Prefer control over each step? Run the stages separately and pass JSON between them. See the [CLI Overview](/usage/cli/overview#stage-based-workflow).</Tip>
+Use other source types with the same workflow:
 
-## 3. Query
+<CodeGroup>
+```bash Documents
+ragrails ingest --docs files/refund-policy.pdf
+
+ragrails ingest --folder files/policies
+```
+
+```bash Website
+ragrails setup-url --browser chromium
+ragrails ingest --source-url https://example.com/help/refunds
+```
+
+```bash REST API
+ragrails ingest --api-url https://api.example.com/refund-policy
+```
+</CodeGroup>
+
+## 4. Query
 
 ```bash
-ragrails query "How long do I have to request a refund?" \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --provider voyage --model voyage-3 \
-  --top-k 5
+ragrails query "How long do I have to request a refund?" --top-k 5
 ```
 
-## 4. Chat
+## 5. Chat
 
 ```bash
-ragrails chat "How long do I have to request a refund?" \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+ragrails chat "How long do I have to request a refund?"
 ```
 
-Run `ragrails chat` with no question to start the interactive session. For an already-built collection, keep the same target in `.ragrails.toml` or pass the same flags on one-shot commands.
+Expected answer:
+
+```text
+You can request a refund within 30 days of purchase.
+```
+
+Run `ragrails chat` with no question to start the interactive session.
 
 ## Next
 
 <CardGroup cols={2}>
-  <Card title="CLI Overview" icon="list" href="/usage/cli/overview">Every command.</Card>
-  <Card title="Interactive chat" icon="terminal" href="/usage/cli/chat">Slash commands and agentic tools.</Card>
+  <Card title="Ingest" icon="package-plus" href="/usage/cli/ingest">Learn the full CLI ingest workflow.</Card>
+  <Card title="Query" icon="search-check" href="/usage/cli/query">Search and chat over a stored collection.</Card>
+  <Card title="Overview" icon="route" href="/usage/cli/pipeline-overview">See every CLI pipeline stage.</Card>
+  <Card title="Doctor" icon="stethoscope" href="/usage/cli/doctor">Validate your environment.</Card>
 </CardGroup>

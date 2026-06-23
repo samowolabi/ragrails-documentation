@@ -1,10 +1,16 @@
 ---
-title: "Website to RAG"
+title: "Build From a Website"
 icon: "globe"
-description: "Build a RAG collection from a website, end to end."
+description: "Crawl a website, store it, then search or chat over it."
 ---
 
-## 1. Install and set up
+Use this walkthrough when the source of truth is a public or internal website: documentation, help centers, marketing pages, handbooks, or knowledge portals.
+
+## What you will build
+
+A `website` collection in your vector database, backed by crawled pages from `https://example.com`, with retrieval and chat on top.
+
+## Prerequisites
 
 ```bash
 pip install "ragrails[url,voyage,qdrant]"
@@ -13,9 +19,13 @@ export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-## 2. Crawl, query, and chat
+URL crawling uses a browser runtime. Install one once:
 
-All three versions crawl `https://example.com` into the `website` collection.
+```bash
+ragrails setup-url --browser chromium
+```
+
+## 1. Ingest the website
 
 <CodeGroup>
 ```python SDK
@@ -27,34 +37,27 @@ rag = RagRails(
     embedding={"provider": "voyage", "model": "voyage-3"},
     llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-rag.setup_url()
 
 result = rag.ingest(
     urls="https://example.com",
     ingestion={"urls": {"mode": "full", "max_depth": 3, "max_pages": 200}},
+    chunking={"chunk_size": 900, "chunk_overlap": 120},
+    storage={"collection": "website"},
 )
-print(f"Stored {result.stored} chunks from {result.sources} pages")
 
-rag.query("What does the site say about pricing?", retrieval={"top_k": 5})
-rag.chat("Summarize the pricing tiers", history=[])
+print(result.sources, result.chunks, result.stored)
 ```
 
 ```bash CLI
-ragrails setup-url
-
 ragrails ingest \
   --source-url https://example.com \
-  --vector-db qdrant --collection website --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-
-ragrails query "What does the site say about pricing?" \
-  --vector-db qdrant --collection website --url http://localhost:6333 \
-  --provider voyage --model voyage-3 --top-k 5
-
-ragrails chat "Summarize the pricing tiers" \
-  --vector-db qdrant --collection website --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+  --vector-db qdrant \
+  --collection website \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --chunk-size 900 \
+  --chunk-overlap 120
 ```
 
 ```bash REST API
@@ -63,30 +66,77 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -d '{
     "urls": "https://example.com",
     "ingestion": {"urls": {"mode": "full", "max_depth": 3, "max_pages": 200}},
+    "chunking": {"chunk_size": 900, "chunk_overlap": 120},
     "embedding": {"provider": "voyage", "model": "voyage-3"},
     "storage": {"vector_db": "qdrant", "collection": "website", "url": "http://localhost:6333"}
   }'
+```
+</CodeGroup>
 
+<Tip>For long crawls, use [Streaming](/capabilities/streaming): `rag.scrape_stream(...)` or `POST /v1/ingest/url/stream`.</Tip>
+
+## 2. Verify retrieval
+
+<CodeGroup>
+```python SDK
+result = rag.query(
+    "What does the site say about pricing?",
+    retrieval={"top_k": 10, "rerank": {"enabled": True, "top_k": 5}},
+)
+
+for item in result.items:
+    print(item.rerank_score, item.metadata.get("title"), item.text[:120])
+```
+
+```bash CLI
+ragrails query "What does the site say about pricing?" \
+  --vector-db qdrant \
+  --collection website \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --top-k 10 \
+  --rerank \
+  --rerank-top-k 5
+```
+
+```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
   -H "Content-Type: application/json" \
   -d '{
     "query": "What does the site say about pricing?",
     "embedding": {"provider": "voyage", "model": "voyage-3"},
-    "retrieval": {"vector_db": "qdrant", "collection": "website", "url": "http://localhost:6333", "top_k": 5}
-  }'
-
-curl -X POST http://127.0.0.1:8000/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Summarize the pricing tiers",
-    "llm_provider": "openai",
-    "llm_model": "gpt-4o-mini",
-    "embedder_provider": "voyage",
-    "embedder_model": "voyage-3",
-    "vector_db": "qdrant",
-    "collection": "website",
-    "url": "http://localhost:6333",
-    "history": []
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "website",
+      "url": "http://localhost:6333",
+      "top_k": 10,
+      "rerank": {"enabled": true, "top_k": 5}
+    }
   }'
 ```
 </CodeGroup>
+
+## 3. Add chat
+
+```python
+history = []
+answer = rag.chat(
+    "Summarize the pricing tiers.",
+    history=history,
+    persona="Answer only from the crawled website context.",
+)
+print(answer.answer)
+print(answer.sources)
+```
+
+## Keep it current
+
+Websites change. Re-crawl on a schedule, store new chunks, and delete stale IDs using [Knowledge Base Maintenance](/features/knowledge-base-maintenance).
+
+## Next steps
+
+- [Extraction](/features/extraction)
+- [Reranking](/capabilities/reranking)
+- [Streaming](/capabilities/streaming)
+- [Documentation Assistant](/use-cases/documentation-assistant)

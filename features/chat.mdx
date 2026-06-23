@@ -4,37 +4,42 @@ icon: "messages-square"
 description: "Answer questions grounded in your data."
 ---
 
-Chat is part of the [Query](/features/query) workflow. It runs retrieval and answer generation together, with conversation history.
+Chat is part of the [Query](/features/query) workflow. It retrieves relevant chunks, builds grounded context, calls an LLM, and returns an answer with sources, updated history, confidence metadata, and any stage errors.
 
-## Interface Docs
-
-Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+Use this page to understand chat behavior. Use the interface-specific pages when you need exact parameters, flags, request fields, or response shapes.
 
 - [SDK chat](/usage/sdk/chat)
 - [CLI chat](/usage/cli/chat)
 - [REST chat](/usage/server/chat)
 
+<Note>Chat is stateless. Ragrails does not persist conversations. Pass `history` into each turn and store the returned `history` wherever your application keeps session state.</Note>
+
+## Basic chat
+
 <CodeGroup>
 ```python SDK
-result = rag.chat("How do I authenticate?", history=[])
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="docs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
+)
+
+history = []
+result = rag.chat("How do I authenticate?", history=history)
 print(result.answer)
 
-for event in rag.chat_stream("How do I authenticate?", history=[]):
-    if event["type"] == "token":
-        print(event["data"]["text"], end="")
+history = result.history
 ```
 
 ```bash CLI
-ragrails chat "How do I authenticate?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+ragrails chat "How do I authenticate?"   --vector-db qdrant   --collection docs   --url http://localhost:6333   --embedder-provider voyage   --embedder-model voyage-3   --llm-provider openai   --llm-model gpt-4o-mini   --history-file files/chat-history.json
 ```
 
 ```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{
+curl -X POST http://127.0.0.1:8000/v1/chat   -H "Content-Type: application/json"   -d '{
     "query": "How do I authenticate?",
     "llm_provider": "openai",
     "llm_model": "gpt-4o-mini",
@@ -45,35 +50,223 @@ curl -X POST http://127.0.0.1:8000/v1/chat \
     "url": "http://localhost:6333",
     "history": []
   }'
-
-curl -N -X POST http://127.0.0.1:8000/v1/chat/stream \
-  -H "Content-Type: application/json" \
-  -d '{"query":"How do I authenticate?","collection":"docs"}'
 ```
 </CodeGroup>
 
-<Note>Streaming emits progress, token, error, and final events for normal RAG chat. Agentic tool-call streaming is not currently covered.</Note>
+Result:
 
-
-
-<CodeGroup>
-```json Response
+```json
 {
   "answer": "Create an API key and include it as a Bearer token in the Authorization header.",
+  "sources": [
+    {
+      "id": "auth#overview",
+      "title": "Authentication",
+      "score": 0.84,
+      "metadata": {"source": "docs/auth.md"}
+    }
+  ],
   "history": [
     {"role": "user", "content": "How do I authenticate?"},
     {"role": "assistant", "content": "Create an API key and include it as a Bearer token in the Authorization header."}
   ],
-  "sources": [
-    {"id": "auth#overview", "score": 0.84, "metadata": {"title": "Authentication"}}
-  ],
-  "intent": "rag",
-  "answer_confidence": {"level": "high", "reason": "retrieval_quality_pass"}
+  "retrieval": {
+    "query": "How do I authenticate?",
+    "search_query": "How do I authenticate?",
+    "retrieved": 3,
+    "failed": 0,
+    "outputs": [],
+    "errors": []
+  },
+  "llm": {"provider": "openai", "model": "gpt-4o-mini"},
+  "errors": [],
+  "retrieval_quality": {"status": "passed", "passed_chunks": 3},
+  "answer_confidence": {"level": "high", "reason": "retrieval_quality_pass"},
+  "compacted": false,
+  "intent": "rag"
 }
+```
+
+| Key | Meaning |
+| --- | --- |
+| `answer` | Generated response. Empty when retrieval or generation fails before an answer can be produced. |
+| `sources` | Source chunks used to build the grounded prompt. Use this for citations. |
+| `history` | Updated chat history. Persist it and pass it into the next turn. |
+| `retrieval` | Raw retrieval stage summary, including `search_query`, counts, outputs, and retrieval errors. |
+| `llm` | LLM provider metadata returned by the generation stage. |
+| `errors` | Chat, retrieval, quality, or generation errors. |
+| `retrieval_quality` | Quality gate status after retrieval. |
+| `answer_confidence` | UI-friendly confidence level and reason. |
+| `compacted` | Whether old history was summarized during the turn. |
+| `intent` | `"rag"` for retrieval-backed answers, or a direct intent such as greeting/thanks when retrieval is bypassed. |
+
+## Streaming
+
+`chat_stream()` yields progress events, token events, error events, and one final event containing the same `ChatResult` shape.
+
+<CodeGroup>
+```python SDK
+for event in rag.chat_stream("How do I authenticate?", history=[]):
+    if event["type"] == "token":
+        print(event["data"]["text"], end="")
+    elif event["type"] == "final":
+        result = event["data"]
+```
+
+```bash CLI
+# The CLI chat command prints the completed answer.
+ragrails chat "How do I authenticate?"   --vector-db qdrant   --collection docs   --url http://localhost:6333
+```
+
+```bash REST API
+curl -N -X POST http://127.0.0.1:8000/v1/chat/stream   -H "Content-Type: application/json"   -d '{
+    "query": "How do I authenticate?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
 ```
 </CodeGroup>
 
-## Possible Errors
+Example event sequence:
+
+```json
+{"type":"progress","stage":"chat","message":"Chat started","data":{"query":"How do I authenticate?"},"sequence":1}
+{"type":"progress","stage":"retrieval","message":"Retrieval complete","data":{"retrieved":3,"failed":0,"search_query":"How do I authenticate?"},"sequence":3}
+{"type":"token","stage":"generation","message":"","data":{"text":"Create"},"sequence":5}
+{"type":"final","stage":"complete","message":"Chat complete","data":{"answer":"Create an API key..."},"sequence":32}
+```
+
+## Conversation features
+
+| Feature | Default | What it does |
+| --- | --- | --- |
+| History compaction | Enabled | Summarizes older turns when history grows past `history_limit`, keeping recent turns intact. |
+| Query rewriting | Disabled | Rewrites follow-ups into standalone search queries before retrieval. |
+| Intent routing | Enabled | Bypasses retrieval for simple greetings, thanks, farewells, and acknowledgements. |
+| Retrieval quality | Enabled | Filters weak context and controls low-confidence answer behavior. |
+| Reranking | Disabled | Reorders retrieved chunks before the answer prompt is built. |
+
+## Query rewriting
+
+Use query rewriting when follow-up questions need previous context to search correctly.
+
+<CodeGroup>
+```python SDK
+from ragrails import QueryRewriteConfig
+
+result = rag.chat(
+    "What about the second step?",
+    history=history,
+    query_rewrite=QueryRewriteConfig(
+        enabled=True,
+        session_context="The user is asking about onboarding setup.",
+    ),
+)
+```
+
+```bash CLI
+ragrails chat "What about the second step?"   --history-file files/chat-history.json   --rewrite-query   --rewrite-session-context "The user is asking about onboarding setup."   --vector-db qdrant   --collection docs   --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat   -H "Content-Type: application/json"   -d '{
+    "query": "What about the second step?",
+    "query_rewrite": {
+      "enabled": true,
+      "session_context": "The user is asking about onboarding setup."
+    },
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+</CodeGroup>
+
+## Reranked chat
+
+Reranking retrieves a wider candidate set, reorders it, and keeps the top reranked chunks for answer generation.
+
+<CodeGroup>
+```python SDK
+from ragrails.core.stg_05_retriever import RetrieverConfig
+
+result = rag.chat(
+    "What is the refund window?",
+    history=history,
+    retrieval_config=RetrieverConfig(use_rerank=True, rerank_top_k=5),
+)
+```
+
+```bash CLI
+ragrails chat "What is the refund window?"   --vector-db qdrant   --collection docs   --url http://localhost:6333   --rerank   --reranker voyage   --reranker-model rerank-2-lite   --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat   -H "Content-Type: application/json"   -d '{
+    "query": "What is the refund window?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "rerank": true,
+    "reranker": "voyage",
+    "reranker_model": "rerank-2-lite",
+    "rerank_top_k": 5,
+    "history": []
+  }'
+```
+</CodeGroup>
+
+## Retrieval quality
+
+Retrieval quality decides how chat behaves when the retrieved context is weak.
+
+<CodeGroup>
+```python SDK
+from ragrails import ChatRetrievalQualityConfig
+
+result = rag.chat(
+    "Can I get a refund after 30 days?",
+    history=history,
+    retrieval_quality=ChatRetrievalQualityConfig(
+        min_retrieval_score=0.35,
+        min_rerank_score=0.50,
+        low_confidence_mode="answer_with_caution",
+        max_context_chunks=5,
+    ),
+)
+```
+
+```bash CLI
+# The CLI does not expose retrieval-quality thresholds yet.
+ragrails chat "Can I get a refund after 30 days?"   --vector-db qdrant   --collection docs   --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat   -H "Content-Type: application/json"   -d '{
+    "query": "Can I get a refund after 30 days?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "retrieval_quality": {
+      "min_retrieval_score": 0.35,
+      "min_rerank_score": 0.50,
+      "low_confidence_mode": "answer_with_caution",
+      "max_context_chunks": 5
+    },
+    "history": []
+  }'
+```
+</CodeGroup>
+
+Low-confidence modes:
+
+| Mode | Behavior |
+| --- | --- |
+| `answer_with_caution` | Generate an answer, but confidence is low and the prompt asks for caution. |
+| `ask_clarifying_question` | Ask the user for a narrower question. |
+| `refuse_grounded_answer` | Refuse to answer from weak context. |
+| `return_no_answer` | Return an empty answer and a quality error. |
+
+## Possible errors
 
 Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
 
@@ -95,9 +288,10 @@ Most stage-level failures are returned in the result `errors` list instead of ra
       "attempts": 1
     }
   ],
-  "intent": "rag",
   "retrieval_quality": {"status": "not_evaluated"},
-  "answer_confidence": {"level": "none", "reason": "errors"}
+  "answer_confidence": {"level": "none", "reason": "errors"},
+  "compacted": false,
+  "intent": "rag"
 }
 ```
 
@@ -132,32 +326,10 @@ Most stage-level failures are returned in the result `errors` list instead of ra
       "attempts": 1
     }
   ],
-  "intent": "rag",
   "retrieval_quality": {"status": "not_evaluated"},
-  "answer_confidence": {"level": "none", "reason": "errors"}
-}
-```
-
-```json Generation failure
-{
-  "answer": "",
-  "sources": [],
-  "history": [{"role": "user", "content": "How do I authenticate?"}],
-  "retrieval": {"retrieved": 1, "failed": 0, "outputs": [], "errors": []},
-  "llm": {},
-  "errors": [
-    {
-      "source": "",
-      "source_kind": "chat",
-      "stage": "generate",
-      "error": "OPENAI_API_KEY environment variable not set",
-      "isRetryable": true,
-      "attempts": 1
-    }
-  ],
-  "intent": "rag",
-  "retrieval_quality": {"status": "not_evaluated"},
-  "answer_confidence": {"level": "none", "reason": "errors"}
+  "answer_confidence": {"level": "none", "reason": "errors"},
+  "compacted": false,
+  "intent": "rag"
 }
 ```
 
@@ -178,137 +350,16 @@ Most stage-level failures are returned in the result `errors` list instead of ra
       "attempts": 1
     }
   ],
-  "intent": "rag",
   "retrieval_quality": {"status": "low_confidence", "mode": "return_no_answer", "passed_chunks": 0},
-  "answer_confidence": {"level": "none", "reason": "retrieval_quality_low_confidence"}
+  "answer_confidence": {"level": "none", "reason": "retrieval_quality_low_confidence"},
+  "compacted": false,
+  "intent": "rag"
 }
 ```
 </CodeGroup>
 
-<Note>**Chat is stateless.** Ragrails never stores conversations. You pass `history` in and get the updated `history` back, so you decide where it lives.</Note>
+## Next steps
 
-## Tuning knobs
-
-| Symptom | Config | What it does |
-| --- | --- | --- |
-| Follow-ups miss context | `QueryRewriteConfig` | Expands follow-ups into standalone questions. |
-| Long chats slow / costly | `HistoryCompactionConfig` | Summarizes old turns, keeps recent ones. |
-| Small talk triggers search | `IntentRoutingConfig` | Skips retrieval for non-questions. |
-| Model answers with weak context | `ChatRetrievalQualityConfig` | Sets confidence thresholds; answers with caution or refuses. |
-
-### Query rewriting
-
-<CodeGroup>
-```python SDK
-from ragrails import QueryRewriteConfig
-rag.chat("What about the second step?", history=history, query_rewrite=QueryRewriteConfig(enabled=True))
-```
-
-```bash CLI
-ragrails chat "What about the second step?" \
-  --history-file files/chat-history.json \
-  --rewrite-query \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
-```
-
-```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "What about the second step?",
-    "query_rewrite": {"enabled": true},
-    "llm_provider": "openai",
-    "llm_model": "gpt-4o-mini",
-    "embedder_provider": "voyage",
-    "embedder_model": "voyage-3",
-    "vector_db": "qdrant",
-    "collection": "docs",
-    "url": "http://localhost:6333",
-    "history": []
-  }'
-```
-</CodeGroup>
-
-<CodeGroup>
-```json Response
-{
-  "answer": "The second step is to invite your team.",
-  "history": [
-    {"role": "user", "content": "What about the second step?"},
-    {"role": "assistant", "content": "The second step is to invite your team."}
-  ],
-  "sources": [{"id": "onboarding#step-2", "score": 0.81}],
-  "intent": "rag",
-  "answer_confidence": {"level": "high", "reason": "retrieval_quality_pass"}
-}
-```
-</CodeGroup>
-
-### Retrieval quality
-
-<CodeGroup>
-```python SDK
-from ragrails import ChatRetrievalQualityConfig
-rag.chat(
-    query,
-    history=history,
-    retrieval_quality=ChatRetrievalQualityConfig(
-        min_retrieval_score=0.35,
-        low_confidence_mode="answer_with_caution",
-    ),
-)
-```
-
-```bash CLI
-ragrails chat "$QUERY" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
-```
-
-```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "Can I get a refund after 30 days?",
-    "retrieval_quality": {"min_retrieval_score": 0.35, "low_confidence_mode": "answer_with_caution"},
-    "llm_provider": "openai",
-    "llm_model": "gpt-4o-mini",
-    "embedder_provider": "voyage",
-    "embedder_model": "voyage-3",
-    "vector_db": "qdrant",
-    "collection": "docs",
-    "url": "http://localhost:6333",
-    "history": []
-  }'
-```
-</CodeGroup>
-
-<CodeGroup>
-```json Response
-{
-  "answer": "I found related policy context, but it does not clearly confirm refunds after 30 days.",
-  "history": [
-    {"role": "user", "content": "Can I get a refund after 30 days?"},
-    {"role": "assistant", "content": "I found related policy context, but it does not clearly confirm refunds after 30 days."}
-  ],
-  "sources": [{"id": "refunds#policy", "score": 0.36}],
-  "intent": "rag",
-  "answer_confidence": {"level": "low", "reason": "retrieval_quality_low_confidence"}
-}
-```
-</CodeGroup>
-
-<Note>The CLI does not expose retrieval-quality thresholds yet; use SDK or REST when you need those controls.</Note>
-
-## What you get back
-
-| Field | Use it for |
-| --- | --- |
-| `answer` | The grounded reply |
-| `history` | Pass to the next turn |
-| `sources` | Show citations |
-| `intent` | `"rag"` or `"direct"` |
-| `answer_confidence` | Flag low-confidence answers in your UI |
+- Use [Retrieval](/features/retrieval) when you want chunks without answer generation.
+- Use [Pipeline Overview](/features/pipeline-overview) to see how chat fits into the full RAG flow.
+- Use [Chat Tuning](/capabilities/chat-tuning) for deeper quality and prompt behavior.

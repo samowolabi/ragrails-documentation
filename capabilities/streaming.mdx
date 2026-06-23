@@ -1,0 +1,164 @@
+---
+title: "Streaming"
+icon: "radio"
+description: "Stream crawl progress, chat progress, tokens, errors, and final results."
+---
+
+Streaming is a Ragrails capability for long-running or interactive workflows. Instead of waiting for one final response, callers can receive structured events while ingestion or chat is running.
+
+Use streaming when you need live progress, token-by-token chat output, responsive UIs, or observability during slow crawls and retrieval-backed generation.
+
+## What streams today
+
+| Workflow | SDK | REST API | CLI |
+| --- | --- | --- | --- |
+| URL scraping | `rag.scrape_stream(...)` | `POST /v1/ingest/url/stream` | Not exposed as a stream command. |
+| RAG chat | `rag.chat_stream(...)` | `POST /v1/chat/stream` | Interactive `ragrails chat` REPL can stream answers. |
+
+<Note>Streaming endpoints emit progress before the final result. The final event contains the same aggregate result shape as the non-streaming workflow.</Note>
+
+## Event shape
+
+SDK streaming yields dictionaries. REST streaming sends the same dictionaries as Server-Sent Events (`text/event-stream`).
+
+```json
+{
+  "type": "progress",
+  "stage": "retrieval",
+  "message": "Retrieval complete",
+  "data": {
+    "retrieved": 3,
+    "failed": 0,
+    "search_query": "How do I authenticate?"
+  },
+  "sequence": 3
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `type` | Event kind, such as `progress`, `token`, `error`, `page`, or `final`. |
+| `stage` | Pipeline stage that emitted the event. |
+| `message` | Human-readable status text. |
+| `data` | Stage-specific payload. |
+| `sequence` | Monotonic event number for ordering. |
+
+REST SSE frames wrap the event in an SSE `event:` line and a JSON `data:` line.
+
+```text
+event: token
+data: {"type":"token","stage":"generation","data":{"text":"Create"},"sequence":7}
+```
+
+## Chat streaming
+
+`chat_stream()` runs normal RAG chat and streams progress, generated tokens, errors, and the final `ChatResult`.
+
+<CodeGroup>
+```python SDK
+for event in rag.chat_stream("How do I authenticate?", history=[]):
+    if event["type"] == "progress":
+        print(event["stage"], event["message"])
+    elif event["type"] == "token":
+        print(event["data"]["text"], end="")
+    elif event["type"] == "final":
+        result = event["data"]
+```
+
+```bash REST API
+curl -N -X POST http://127.0.0.1:8000/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
+```
+</CodeGroup>
+
+Typical chat event sequence:
+
+```json
+{"type":"progress","stage":"chat","message":"Chat started","data":{"query":"How do I authenticate?"},"sequence":1}
+{"type":"progress","stage":"intent","message":"Intent detected","data":{"intent":"rag"},"sequence":2}
+{"type":"progress","stage":"retrieval","message":"Retrieval started","data":{},"sequence":3}
+{"type":"progress","stage":"retrieval","message":"Retrieval complete","data":{"retrieved":3,"failed":0,"search_query":"How do I authenticate?"},"sequence":4}
+{"type":"progress","stage":"quality","message":"Retrieval quality evaluated","data":{"status":"pass","passed_chunks":3},"sequence":5}
+{"type":"progress","stage":"generation","message":"Generation started","data":{},"sequence":6}
+{"type":"token","stage":"generation","message":"","data":{"text":"Create"},"sequence":7}
+{"type":"final","stage":"complete","message":"Chat complete","data":{"answer":"Create an API key..."},"sequence":42}
+```
+
+## URL scrape streaming
+
+`scrape_stream()` is for long crawls where the caller should see page progress and errors before the crawl finishes.
+
+<CodeGroup>
+```python SDK
+for event in rag.scrape_stream("https://example.com/docs", mode="full", max_pages=50):
+    if event["type"] == "page":
+        print("scraped", event["data"]["url"])
+    elif event["type"] == "error":
+        print("error", event["message"])
+    elif event["type"] == "final":
+        result = event["data"]
+```
+
+```bash REST API
+curl -N -X POST http://127.0.0.1:8000/v1/ingest/url/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/docs",
+    "mode": "full",
+    "max_pages": 50
+  }'
+```
+</CodeGroup>
+
+URL scrape streams can emit:
+
+| Event type | Meaning |
+| --- | --- |
+| `progress` | Crawl setup or stage progress. |
+| `page` | One page was scraped successfully. |
+| `error` | A page or crawl step failed. |
+| `final` | Aggregate scrape result with `pages`, `failed`, `outputs`, and `errors`. |
+
+<Note>`scrape_stream()` does not accept a DLQ argument today. Use non-streaming `scrape(..., dlq=...)` when you need DLQ collection for retryable failures.</Note>
+
+## Interactive CLI streaming
+
+Run the interactive chat with no query argument:
+
+```bash CLI
+ragrails chat
+```
+
+Inside the REPL, use:
+
+```text
+/stream on
+/stream off
+```
+
+The one-shot command `ragrails chat "..."` prints the completed answer. It does not expose structured stream events.
+
+## Boundaries
+
+| Boundary | Current behavior |
+| --- | --- |
+| Agentic tools | `chat_stream()` covers normal RAG chat, not agentic tool-call execution. |
+| CLI one-shot chat | Prints the final answer rather than event frames. |
+| REST transport | Uses Server-Sent Events, not WebSockets. |
+| Final result | Always read the final event if you need updated history, sources, errors, and confidence metadata. |
+
+## Related pages
+
+- [Chat](/features/chat)
+- [Extraction](/features/extraction)
+- [Resilient Ingestion](/capabilities/resilient-ingestion)
+- [SDK chat](/usage/sdk/chat)
+- [REST chat](/usage/server/chat)
+- [SDK ingestion](/usage/sdk/extraction)
+- [REST extraction](/usage/server/extraction)

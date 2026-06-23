@@ -1,0 +1,206 @@
+---
+title: "Reranking"
+icon: "arrow-up-narrow-wide"
+description: "Use a second relevance pass to reorder retrieved chunks."
+---
+
+Vector search is fast, but it only ranks by embedding similarity. Reranking takes the retrieved candidates, scores each candidate against the query, and returns the best subset.
+
+Use reranking when precision matters more than latency. Skip it when results are already good, latency is tight, or an extra model call is not worth the quality gain.
+
+## Retrieval reranking
+
+Retrieve wide, rerank down.
+
+<CodeGroup>
+```python SDK
+result = rag.retrieve(
+    "How do I authenticate?",
+    top_k=20,
+    use_rerank=True,
+    reranker=rag.reranker(provider="voyage", model="rerank-2-lite"),
+    rerank_top_k=5,
+)
+
+for item in result.items:
+    print(item.rerank_score, item.score, item.text)
+```
+
+```bash CLI
+ragrails retrieve "How do I authenticate?" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --top-k 20 \
+  --rerank \
+  --reranker voyage \
+  --reranker-model rerank-2-lite \
+  --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "top_k": 20,
+    "use_rerank": true,
+    "reranker": "voyage",
+    "reranker_model": "rerank-2-lite",
+    "rerank_top_k": 5
+  }'
+```
+</CodeGroup>
+
+Result shape:
+
+```json
+{
+  "query": "How do I authenticate?",
+  "search_query": "How do I authenticate?",
+  "retrieved": 20,
+  "items": [
+    {
+      "id": "auth#overview",
+      "chunk_id": "auth#overview",
+      "score": 0.72,
+      "rerank_score": 0.94,
+      "text": "Create an API key and send it as a Bearer token.",
+      "metadata": {"title": "Authentication"}
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+
+## Query pipeline reranking
+
+`query()` wraps query embedding and retrieval in one stable pipeline shape.
+
+<CodeGroup>
+```python SDK
+result = rag.query(
+    "How do I authenticate?",
+    retrieval={
+        "top_k": 20,
+        "rerank": {
+            "enabled": True,
+            "provider": "voyage",
+            "model": "rerank-2-lite",
+            "top_k": 5,
+        },
+    },
+)
+```
+
+```bash CLI
+ragrails query "How do I authenticate?" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --top-k 20 \
+  --rerank \
+  --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "docs",
+      "url": "http://localhost:6333",
+      "top_k": 20,
+      "rerank": {
+        "enabled": true,
+        "provider": "voyage",
+        "model": "rerank-2-lite",
+        "top_k": 5
+      }
+    }
+  }'
+```
+</CodeGroup>
+
+## Chat reranking
+
+Chat can rerank before building the prompt context. Use [Streaming](/capabilities/streaming) if the UI should show retrieval and generation progress while reranked chat runs.
+
+<CodeGroup>
+```python SDK
+from ragrails.core.stg_05_retriever import RetrieverConfig
+
+result = rag.chat(
+    "How do I authenticate?",
+    history=[],
+    retrieval_config=RetrieverConfig(top_k=20, use_rerank=True, rerank_top_k=5),
+)
+```
+
+```bash CLI
+ragrails chat "How do I authenticate?" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --rerank \
+  --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "rerank": true,
+    "rerank_top_k": 5,
+    "history": []
+  }'
+```
+</CodeGroup>
+
+## Choosing a reranker
+
+| Provider | Models | Use when |
+| --- | --- | --- |
+| `voyage` | `rerank-2-lite`, `rerank-2` | You want semantic reranking and can pay for an API call. |
+| `bm25` | `bm25` | You want local, no-network, exact-term-oriented reranking. |
+
+```python
+# Local reranking, useful for offline or cost-sensitive setups.
+result = rag.retrieve(
+    "refund deadline",
+    top_k=20,
+    use_rerank=True,
+    reranker=rag.reranker(provider="bm25"),
+    rerank_top_k=5,
+)
+```
+
+## Practical defaults
+
+| Setting | Starting point | Why |
+| --- | --- | --- |
+| `top_k` | `20` | Gives the reranker enough candidates. |
+| `rerank_top_k` | `5` | Keeps answer context focused. |
+| `min_rerank_score` in chat quality | `0.50` | Filters weak reranked context before generation. |
+
+<Warning>If `use_rerank=True`, the SDK retrieval path needs an actual reranker object or a configured reranker. REST and CLI create the reranker from provider/model fields.</Warning>
+
+## Related pages
+
+- [Retrieval](/features/retrieval)
+- [Query Rewriting](/capabilities/query-rewriting)
+- [Chat Tuning](/capabilities/chat-tuning)
+- [Cost Optimization](/capabilities/cost-optimization)

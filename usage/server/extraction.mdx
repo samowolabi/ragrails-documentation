@@ -1,0 +1,103 @@
+---
+title: "REST Extraction"
+icon: "file-input"
+description: "Extract websites, documents, uploads, and APIs over HTTP."
+---
+
+Extraction endpoints return normalized document objects in `outputs`. Feed those documents to [`/v1/chunk`](/usage/server/chunking), or use [`/v1/pipelines/ingest`](/usage/server/ingest) to run the full ingest workflow in one request.
+
+## Scrape URLs
+
+`POST /v1/ingest/url` scrapes exact URLs or crawls a site.
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/ingest/url \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "https://example.com/docs", "mode": "full", "max_depth": 2, "max_pages": 50 }'
+```
+
+```json Response
+{
+  "pages": 12,
+  "failed": 0,
+  "outputs": [
+    {
+      "id": "url_a1b2",
+      "title": "Docs",
+      "text": "# Docs\n\n...",
+      "source": "https://example.com/docs",
+      "metadata": {"source_kind": "url"}
+    }
+  ],
+  "errors": [],
+  "dlq": null
+}
+```
+</CodeGroup>
+
+Use `POST /v1/ingest/url/stream` for live crawl progress as server-sent events.
+
+```bash
+curl -N -X POST http://127.0.0.1:8000/v1/ingest/url/stream \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/docs","mode":"full"}'
+```
+
+## Parse Documents
+
+`POST /v1/ingest/docs` parses server-accessible paths, folders, or file URLs.
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{ "files": ["files/guide.pdf", "https://example.com/whitepaper.pdf"] }'
+```
+
+`POST /v1/ingest/docs/upload` accepts multipart uploads from clients.
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs/upload \
+  -F "files=@docs/guide.pdf" \
+  -F "frontmatter=false" \
+  -F "title=Guide" \
+  -F "description=Product guide"
+```
+
+Upload multiple files by repeating `files`.
+
+## Fetch APIs
+
+`POST /v1/ingest/api` fetches one REST endpoint and converts the response into a document.
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ingest/api \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.example.com/posts",
+    "title": "Blog posts",
+    "headers": {"Authorization": "Bearer token"},
+    "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+    "max_pages": 10
+  }'
+```
+
+<Note>Batch API ingestion with `apis` is SDK-only for now. The REST schema currently requires `url`, so `/v1/ingest/api` examples use one endpoint per request.</Note>
+
+## Request Fields
+
+| Endpoint | Important fields |
+| --- | --- |
+| `/v1/ingest/url` | `url`, `mode`, `max_depth`, `max_pages`, `frontmatter`, `verbose` |
+| `/v1/ingest/docs` | `files`, `folder`, `frontmatter` |
+| `/v1/ingest/docs/upload` | `files`, `frontmatter`, `title`, `description` |
+| `/v1/ingest/api` | `url`, `method`, `headers`, `params`, `body`, `pagination`, `max_pages`, `timeout` |
+
+## Output Shape
+
+| Field | Description |
+| --- | --- |
+| `outputs` | Extracted document dicts with text and metadata. |
+| `failed` | Number of failed sources. |
+| `errors` | Error objects for failed sources. |
+| `dlq` | URL scrape dead-letter summary when available. |

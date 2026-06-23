@@ -1,93 +1,90 @@
 ---
-title: "CLI Chat"
+title: "Chat"
 icon: "messages-square"
-description: "RAG chat from the terminal."
+description: "Run one-shot and interactive grounded chat from the terminal."
 ---
 
-`chat` answers a question grounded in your vector index. Pass a query for a one-shot turn, or run it with no query to start an interactive session.
+`ragrails chat` answers with retrieved context from your vector database. Pass a query for a one-shot turn, or run it with no query to start an interactive REPL.
 
-## One-shot chat turn
+## One-shot Chat
 
-<CodeGroup>
-```bash Command
-ragrails chat "How do I authenticate?" \
+```bash
+ragrails chat "How long do I have to request a refund?" \
   --vector-db qdrant \
-  --collection docs \
+  --collection support \
   --url http://localhost:6333 \
+  --embedder-provider voyage \
+  --embedder-model voyage-3 \
   --llm-provider openai \
   --llm-model gpt-4o-mini
 ```
 
-```text Output
-To authenticate, create an API key in your account settings...
+Output:
+
+```text
+You can request a refund within 30 days of purchase.
 
 Sources:
-[1] Authentication
+[1] Refund policy
 ```
-</CodeGroup>
 
-## Multi-turn with a history file
+## Multi-turn with History File
 
-`--history-file` persists conversation history across turns. The file is created on the first turn and updated after each one.
+`--history-file` persists conversation history across one-shot turns.
 
 ```bash
-ragrails chat "How do I authenticate?" \
+ragrails chat "How long do I have to request a refund?" \
   --history-file files/chat/history.json \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --llm-provider openai --llm-model gpt-4o-mini
+  --vector-db qdrant --collection support --url http://localhost:6333
 
-ragrails chat "What about the second step?" \
-  --history-file files/chat/history.json --rewrite-query
+ragrails chat "What about the payment method?" \
+  --history-file files/chat/history.json \
+  --rewrite-query
 ```
 
-## Interactive session
-
-Run `chat` with no query to start a REPL that keeps history, streams answers, and can call tools.
+## Interactive Chat
 
 ```bash
 ragrails chat
 ```
 
-### Slash commands
+The REPL keeps session history, can stream answers, and can call built-in tools.
 
 | Command | What it does |
 | --- | --- |
-| `/model` | List models, or `/model gpt-4o` to switch mid-conversation |
-| `/stream on` / `/stream off` | Toggle token-by-token streaming |
-| `/tools` | List the tools the assistant can call |
-| `/debug` | Show the retrieval trace for the last answer |
+| `/model` | List models, or `/model gpt-4o-mini` to switch. |
+| `/stream on` / `/stream off` | Toggle token-by-token streaming. |
+| `/tools` | List built-in tools. |
+| `/debug` | Show the retrieval trace for the last answer. |
 
-### Agentic tools
+## Agentic Tools
 
-When the answer isn't in your index, the assistant can call `web_fetch` (read a web page) or `api_call` (make a live HTTP request). It confirms before each call. See [agentic tools](/advanced/agentic-tools).
+Interactive chat can call `web_fetch` and `api_call`. Side-effecting API calls are validated and confirmed before execution.
 
-## Flags map to SDK config
-
-| Flag | SDK config |
-| --- | --- |
-| `--rewrite-query`, `--rewrite-session-context` | `QueryRewriteConfig` |
-| `--disable-history-compaction` | `HistoryCompactionConfig(enabled=False)` |
-| `--disable-intent-routing` | `IntentRoutingConfig(enabled=False)` |
-| `--rerank`, `--reranker`, `--reranker-model`, `--rerank-top-k` | reranker |
+Use [Agentic Tools](/capabilities/agentic-tools) for the safety model and boundaries.
 
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `QUERY` | none | Question (positional). Omit to start the interactive REPL |
-| `--llm-provider` | `openai` | LLM provider (`openai`, `anthropic`, `google`) |
-| `--llm-model` | `gpt-4o-mini` | LLM model |
-| `--max-tokens` | `1024` | Max output tokens |
-| `--embedder-provider` | `voyage` | Query embedding provider |
-| `--embedder-model` | `voyage-3` | Query embedding model |
-| `--vector-db` | `qdrant` | Vector DB provider |
-| `--collection` | none | Collection name |
-| `--url` | none | Vector DB URL |
-| `--persona` | `""` | System persona for the turn |
-| `--history-file` | none | JSON file to load and save history |
-| `--rewrite-query` | off | Rewrite the query before retrieval |
-| `--rewrite-session-context` | `""` | Context hint for query rewriting |
-| `--rerank` | off | Rerank retrieved chunks |
-| `--reranker` / `--reranker-model` / `--rerank-top-k` | `voyage` / `rerank-2-lite` / `5` | Reranker config |
-| `--disable-intent-routing` | off | Always run retrieval, even for small talk |
-| `--disable-history-compaction` | off | Return full history without summarisation |
+| `QUERY` | none | Question. Omit to start the interactive REPL. |
+| `--llm-provider` | `openai` | LLM provider. |
+| `--llm-model` | `gpt-4o-mini` | LLM model. |
+| `--max-tokens` | `1024` | Max output tokens. |
+| `--embedder-provider` / `--embedder-model` | `voyage` / `voyage-3` | Query embedding provider/model. |
+| `--vector-db` | `qdrant` | Vector DB provider. |
+| `--collection` | config or none | Collection, index, or class name. |
+| `--url` | config or none | Vector DB URL. |
+| `--persona` | `""` | System persona/domain instruction. |
+| `--history-file` | none | JSON history file to load and save. |
+| `--rewrite-query` | off | Rewrite follow-up questions before retrieval. |
+| `--rewrite-session-context` | `""` | Context hint for query rewrite. |
+| `--rerank` | off | Rerank retrieved chunks. |
+| `--reranker` / `--reranker-model` / `--rerank-top-k` | `voyage` / `rerank-2-lite` / `5` | Reranker config. |
+| `--disable-intent-routing` | off | Always run retrieval. |
+| `--disable-history-compaction` | off | Return full history without summarization. |
+
+<CardGroup cols={2}>
+  <Card title="Query" icon="search-check" href="/usage/cli/query">Use chat in the query workflow.</Card>
+  <Card title="Streaming" icon="radio" href="/capabilities/streaming">Understand interactive streaming boundaries.</Card>
+</CardGroup>

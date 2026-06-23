@@ -4,57 +4,209 @@ icon: "binary"
 description: "Turn passages into vectors."
 ---
 
-Embedding is part of the [Ingest](/features/ingest) workflow. It converts each chunk into a vector: numbers that capture meaning, so similar meaning lands close together in search.
+Embedding is part of the [Ingest](/features/ingest) workflow. It turns chunks into vectors so similar meaning lands close together during retrieval.
 
-## Interface Docs
-
-Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+Use this page to understand the embedding stage. Use the interface-specific pages when you need exact parameters, flags, request fields, or response shapes.
 
 - [SDK embedding](/usage/sdk/embedding)
 - [CLI embedding](/usage/cli/embedding)
 - [REST embedding](/usage/server/embedding)
 
+<Warning>Use the same embedding provider and model for indexing and querying. Vectors from different models are not comparable.</Warning>
+
+## Source and output
+
+Embedding takes chunk dictionaries from [Chunking](/features/chunking) and returns the same chunks with an added `embedding` vector.
+
 <CodeGroup>
 ```python SDK
-result = rag.embed(chunks=chunk_result.items)
-result.items  # chunks with an added "embedding" field
+from ragrails import RagRails
+
+rag = RagRails(embedding={"provider": "voyage", "model": "voyage-3"})
+
+parsed = rag.parse(files="files/refund-policy.pdf")
+chunks = rag.chunk(markdown=parsed.outputs)
+
+embedded = rag.embed(
+    chunks=chunks.items,
+    batch_size=64,
+)
+
+embedded.items[0]["embedding"]
 ```
 
 ```bash CLI
+# input-dir must contain chunk JSON files, usually files/chunks/chunks.json
 ragrails embed \
   --input-dir files/chunks/ \
   --output-dir files/embedded/ \
   --provider voyage \
-  --model voyage-3
+  --model voyage-3 \
+  --batch-size 64
 ```
 
 ```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/embed \
   -H "Content-Type: application/json" \
   -d '{
-    "chunks": [{"id": "policy#refunds", "text": "Refunds are available within 30 days.", "source": "policy.md", "metadata": {}}],
+    "chunks": [
+      {
+        "id": "chunk-1",
+        "text": "Refunds are available within 30 days.",
+        "embed_text": "Refund policy\nRefund policy\n\nRefunds are available within 30 days.",
+        "source": "policy.md",
+        "metadata": {"title": "Refund policy", "chunk_id": "chk_abc123"}
+      }
+    ],
     "provider": "voyage",
     "model": "voyage-3",
-    "input_type": "document"
+    "input_type": "document",
+    "batch_size": 64
   }'
 ```
 </CodeGroup>
 
+Example `embedded` result:
 
-
-<CodeGroup>
-```json Response
+```json
 {
   "inputs": 1,
   "embedded": 1,
   "items": [
     {
-      "id": "policy#refunds",
-      "text": "Refunds are available within 30 days.",
-      "embedding": [0.01, 0.02, 0.03],
+      "id": "chunk-1",
       "source": "policy.md",
+      "text": "Refunds are available within 30 days.",
+      "embed_text": "Refund policy\nRefund policy\n\nRefunds are available within 30 days.",
+      "embedding": [0.012, -0.084, 0.031, "..."],
       "metadata": {
         "source": "policy.md",
+        "source_kind": "docs",
+        "title": "Refund policy",
+        "heading": {"h1": "Refund policy"},
+        "chunk_id": "chk_abc123"
+      }
+    }
+  ],
+  "failed": 0,
+  "errors": []
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `inputs` | Number of chunk dictionaries submitted to `embed()`. |
+| `embedded` | Number of chunks that successfully received vectors. |
+| `items` | Embedded chunk dictionaries ready for storage. |
+| `items[].id` | Chunk identifier carried forward from `id`, `metadata.id`, or `metadata.chunk_id`. |
+| `items[].source` | Original document, URL, API endpoint, or manual source for citation and filtering. |
+| `items[].text` | Visible chunk text used for citations and answer display. |
+| `items[].embed_text` | Text actually sent to the embedding model; usually title, heading, description, and chunk text. |
+| `items[].embedding` | Vector returned by the embedding provider. |
+| `items[].metadata` | Source, title, heading, chunk, and custom metadata carried into storage. |
+| `failed` | Number of chunks that failed validation or provider embedding. |
+| `errors` | Structured validation or provider errors for failed chunks. |
+
+The SDK and REST API return embedded chunks in memory. The CLI writes `embedded.json` to `--output-dir`. Vector database persistence happens in [Storing](/features/storing), not embedding.
+
+## What gets embedded
+
+Each input chunk must be a dictionary with non-empty `text`. If the chunk also has `embed_text`, Ragrails sends `embed_text` to the embedding model and keeps `text` for citations and display.
+
+```json
+{
+  "id": "chunk-1",
+  "source": "policy.md",
+  "text": "Refunds are available within 30 days.",
+  "embed_text": "Refund policy\nRefund policy\n\nRefunds are available within 30 days.",
+  "metadata": {
+    "title": "Refund policy",
+    "heading": {"h1": "Refund policy"},
+    "chunk_id": "chk_abc123"
+  }
+}
+```
+
+`embed_text` is created by the chunking stage from the title, heading path, description, and visible text. This improves semantic retrieval without changing the text you show users later.
+
+<Note>If `embed_text` is missing, Ragrails embeds the chunk `text` field.</Note>
+
+## Providers
+
+Ragrails ships with Voyage embeddings and a registry for custom embedders.
+
+| Provider | Install extra | Default model | Known models | Vector size |
+| --- | --- | --- | --- | --- |
+| `voyage` | `pip install "ragrails[voyage]"` | `voyage-3` | `voyage-3-lite`, `voyage-3`, `voyage-3-large` | `512` for `voyage-3-lite`; `1024` for `voyage-3` and `voyage-3-large` |
+
+Voyage requires `VOYAGE_API_KEY` in the environment that runs embedding.
+
+<CodeGroup>
+```bash Environment
+export VOYAGE_API_KEY="..."
+```
+
+```python Custom embedder object
+class LocalEmbedder:
+    @property
+    def vector_size(self) -> int:
+        return 384
+
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        return [[0.0] * self.vector_size for _ in texts]
+
+embedded = rag.embed(chunks=chunks.items, embedder=LocalEmbedder())
+```
+
+```python Custom provider registry
+from ragrails.models.embedder.registry import register_embedder
+
+register_embedder(
+    "local",
+    LocalEmbedder,
+    default_model="local-small",
+    models=("local-small",),
+)
+
+rag = RagRails(embedding={"provider": "local", "model": "local-small"})
+embedded = rag.embed(chunks=chunks.items)
+```
+</CodeGroup>
+
+## Input type
+
+Embedding providers may optimize vectors differently for indexed documents and user queries. Ragrails uses `input_type="document"` by default for `embed()` because embedding is an indexing step.
+
+Retrieval and chat create query embeddings with `input_type="query"` for you. You normally only set `input_type` manually when constructing an embedder or using `/v1/embed` for a non-indexing workflow.
+
+<Warning>Do not index documents with `input_type="query"` or query with `input_type="document"` unless you intentionally know the provider behavior. Mismatching input types can degrade retrieval quality.</Warning>
+
+## Batching
+
+`batch_size` controls how many chunks are sent to the embedding stage per request batch.
+
+| Interface | Default | Behavior |
+| --- | --- | --- |
+| SDK `embed()` | `64` | Splits valid chunks into batches before calling `model.encode()` |
+| CLI `ragrails embed` | `64` | Reads `.ragrails.toml` `[embedding].batch_size` unless overridden by `--batch-size` |
+| REST `/v1/embed` | `64` | Uses request `batch_size` |
+
+`batch_size` must be an integer greater than `0`. If one provider batch fails, each chunk in that batch gets a retryable `embed` error and other valid batches can still succeed.
+
+## Output shape
+
+```json
+{
+  "inputs": 1,
+  "embedded": 1,
+  "items": [
+    {
+      "id": "chunk-1",
+      "source": "policy.md",
+      "text": "Refunds are available within 30 days.",
+      "embed_text": "Refund policy\nRefund policy\n\nRefunds are available within 30 days.",
+      "embedding": [0.01, 0.02, 0.03],
+      "metadata": {
         "title": "Refund policy",
         "chunk_id": "chk_abc123"
       }
@@ -64,22 +216,67 @@ curl -X POST http://127.0.0.1:8000/v1/embed \
   "errors": []
 }
 ```
+
+The `id` is resolved from the chunk `id`, then `metadata.id`, then `metadata.chunk_id`. The `source` is resolved from the chunk `source`, then `metadata.source`.
+
+## Ingest pipeline
+
+High-level ingestion embeds after chunking and before storing. Pass embedding options through the `embedding` object.
+
+<CodeGroup>
+```python SDK
+result = rag.ingest(
+    docs={"files": "files/refund-policy.pdf"},
+    chunking={"chunk_size": 1200, "chunk_overlap": 120},
+    embedding={"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    storage={"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"},
+)
+```
+
+```bash CLI
+ragrails ingest \
+  --docs files/refund-policy.pdf \
+  --provider voyage \
+  --model voyage-3 \
+  --batch-size 64 \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"files": "files/refund-policy.pdf"},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+```
 </CodeGroup>
 
-## Possible Errors
+## Possible errors
 
-Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+Interface validation errors raise immediately in SDK and REST. Chunk validation and provider failures are returned in the result `errors` list when processing can continue. See [Errors](/reference/errors) for the shared shapes.
 
 <CodeGroup>
 ```json Validation
 {
-  "inputs": 1,
-  "embedded": 0,
-  "items": [],
+  "inputs": 2,
+  "embedded": 1,
+  "items": [
+    {
+      "id": "good",
+      "text": "Good chunk text.",
+      "embed_text": "Good chunk text.",
+      "embedding": [0.01, 0.02],
+      "metadata": {"id": "good"}
+    }
+  ],
   "failed": 1,
   "errors": [
     {
-      "source": "policy#refunds",
+      "source": "manual://bad",
       "source_kind": "chunk",
       "stage": "validate",
       "error": "chunk text must be a non-empty string",
@@ -98,10 +295,10 @@ Most stage-level failures are returned in the result `errors` list instead of ra
   "failed": 1,
   "errors": [
     {
-      "source": "policy#refunds",
+      "source": "manual://one",
       "source_kind": "chunk",
       "stage": "embed",
-      "error": "embedding model returned a different number of vectors than input texts",
+      "error": "provider unavailable",
       "isRetryable": true,
       "attempts": 1
     }
@@ -117,16 +314,14 @@ Most stage-level failures are returned in the result `errors` list instead of ra
   }
 }
 ```
+
+```text CLI
+Error: No JSON files found in files/chunks/
+```
 </CodeGroup>
 
-<Warning>**Match `input_type` to the job.** `embed()` uses `"document"` for indexing; retrieval embeds the query as `"query"` for you. Mismatching them hurts retrieval quality.</Warning>
+## Next steps
 
-## Providers
-
-| Provider | Extra | Models |
-| --- | --- | --- |
-| Voyage | `ragrails[voyage]` | `voyage-3` (default), `voyage-3-lite`, `voyage-3-large` |
-
-Need a different provider? Register your own with `register_embedder()`.
-
-<Tip>Use the **same model** for indexing and querying. Vectors from different models aren't comparable.</Tip>
+- Use [Storing](/features/storing) to write embedded chunks to a vector database.
+- Use [Retrieval](/features/retrieval) to embed queries and search the stored vectors.
+- Use [Ingest](/features/ingest) to run extraction, chunking, embedding, and storage together.

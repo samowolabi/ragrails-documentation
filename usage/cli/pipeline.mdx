@@ -1,80 +1,14 @@
 ---
 title: "CLI Pipeline"
 icon: "workflow"
-description: "Run the full ingest and query pipeline in one command."
+description: "Renamed into CLI workflow and pipeline overview pages."
 ---
 
-Pipeline commands run multiple stages in one call. Use them for quick setup; use the [stage commands](/usage/cli/overview#stage-based-workflow) when you want to inspect intermediate files.
+The old CLI pipeline page has been split to match the main docs flow:
 
-## `ingest`
-
-Runs ingestion, chunking, embedding, and storage. Combine `--docs`, `--folder`, `--source-url`, `--api-url`, and `--markdown` in one call.
-
-Use `--concurrency parallel` to run independent source ingestion groups together before chunking.
-
-<CodeGroup>
-```bash Command
-ragrails ingest \
-  --docs files/guide.pdf \
-  --source-url https://example.com/docs \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3 \
-  --concurrency serial
-```
-
-```text Output
-Sources  : 9
-Chunks   : 72
-Embedded : 72
-Stored   : 72
-Failed   : 0
-```
-</CodeGroup>
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `--docs` | none | Document file (repeatable) |
-| `--folder` | none | Folder of documents to parse |
-| `--source-url` | none | URL to scrape (repeatable) |
-| `--api-url` | none | API endpoint to fetch |
-| `--markdown` | none | Raw markdown string (repeatable) |
-| `--vector-db` | `qdrant` | Vector DB provider |
-| `--collection` | none | Collection name |
-| `--url` | none | Vector DB URL |
-| `--provider` / `--model` | `voyage` / `voyage-3` | Embedding provider and model |
-| `--batch-size` | `64` | Chunks per batch |
-| `--chunk-size` / `--chunk-overlap` / `--min-chunk-length` | `2000` / `200` / `100` | Chunking config |
-| `--concurrency` | `serial` | Source ingestion mode: `serial` or `parallel` |
-
-## `query`
-
-Runs query embedding and retrieval.
-
-<CodeGroup>
-```bash Command
-ragrails query "What does the guide cover?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3 \
-  --top-k 5 \
-  --rerank --reranker-model rerank-2-lite --rerank-top-k 3
-```
-
-```text Output
-Query  : What does the guide cover?
-Results: 3
-
-[1] score=0.8300 rerank=0.9100 id=guide-7
-    text : The guide covers setup, authentication, and usage...
-```
-</CodeGroup>
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `QUERY` | required | Search query (positional) |
-| `--vector-db` | `qdrant` | Vector DB provider |
-| `--collection` | none | Collection name |
-| `--url` | none | Vector DB URL |
-| `--top-k` | `10` | Results to retrieve |
-| `--provider` / `--model` | `voyage` / `voyage-3` | Query embedding provider and model |
-| `--rerank` | off | Enable reranking |
-| `--reranker` / `--reranker-model` / `--rerank-top-k` | `voyage` / `rerank-2-lite` / `5` | Reranker config |
+<CardGroup cols={2}>
+  <Card title="Ingest" icon="package-plus" href="/usage/cli/ingest">Build or refresh a knowledge base.</Card>
+  <Card title="Query" icon="search-check" href="/usage/cli/query">Search and chat over a knowledge base.</Card>
+  <Card title="Overview" icon="route" href="/usage/cli/pipeline-overview">See the CLI pipeline stages.</Card>
+  <Card title="Maintenance" icon="refresh-cw" href="/usage/cli/knowledge-base-maintenance">Keep stored chunks current.</Card>
+</CardGroup>

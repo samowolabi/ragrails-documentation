@@ -1,102 +1,14 @@
 ---
 title: "SDK Pipeline"
 icon: "workflow"
-description: "Run the full ingest and query pipeline in one call."
+description: "Renamed into SDK workflow and pipeline overview pages."
 ---
 
-`ingest()` and `query()` wrap the whole pipeline. With providers configured on `RagRails`, they take just your sources or query.
+The old SDK pipeline page has been split to match the main docs flow:
 
-```python
-from ragrails import RagRails
-
-rag = RagRails(
-    collection="docs",
-    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
-    embedding={"provider": "voyage", "model": "voyage-3"},
-)
-```
-
-## `ingest()`
-
-Runs ingestion, chunking, embedding, and storage. Combine `docs`, `urls`, `api`, and `markdown` in one call.
-
-Set `concurrency="parallel"` to run independent `docs`, `urls`, and `api` source ingestion together before chunking. The default is `serial`.
-
-<CodeGroup>
-```python Request
-result = rag.ingest(
-    docs=["files/guide.pdf"],
-    urls=["https://example.com/docs"],
-    concurrency="serial",
-)
-```
-
-```python Response
-result.sources   # 9
-result.chunks    # 72
-result.embedded  # 72
-result.stored    # 72
-result.failed    # 0
-```
-</CodeGroup>
-
-Override any stage with a config dict (these merge over the constructor defaults):
-
-```python
-result = rag.ingest(
-    docs={"folder": "files/docs/"},
-    chunking={"chunk_size": 1000, "chunk_overlap": 100},
-    embedding={"provider": "voyage", "model": "voyage-3-large"},
-    storage={"collection": "docs_large"},
-    concurrency="parallel",
-)
-```
-
-| Parameter | Description |
-| --- | --- |
-| `docs` | Document files or folder, passed to `parse()` |
-| `urls` | URLs to scrape, passed to `scrape()` |
-| `api` | API endpoints, passed to `fetch()` |
-| `markdown` | Raw markdown documents |
-| `ingestion` | Ingestor config overrides |
-| `chunking` | Chunking config, e.g. `{"chunk_size": 1000}` |
-| `embedding` | Embedding config (overrides constructor) |
-| `storage` | Storage config (overrides constructor) |
-| `concurrency` | Source ingestion mode: `serial` or `parallel` |
-
-## `query()`
-
-Runs query embedding and retrieval.
-
-<CodeGroup>
-```python Request
-result = rag.query("What does the guide cover?", retrieval={"top_k": 5})
-
-for chunk in result.items:
-    print(chunk.score, chunk.text)
-```
-
-```python Response
-result.retrieved  # 5
-result.items[0]   # RetrievedChunk(id="guide-7", score=0.83, text="The guide covers setup...", metadata={}, rerank_score=None)
-```
-</CodeGroup>
-
-The `retrieval` dict accepts every `retrieve()` option plus `query_rewrite` and `rerank` sub-dicts:
-
-```python
-result = rag.query(
-    "What does the guide cover?",
-    retrieval={
-        "top_k": 20,
-        "rerank": {"enabled": True, "top_k": 5},
-        "query_rewrite": {"enabled": True},
-    },
-)
-```
-
-| Parameter | Description |
-| --- | --- |
-| `query` | Search query |
-| `embedding` | Embedding config (overrides constructor) |
-| `retrieval` | Retrieval config: `top_k`, plus `query_rewrite` and `rerank` sub-dicts |
+<CardGroup cols={2}>
+  <Card title="Ingest" icon="package-plus" href="/usage/sdk/ingest">Build or refresh a knowledge base.</Card>
+  <Card title="Query" icon="search-check" href="/usage/sdk/query">Search and chat over a knowledge base.</Card>
+  <Card title="Overview" icon="route" href="/usage/sdk/pipeline-overview">See the SDK pipeline stages.</Card>
+  <Card title="Maintenance" icon="refresh-cw" href="/usage/sdk/knowledge-base-maintenance">Keep stored chunks current.</Card>
+</CardGroup>

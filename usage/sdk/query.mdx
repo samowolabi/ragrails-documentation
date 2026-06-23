@@ -1,0 +1,97 @@
+---
+title: "Query"
+icon: "search-check"
+description: "Search a stored knowledge base and generate grounded answers with the SDK."
+---
+
+The query side has two SDK entry points.
+
+`rag.query()` embeds a user query and returns matching chunks. `rag.chat()` runs retrieval and answer generation together.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    llm={"provider": "openai", "model": "gpt-4o-mini"},
+)
+```
+
+## Search with `query()`
+
+```python
+result = rag.query("How long do I have to request a refund?", retrieval={"top_k": 5})
+
+for item in result.items:
+    print(item.score, item.text)
+```
+
+`query()` returns a `RetrieveResult` with `query`, `search_query`, `retrieved`, `items`, `failed`, and `errors`.
+
+## Add Reranking and Query Rewriting
+
+```python
+result = rag.query(
+    "What about the second step?",
+    retrieval={
+        "top_k": 20,
+        "query_rewrite": {
+            "enabled": True,
+            "session_context": "The user is asking about refund setup.",
+        },
+        "rerank": {
+            "enabled": True,
+            "provider": "voyage",
+            "model": "rerank-2-lite",
+            "top_k": 5,
+        },
+    },
+)
+```
+
+Query rewriting needs an LLM. Configure `llm={...}` on `RagRails(...)` or pass a rewrite LLM in the config.
+
+## Generate an Answer with `chat()`
+
+```python
+history = []
+result = rag.chat(
+    "How long do I have to request a refund?",
+    history=history,
+    persona="Answer only from the support policy context.",
+)
+
+print(result.answer)
+history = result.history
+```
+
+`chat()` returns `answer`, `sources`, `history`, `retrieval`, `llm`, `errors`, `retrieval_quality`, `answer_confidence`, `compacted`, and `intent`.
+
+## Stream Chat
+
+```python
+for event in rag.chat_stream("How long do I have to request a refund?", history=[]):
+    if event["type"] == "token":
+        print(event["data"]["text"], end="")
+    elif event["type"] == "final":
+        result = event["data"]
+```
+
+The final event contains the complete chat result as a dictionary.
+
+## Choosing the SDK Call
+
+| Need | Use |
+| --- | --- |
+| Raw matching chunks | `rag.query(...)` or `rag.retrieve(...)` |
+| Reranked search results | `rag.query(..., retrieval={"rerank": {"enabled": True}})` |
+| Conversational answer with sources | `rag.chat(...)` |
+| Token/progress events | `rag.chat_stream(...)` |
+| Full control over retrieval objects | `rag.retrieve(...)` |
+
+<CardGroup cols={2}>
+  <Card title="Retrieval" icon="search" href="/usage/sdk/retrieval">Tune lower-level retrieval.</Card>
+  <Card title="Chat" icon="messages-square" href="/usage/sdk/chat">Tune grounded chat behavior.</Card>
+</CardGroup>

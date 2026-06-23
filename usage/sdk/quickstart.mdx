@@ -1,21 +1,28 @@
 ---
 title: "SDK Quickstart"
 icon: "zap"
-description: "Build a knowledge base and chat from Python in a few lines."
+description: "Build a knowledge base, query it, and chat from Python."
 ---
 
-## 1. Install and start Qdrant
+This quickstart creates a small support knowledge base, stores it in Qdrant, retrieves the matching chunk, and asks an LLM for a grounded answer. It uses inline Markdown for the first smoke test, then shows the same SDK workflow with documents, websites, and REST API sources.
+
+## 1. Install
 
 ```bash
-pip install "ragrails[voyage,qdrant]"
+pip install "ragrails[store-qdrant]"
 export VOYAGE_API_KEY="..."
 export OPENAI_API_KEY="..."
 docker run -p 6333:6333 qdrant/qdrant
 ```
 
-## 2. Configure once
+For website extraction:
 
-SDK defaults live on the `RagRails(...)` instance. They do not write `.ragrails.toml` and they do not change CLI or REST defaults.
+```bash
+pip install "ragrails[url,store-qdrant]"
+ragrails setup-url --browser chromium
+```
+
+## 2. Configure
 
 ```python
 from ragrails import RagRails
@@ -28,19 +35,46 @@ rag = RagRails(
 )
 ```
 
-## 3. Build the index
+## 3. Ingest
+
+`ingest()` runs extraction, chunking, embedding, and storage.
 
 ```python
-rag.ingest(
+ingested = rag.ingest(
     markdown=(
         "# Refund policy\n\n"
         "Customers can request a refund within 30 days of purchase. "
         "Refunds are returned to the original payment method within 5 business days."
     ),
 )
+
+print({
+    "sources": ingested.sources,
+    "chunks": ingested.chunks,
+    "embedded": ingested.embedded,
+    "stored": ingested.stored,
+    "failed": ingested.failed,
+})
 ```
 
-`ingest()` runs ingest, chunk, embed, and store in one call.
+Use the same ingest workflow with other source types:
+
+<CodeGroup>
+```python Documents
+rag.ingest(docs=["files/refund-policy.pdf"])
+rag.ingest(docs={"folder": "files/policies"})
+```
+
+```python Website
+rag.setup_url(browser="chromium")
+rag.ingest(urls="https://example.com/help/refunds")
+rag.ingest(urls={"url": "https://example.com/docs", "mode": "full", "max_pages": 25})
+```
+
+```python REST API
+rag.ingest(api={"url": "https://api.example.com/refund-policy", "title": "Refund policy"})
+```
+</CodeGroup>
 
 ## 4. Query
 
@@ -56,13 +90,22 @@ for chunk in result.items:
 ```python
 result = rag.chat("How long do I have to request a refund?", history=[])
 print(result.answer)
+history = result.history
 ```
 
-<Tip>Chat is stateless. Save `result.history` and pass it to the next turn.</Tip>
+Expected answer:
+
+```text
+You can request a refund within 30 days of purchase.
+```
+
+<Tip>Chat is stateless. Store the returned `history` and pass it to the next turn.</Tip>
 
 ## Next
 
 <CardGroup cols={2}>
-  <Card title="SDK Overview" icon="list" href="/usage/sdk/overview">Every method.</Card>
-  <Card title="Run stages individually" icon="layers" href="/usage/sdk/ingestion">Ingest, chunk, embed, store, step by step.</Card>
+  <Card title="Ingest" icon="package-plus" href="/usage/sdk/ingest">Learn the full SDK ingest workflow.</Card>
+  <Card title="Query" icon="search-check" href="/usage/sdk/query">Search and chat over the stored knowledge base.</Card>
+  <Card title="Overview" icon="route" href="/usage/sdk/pipeline-overview">See every SDK pipeline stage.</Card>
+  <Card title="Extraction" icon="file-input" href="/usage/sdk/extraction">Use documents, websites, and APIs.</Card>
 </CardGroup>

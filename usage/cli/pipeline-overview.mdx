@@ -1,0 +1,105 @@
+---
+title: "Overview"
+icon: "route"
+description: "How CLI extraction, chunking, embedding, storing, retrieval, chat, and maintenance fit together."
+---
+
+The CLI supports two ways to work.
+
+Workflow commands (`ingest`, `query`, `chat`) run the common path in one command. Stage commands (`scrape`, `parse`, `fetch`, `chunk`, `embed`, `store`, `retrieve`) create inspectable JSON files between stages.
+
+## Pipeline Map
+
+| Stage | CLI input | CLI output | Use it when |
+| --- | --- | --- | --- |
+| [Extraction](/usage/cli/extraction) | URLs, files, folders, or APIs | JSON document files | You need source content in a common shape. |
+| [Chunking](/usage/cli/chunking) | Extraction JSON directory | `chunks.json` | You need retrieval-sized units. |
+| [Embedding](/usage/cli/embedding) | Chunk JSON directory | `embedded.json` | You need vectors for semantic search. |
+| [Storing](/usage/cli/storing) | Embedded JSON directory | Vector database records | You need a searchable index. |
+| [Retrieval](/usage/cli/retrieval) | Query string | Printed chunks and scores | You need search results without generation. |
+| [Chat](/usage/cli/chat) | Query string or REPL | Answer, sources, optional history file | You need grounded answers. |
+| [Maintenance](/usage/cli/knowledge-base-maintenance) | Updated chunk JSON or chunk IDs | Replaced or removed vectors | You need to keep the index fresh. |
+
+## Full Ingest Workflow
+
+```bash
+ragrails ingest \
+  --docs files/handbook.pdf \
+  --source-url https://example.com/docs \
+  --markdown "# Refunds\n\nRefunds are available within 30 days." \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
+```
+
+## Manual Stage Pipeline
+
+```bash
+ragrails parse --files files/handbook.pdf --output-dir files/output/docs/
+ragrails chunk --input-dir files/output/docs/ --output-dir files/output/chunks/
+ragrails embed --input-dir files/output/chunks/ --output-dir files/output/embedded/ \
+  --provider voyage --model voyage-3
+ragrails store --input-dir files/output/embedded/ \
+  --vector-db qdrant --collection docs --url http://localhost:6333
+```
+
+## Query Pipeline
+
+```bash
+ragrails query "How do refunds work?" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --top-k 20 \
+  --rerank \
+  --rerank-top-k 5
+```
+
+## Chat Pipeline
+
+```bash
+ragrails chat "How do refunds work?" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini \
+  --history-file files/chat-history.json
+```
+
+## Maintenance Loop
+
+```bash
+ragrails edit \
+  --input-dir files/updated-chunks/ \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+
+ragrails delete \
+  --id old-policy-0 \
+  --id old-policy-1 \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+```
+
+## Choose the Entry Point
+
+| Need | Use |
+| --- | --- |
+| Build an index quickly | `ragrails ingest` |
+| Search without generation | `ragrails query` or `ragrails retrieve` |
+| Answer with sources | `ragrails chat "..."` |
+| Interactive chat and tools | `ragrails chat` |
+| Inspect intermediate artifacts | Stage commands with `--input-dir` / `--output-dir` |
+| Replace or remove stale chunks | `ragrails edit` and `ragrails delete` |
+
+<CardGroup cols={2}>
+  <Card title="Extraction" icon="file-input" href="/usage/cli/extraction">Start with source inputs.</Card>
+  <Card title="Maintenance" icon="refresh-cw" href="/usage/cli/knowledge-base-maintenance">Keep stored chunks fresh.</Card>
+</CardGroup>

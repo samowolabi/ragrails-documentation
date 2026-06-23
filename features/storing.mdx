@@ -4,76 +4,336 @@ icon: "database"
 description: "Save vectors to a database."
 ---
 
-Storing is part of the [Ingest](/features/ingest) workflow. It upserts embedded chunks into the vector database you configured on `RagRails`. The collection is created automatically if it doesn't exist.
+Storing is part of the [Ingest](/features/ingest) workflow. It upserts embedded chunks into a vector database so retrieval, query, and chat can search them later.
 
-## Interface Docs
-
-Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+Use this page to understand the storage lifecycle. Use the interface-specific pages when you need exact parameters, flags, request fields, or response shapes.
 
 - [SDK storing](/usage/sdk/storing)
 - [CLI storing](/usage/cli/storing)
 - [REST storing](/usage/server/storing)
 
+<Note>Use the same `vector_db`, `collection`, and `url` when you store, retrieve, query, or chat over the same knowledge base.</Note>
+
+## Store embedded chunks
+
+`store()` takes embedded chunk dictionaries from [Embedding](/features/embedding), validates their IDs/text/vectors, creates the target collection by default, and upserts points in batches.
+
 <CodeGroup>
 ```python SDK
-rag.store(embedded_chunks=embed_result.items)
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+parsed = rag.parse(files="files/refund-policy.pdf")
+chunks = rag.chunk(markdown=parsed.outputs)
+embedded = rag.embed(chunks=chunks.items)
+
+stored = rag.store(
+    embedded_chunks=embedded.items,
+    batch_size=64,
+    ensure_collection=True,
+)
 ```
 
 ```bash CLI
+# input-dir must contain embedded JSON files, usually files/embedded/embedded.json
 ragrails store \
   --input-dir files/embedded/ \
   --vector-db qdrant \
-  --collection docs \
-  --url http://localhost:6333
+  --collection support \
+  --url http://localhost:6333 \
+  --batch-size 64
 ```
 
 ```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/store \
   -H "Content-Type: application/json" \
   -d '{
-    "embedded_chunks": [{"id": "policy#refunds", "text": "Refunds are available within 30 days.", "embedding": [0.01, 0.02], "source": "policy.md", "metadata": {}}],
+    "embedded_chunks": [
+      {
+        "id": "chunk-1",
+        "source": "policy.md",
+        "text": "Refunds are available within 30 days.",
+        "embedding": [0.012, -0.084, 0.031],
+        "metadata": {"title": "Refund policy", "chunk_id": "chk_abc123"}
+      }
+    ],
     "vector_db": "qdrant",
-    "collection": "docs",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "batch_size": 64,
+    "ensure_collection": true
+  }'
+```
+</CodeGroup>
+
+Example `stored` result:
+
+```json
+{
+  "inputs": 1,
+  "stored": 1,
+  "items": [
+    {"id": "chunk-1", "source": "policy.md"}
+  ],
+  "failed": 0,
+  "provider": "qdrant",
+  "collection": "support",
+  "errors": []
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `inputs` | Number of embedded chunk dictionaries submitted to `store()`. |
+| `stored` | Number of chunks successfully upserted. |
+| `items` | Stored chunk IDs and sources. |
+| `failed` | Number of chunks that failed validation, collection setup, or upsert. |
+| `provider` | Vector database provider used for this operation. |
+| `collection` | Actual collection, index, or class name used by the store. |
+| `errors` | Structured validation or provider errors for failed chunks. |
+
+## Stored point shape
+
+Each embedded chunk becomes a vector database point.
+
+```json
+{
+  "id": "chunk-1",
+  "vector": [0.012, -0.084, 0.031],
+  "payload": {
+    "text": "Refunds are available within 30 days.",
+    "source": "policy.md",
+    "title": "Refund policy",
+    "chunk_id": "chk_abc123"
+  }
+}
+```
+
+`text` is stored in payload so retrieval can return answerable passages. Metadata is copied into payload for filtering, citations, table context, and maintenance workflows.
+
+<Warning>All vectors in a single store operation must have the same dimension. Ragrails stores valid chunks and rejects chunks whose vector size differs from the first valid embedding.</Warning>
+
+## Databases
+
+See [Vector Databases](/reference/vector-databases) for the reference table. These are the provider names accepted by SDK, CLI, and REST.
+
+| Database | `vector_db` | Install extra | Default URL | Default collection | Environment |
+| --- | --- | --- | --- | --- | --- |
+| Qdrant local | `qdrant` | `ragrails[qdrant]` | `http://localhost:6333` | `rag_chunks` | none |
+| Qdrant Cloud | `qdrant_cloud` | `ragrails[qdrant]` | none | `rag_chunks` | `QDRANT_API_KEY` |
+| Pinecone | `pinecone` | `ragrails[pinecone]` | none | `rag-chunks` | `PINECONE_API_KEY` |
+| Weaviate | `weaviate` | `ragrails[weaviate]` | `http://localhost:8080` | `RagChunks` | optional `WEAVIATE_API_KEY` |
+
+<Note>The SDK constructor uses `vector_store={"provider": ...}`. SDK method overrides, CLI, and REST use `vector_db` for the same provider value.</Note>
+
+### Collection names
+
+| Provider | Rule |
+| --- | --- |
+| `qdrant`, `qdrant_cloud` | Uses Qdrant collection naming; examples use `support` or `rag_chunks`. |
+| `pinecone` | Index names must use lowercase letters, digits, and hyphens. Do not use underscores. Example: `rag-chunks`. |
+| `weaviate` | Collection names must start uppercase and contain only letters and digits. Example: `RagChunks`. |
+
+## Collection creation
+
+`store()` creates or reuses the target collection by default with `ensure_collection=True`.
+
+- Qdrant collections are created with cosine distance and the first valid vector size.
+- Pinecone creates a dense serverless index when missing.
+- Weaviate creates a collection with self-provided vectors because Ragrails supplies embeddings itself.
+
+Set `ensure_collection=False` only when the collection/index/class already exists and you want store operations to skip setup.
+
+```python
+stored = rag.store(
+    embedded_chunks=embedded.items,
+    ensure_collection=False,
+)
+```
+
+## Update stored chunks
+
+Use `edit()` to replace existing chunks by exact ID. It accepts unembedded chunk dictionaries, re-embeds their text with the configured embedder, then upserts replacements under the same IDs.
+
+<CodeGroup>
+```python SDK
+edited = rag.edit(
+    chunks=[
+        {
+            "id": "chunk-1",
+            "text": "Refunds are available within 45 days for annual plans.",
+            "source": "policy.md",
+            "metadata": {"title": "Refund policy", "chunk_id": "chk_abc123"},
+        }
+    ],
+    batch_size=64,
+)
+```
+
+```bash CLI
+ragrails edit \
+  --input-dir files/updates/ \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --batch-size 64
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/edit \
+  -H "Content-Type: application/json" \
+  -d '{
+    "chunks": [
+      {
+        "id": "chunk-1",
+        "text": "Refunds are available within 45 days for annual plans.",
+        "source": "policy.md",
+        "metadata": {"title": "Refund policy", "chunk_id": "chk_abc123"}
+      }
+    ],
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "support",
+    "url": "http://localhost:6333",
+    "batch_size": 64
+  }'
+```
+</CodeGroup>
+
+Example `edit()` result:
+
+```json
+{
+  "requested": 1,
+  "edited": 1,
+  "items": [{"id": "chunk-1", "source": "policy.md"}],
+  "failed": 0,
+  "provider": "qdrant",
+  "collection": "support",
+  "errors": []
+}
+```
+
+<Warning>`edit()` is chunk-level. It does not find all chunks for a document; pass the exact chunk IDs you want to replace.</Warning>
+
+## Delete stored chunks
+
+Use `delete()` to remove exact chunk IDs from the vector database.
+
+<CodeGroup>
+```python SDK
+deleted = rag.delete(ids=["chunk-1", "chunk-2"])
+```
+
+```bash CLI
+ragrails delete \
+  --id chunk-1 \
+  --id chunk-2 \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/delete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ids": ["chunk-1", "chunk-2"],
+    "vector_db": "qdrant",
+    "collection": "support",
     "url": "http://localhost:6333"
   }'
 ```
 </CodeGroup>
 
+Example `delete()` result:
 
-
-<CodeGroup>
-```json Response
+```json
 {
-  "inputs": 1,
-  "stored": 1,
-  "items": [{"id": "policy#refunds"}],
+  "requested": 2,
+  "deleted": 2,
+  "items": [{"id": "chunk-1"}, {"id": "chunk-2"}],
   "failed": 0,
   "provider": "qdrant",
-  "collection": "docs",
+  "collection": "support",
   "errors": []
 }
 ```
+
+## Ingest pipeline
+
+High-level ingestion stores after extraction, chunking, and embedding. Pass storage options through the `storage` object.
+
+<CodeGroup>
+```python SDK
+result = rag.ingest(
+    docs={"files": "files/refund-policy.pdf"},
+    embedding={"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    storage={
+        "vector_db": "qdrant",
+        "collection": "support",
+        "url": "http://localhost:6333",
+        "batch_size": 64,
+        "ensure_collection": True,
+    },
+)
+```
+
+```bash CLI
+ragrails ingest \
+  --docs files/refund-policy.pdf \
+  --provider voyage \
+  --model voyage-3 \
+  --batch-size 64 \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"files": "files/refund-policy.pdf"},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {
+      "vector_db": "qdrant",
+      "collection": "support",
+      "url": "http://localhost:6333",
+      "batch_size": 64,
+      "ensure_collection": true
+    }
+  }'
+```
 </CodeGroup>
 
-## Possible Errors
+## Possible errors
 
-Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
+Interface validation errors raise immediately in SDK and REST. Chunk validation, collection setup failures, and upsert/delete failures are returned in the result `errors` list when processing can continue. See [Errors](/reference/errors) for the shared shapes.
 
 <CodeGroup>
 ```json Validation
 {
-  "inputs": 1,
-  "stored": 0,
-  "items": [],
+  "inputs": 2,
+  "stored": 1,
+  "items": [{"id": "good", "source": "manual://good"}],
   "failed": 1,
   "provider": "qdrant",
-  "collection": "docs",
+  "collection": "support",
   "errors": [
     {
-      "source": "policy#refunds",
+      "source": "manual://bad",
       "source_kind": "embedded_chunk",
       "stage": "validate",
-      "error": "embedding must be a non-empty list",
+      "error": "embedded chunk id must be a non-empty string",
       "isRetryable": false,
       "attempts": 1
     }
@@ -81,20 +341,41 @@ Most stage-level failures are returned in the result `errors` list instead of ra
 }
 ```
 
-```json Store failure
+```json Ensure collection failure
 {
   "inputs": 1,
   "stored": 0,
   "items": [],
   "failed": 1,
   "provider": "qdrant",
-  "collection": "docs",
+  "collection": "support",
   "errors": [
     {
-      "source": "policy#refunds",
+      "source": "",
       "source_kind": "embedded_chunk",
-      "stage": "store",
-      "error": "Connection refused: http://localhost:6333",
+      "stage": "ensure_collection",
+      "error": "collection unavailable",
+      "isRetryable": true,
+      "attempts": 1
+    }
+  ]
+}
+```
+
+```json Upsert failure
+{
+  "inputs": 1,
+  "stored": 0,
+  "items": [],
+  "failed": 1,
+  "provider": "qdrant",
+  "collection": "support",
+  "errors": [
+    {
+      "source": "manual://one",
+      "source_kind": "embedded_chunk",
+      "stage": "upsert",
+      "error": "upsert unavailable",
       "isRetryable": true,
       "attempts": 1
     }
@@ -110,27 +391,14 @@ Most stage-level failures are returned in the result `errors` list instead of ra
   }
 }
 ```
+
+```text CLI
+Error: No JSON files found in files/embedded/
+```
 </CodeGroup>
 
-## Databases
+## Next steps
 
-See [vector databases](/reference/vector-databases) for supported providers, install extras, defaults, and required environment variables.
-
-| Database | `vector_db` | Extra | Notes |
-| --- | --- | --- | --- |
-| Qdrant (local) | `qdrant` | `ragrails[qdrant]` | Needs `url` |
-| Qdrant Cloud | `qdrant_cloud` | `ragrails[qdrant]` | Cloud `url` + `QDRANT_API_KEY` |
-| Pinecone | `pinecone` | `ragrails[pinecone]` | Uses `PINECONE_API_KEY` |
-| Weaviate | `weaviate` | `ragrails[weaviate]` | Local or cloud, needs `url` |
-
-<Note>The constructor uses `vector_store={"provider": ...}` + `collection=`; `store`/`edit`/`delete` use `vector_db=` to override.</Note>
-
-## Keeping an index current
-
-| Task | Method |
-| --- | --- |
-| Add new chunks | `store()` |
-| Replace chunks (re-embeds by ID) | `edit()` |
-| Remove chunks by ID | `delete()` |
-
-<Tip>Give chunks stable IDs at chunk time so `edit()` and `delete()` can target them later.</Tip>
+- Use [Retrieval](/features/retrieval) to search stored vectors.
+- Use [Query](/features/query) for the high-level query pipeline.
+- Use [Knowledge Base Maintenance](/features/knowledge-base-maintenance) for update and delete workflows.

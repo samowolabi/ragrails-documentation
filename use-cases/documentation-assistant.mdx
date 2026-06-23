@@ -6,19 +6,25 @@ description: "Let users ask your docs in plain language."
 
 ## The problem
 
-Documentation grows faster than anyone can navigate it. Users give up on search and file a ticket, or leave.
+Documentation grows faster than users can navigate it. Keyword search fails when users ask in their own words, and support tickets pile up for answers that already exist in the docs.
 
-## How Ragrails solves it
+## Why Ragrails fits
 
-Crawl the whole docs site once, then answer questions grounded in the actual pages.
+Ragrails can crawl a docs site, store it in a vector database, stream progress during long crawls, and answer with citations to the original pages.
 
-1. **Full-crawl** the docs site into a collection.
-2. **Chat** over it, embedded as a widget, Slack bot, or CLI.
-3. Cite `result.sources` so users can click through to the real page.
+| Need | Ragrails capability |
+| --- | --- |
+| Crawl a full documentation site | [Extraction](/features/extraction) |
+| Show crawl and answer progress | [Streaming](/capabilities/streaming) |
+| Answer with source citations | [Chat](/features/chat) |
+| Improve follow-up questions | [Query Rewriting](/capabilities/query-rewriting) |
+| Keep docs fresh after deploys | [Knowledge Base Maintenance](/features/knowledge-base-maintenance) |
+
+## Sample
 
 <CodeGroup>
 ```python SDK
-from ragrails import RagRails
+from ragrails import QueryRewriteConfig, RagRails
 
 rag = RagRails(
     collection="docs",
@@ -26,38 +32,77 @@ rag = RagRails(
     embedding={"provider": "voyage", "model": "voyage-3"},
     llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
-rag.setup_url()
-rag.ingest(urls="https://docs.example.com", ingestion={"urls": {"mode": "full", "max_pages": 500}})
-result = rag.chat("How do I rotate an API key?", history=[])
+
+for event in rag.scrape_stream("https://docs.example.com", mode="full", max_pages=500):
+    if event["type"] == "page":
+        print("indexed source page", event["data"]["url"])
+
+rag.ingest(
+    urls="https://docs.example.com",
+    ingestion={"urls": {"mode": "full", "max_pages": 500}},
+    storage={"collection": "docs"},
+)
+
+result = rag.chat(
+    "How do I rotate an API key?",
+    history=[],
+    query_rewrite=QueryRewriteConfig(enabled=True),
+)
+
 print(result.answer)
+print(result.sources)
 ```
 
 ```bash CLI
-ragrails setup-url
+ragrails setup-url --browser chromium
+
 ragrails ingest \
   --source-url https://docs.example.com \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
 
 ragrails chat "How do I rotate an API key?" \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+  --rewrite-query \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --embedder-provider voyage \
+  --embedder-model voyage-3 \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini
 ```
 
 ```bash REST API
+curl -N -X POST http://127.0.0.1:8000/v1/ingest/url/stream \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://docs.example.com", "mode": "full", "max_pages": 500}'
+
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
-  -d '{"urls": "https://docs.example.com", "ingestion": {"urls": {"mode": "full", "max_pages": 500}}, "embedding": {"provider": "voyage", "model": "voyage-3"}, "storage": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"}}' 
+  -d '{
+    "urls": "https://docs.example.com",
+    "ingestion": {"urls": {"mode": "full", "max_pages": 500}},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"}
+  }'
 
-curl -X POST http://127.0.0.1:8000/v1/chat \
+curl -N -X POST http://127.0.0.1:8000/v1/chat/stream \
   -H "Content-Type: application/json" \
-  -d '{"query": "How do I rotate an API key?", "llm_provider": "openai", "llm_model": "gpt-4o-mini", "embedder_provider": "voyage", "embedder_model": "voyage-3", "vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "history": []}' 
+  -d '{
+    "query": "How do I rotate an API key?",
+    "query_rewrite": {"enabled": true},
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": []
+  }'
 ```
 </CodeGroup>
 
-<Tip>Re-crawl on a schedule and use [`edit()`/`delete()`](/features/knowledge-base-maintenance) to keep the index in sync as docs change.</Tip>
+## Production notes
 
-## Features used
-
-[Extraction](/features/extraction) · [Chat](/features/chat) · [Keeping your index current](/features/knowledge-base-maintenance)
+- Use `max_pages` so crawls are bounded.
+- Store returned sources in the UI for click-through citations.
+- Re-crawl after docs deploys and delete chunks that disappeared.

@@ -1,39 +1,54 @@
 ---
-title: "CLI Chunking"
+title: "Chunking"
 icon: "scissors"
-description: "Chunk ingestion output JSON files from the terminal."
+description: "Split CLI extraction JSON into retrieval-ready chunks."
 ---
 
-`chunk` reads ingestion-output JSON from `--input-dir` and writes a `chunks.json` file to `--output-dir`. Chunking splits documents into focused passages so search can match the exact paragraph that answers a query.
+`ragrails chunk` reads extraction output JSON from `--input-dir` and writes `chunks.json` to `--output-dir`.
 
-<CodeGroup>
-```bash Command
+Use it when you want to inspect or version chunks before embedding. If you do not need intermediate files, use `ragrails ingest` instead.
+
+## Command
+
+```bash
 ragrails chunk \
   --input-dir files/output/docs/ \
-  --output-dir files/chunks/ \
+  --output-dir files/output/chunks/ \
   --chunk-size 2000 \
   --chunk-overlap 200 \
   --min-chunk-length 100
 ```
 
-```text Output
+Output:
+
+```text
 Documents : 12
 Chunks    : 87
 Failed    : 0
-Saved to  : files/chunks/chunks.json
+Saved to  : files/output/chunks/chunks.json
 ```
-</CodeGroup>
 
-## Choosing chunk size
+## Choosing Chunk Size
 
-`--chunk-size` is the main lever. Too small loses surrounding context; too large retrieves noise around the answer. Start at `2000` with `200` overlap (~10%), lower the size for dense factual content like specs or FAQs.
+Start at `--chunk-size 2000` with `--chunk-overlap 200`. Lower the size for dense factual content like FAQs, specs, or policies. Raise it when answers need more surrounding context.
 
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--input-dir` | required | Folder of ingestion output JSON files |
-| `--output-dir` | required | Folder to write `chunks.json` to |
-| `--chunk-size` | `2000` | Max characters per chunk |
-| `--chunk-overlap` | `200` | Character overlap between chunks |
-| `--min-chunk-length` | `100` | Drop chunks shorter than this |
+| `--input-dir` | required | Folder containing extraction output JSON files. |
+| `--output-dir` | required | Folder to write `chunks.json`. |
+| `--chunk-size` | `2000` | Target max characters per chunk. |
+| `--chunk-overlap` | `200` | Character overlap between adjacent chunks. |
+| `--min-chunk-length` | `100` | Drop chunks shorter than this. |
+
+## Next Stage
+
+```bash
+ragrails embed --input-dir files/output/chunks/ --output-dir files/output/embedded/
+```
+
+<CardGroup cols={2}>
+  <Card title="Extraction" icon="file-input" href="/usage/cli/extraction">Create document JSON.</Card>
+  <Card title="Embedding" icon="binary" href="/usage/cli/embedding">Embed chunk JSON.</Card>
+</CardGroup>

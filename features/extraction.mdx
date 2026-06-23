@@ -4,86 +4,512 @@ icon: "file-input"
 description: "Load documents, scraped websites, APIs, or Markdown before indexing."
 ---
 
-Extraction is part of the ingest workflow. It loads source content and normalizes it into Markdown the rest of the pipeline can use.
+Extraction is part of the [Ingest](/features/ingest) workflow. It loads source content and normalizes it into Markdown the rest of the pipeline can use.
 
-## Interface Docs
+Use this page to choose the right extraction path. Use the interface-specific pages when you need every parameter, flag, request field, or response shape.
 
-Use the interface-specific docs when you need exact parameters, flags, request fields, or response shapes.
+- [SDK extraction](/usage/sdk/extraction)
+- [CLI extraction](/usage/cli/extraction)
+- [REST extraction](/usage/server/extraction)
 
-- [SDK extraction](/usage/sdk/ingestion)
-- [CLI extraction](/usage/cli/ingestion)
-- [REST extraction](/usage/server/ingestion)
+## Source forms
 
-Supported source forms:
+| Method | Source | Best for | Notes |
+| --- | --- | --- | --- |
+| `scrape()` | Web pages and full sites | Docs sites, help centers, marketing pages | Needs `ragrails[url]` and one-time browser setup |
+| `scrape_stream()` | Web pages with live events | Long crawls where you want progress | SDK and REST streaming are supported |
+| `parse()` | Documents | PDFs, DOCX, PPTX, XLSX, HTML, Markdown, TXT, CSV, JSON, XML, ZIP, and more | Accepts paths, file URLs, folders, and bytes |
+| `fetch()` | REST API responses | Product catalogs, support articles, OpenAPI JSON, paginated APIs | Supports headers, params, JSON bodies, pagination, and batch endpoints in SDK |
+| `markdown` | Already-normalized text | Generated docs, fixtures, CMS exports | Used directly by `ingest()`, not a standalone extraction method |
 
-| Method | Source | Needs |
-| --- | --- | --- |
-| `scrape()` | Scrape Website (one URL or a full crawl) | `ragrails[url]` + `setup_url()` |
-| `scrape_stream()` | Scrape Website with live progress events | `ragrails[url]` + `setup_url()` |
-| `parse()` | Files: local paths, file URLs, or raw bytes (PDF, DOCX, XLSX, HTML, MD, CSV...) | none |
-| `fetch()` | REST API responses | none |
+<Note>Website scraping needs `pip install "ragrails[url]"` and a one-time `rag.setup_url()` or `ragrails setup-url` in the environment that runs the scraper. The browser can be `chromium`, `firefox`, or `webkit`.</Note>
+
+## Common shape
+
+All extraction methods return normalized document objects. Downstream chunking only needs the `text` field, but the metadata keeps source context for retrieval and citations.
+
+```json
+{
+  "id": "doc_123",
+  "text": "# Refund policy\n\nRefunds are available within 30 days.",
+  "source": "files/docs/refund-policy.pdf",
+  "title": "Refund policy",
+  "metadata": {
+    "source_kind": "path",
+    "file_type": "pdf"
+  }
+}
+```
+
+## Scrape websites
+
+Use `scrape()` for exact URLs or full-site crawls.
+
+<CodeGroup>
+```python SDK
+from ragrails import DLQ, RagRails
+
+rag = RagRails()
+rag.setup_url()
+
+# One exact URL
+one = rag.scrape("https://example.com/docs")
+
+# Multiple exact URLs
+many = rag.scrape([
+    "https://example.com/docs",
+    "https://example.com/blog",
+])
+
+# Per-URL config: mix exact pages and full crawls
+mixed = rag.scrape([
+    "https://example.com/docs/auth",
+    {"url": "https://example.com/docs", "mode": "full", "max_depth": 2, "max_pages": 50},
+])
+
+# Save retryable failures, then retry only those pages later
+first = rag.scrape("https://example.com/docs", mode="full", dlq=DLQ("files/dlq/web.json"))
+retry = rag.scrape(dlq="files/dlq/web.json")
+
+# Save extracted pages to JSON files
+saved = rag.scrape(
+    "https://example.com/docs",
+    output_format="json",
+    output_dest="file",
+    output_dir="files/output/web/",
+)
+```
+
+```bash CLI
+ragrails setup-url
+
+# Exact URLs
+ragrails scrape https://example.com/docs https://example.com/blog
+
+# Full site crawl
+ragrails scrape https://example.com/docs \
+  --mode full \
+  --max-depth 2 \
+  --max-pages 50 \
+  --output-dir files/output/web/
+
+# Add YAML frontmatter to saved markdown output
+ragrails scrape https://example.com/docs \
+  --frontmatter \
+  --output-dir files/output/web/
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/ingest/url \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/docs", "mode": "full", "max_depth": 2, "max_pages": 50}'
+
+curl -X POST http://127.0.0.1:8000/v1/ingest/url \
+  -H "Content-Type: application/json" \
+  -d '{"url": ["https://example.com/docs", {"url": "https://example.com/blog", "mode": "full", "max_depth": 1}]}'
+```
+</CodeGroup>
+
+<Warning>Always cap `max_pages` on a full crawl. Sites can be huge, and every page costs a fetch.</Warning>
+
+<Note>Dead-letter queue retry is SDK-first. REST returns `errors` and a `dlq` payload, but you resubmit failed URLs yourself. The CLI does not expose DLQ retry flags.</Note>
+
+## Stream website extraction
+
+Use streaming when a crawl may take a while and the caller should see progress before the final result.
+
+<CodeGroup>
+```python SDK
+for event in rag.scrape_stream("https://example.com/docs", mode="full", max_pages=50):
+    if event["type"] == "page":
+        print("scraped", event["data"]["url"])
+    elif event["type"] == "error":
+        print("error", event["message"])
+    elif event["type"] == "final":
+        print("pages", event["data"]["pages"])
+```
+
+```bash REST API
+curl -N -X POST http://127.0.0.1:8000/v1/ingest/url/stream \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/docs", "mode": "full", "max_pages": 50}'
+```
+</CodeGroup>
+
+Streaming yields progress/page/error events and ends with a `final` event containing the same aggregate shape as `scrape()`.
+
+## Parse documents
+
+Use `parse()` for local files, folders, remote file URLs, path dictionaries with metadata, or raw bytes from uploads/object storage.
 
 <CodeGroup>
 ```python SDK
 from ragrails import RagRails
+
 rag = RagRails()
 
-docs = rag.parse(folder="files/docs/")
-api = rag.fetch(url="https://api.example.com/products", title="Products")
+# One or more local files
+local = rag.parse(files=["files/guide.pdf", "files/pricing.csv"])
 
-rag.setup_url()  # one-time browser install
-site = rag.scrape("https://example.com", mode="full", max_pages=50)
-events = rag.scrape_stream("https://example.com", mode="full", max_pages=50)
+# Folder: all supported files directly inside the folder
+folder = rag.parse(folder="files/docs/")
+
+# Remote file URL; the URL path must end with a supported extension
+remote = rag.parse(files="https://example.com/files/whitepaper.pdf")
+
+# Path dicts add title/description metadata
+with_metadata = rag.parse(files=[
+    {"path": "files/refund-policy.pdf", "title": "Refund policy", "description": "Customer refund rules"},
+    {"path": "https://example.com/files/product-guide.pdf", "title": "Product guide"},
+])
+
+# Raw bytes, useful for web uploads or object storage
+with open("files/guide.pdf", "rb") as f:
+    data = f.read()
+bytes_result = rag.parse(files=[{"content": data, "filename": "guide.pdf", "title": "Guide"}])
+
+# Mixed inputs in one call
+mixed = rag.parse(files=[
+    "files/local.pdf",
+    "https://example.com/files/remote.docx",
+    {"content": data, "filename": "upload.pdf", "source": "s3://bucket/upload.pdf"},
+])
+
+# Return markdown with YAML frontmatter, or save JSON/markdown files
+frontmatter = rag.parse(files="files/guide.pdf", frontmatter=True)
+saved = rag.parse(files="files/guide.pdf", output_format="json", output_dest="file", output_dir="files/output/docs/")
 ```
 
 ```bash CLI
+# Folder
 ragrails parse --folder files/docs/ --output-dir files/output/docs/
-ragrails fetch https://api.example.com/products --title Products --output-dir files/output/api/
 
-ragrails setup-url
-ragrails scrape https://example.com --mode full --max-pages 50 --output-dir files/output/web/
+# Specific paths or file URLs
+ragrails parse \
+  --files files/guide.pdf \
+  --files https://example.com/files/whitepaper.pdf \
+  --output-dir files/output/docs/
+
+# Add frontmatter to saved markdown output
+ragrails parse --files files/guide.pdf --frontmatter --output-dir files/output/docs/
 ```
 
 ```bash REST API
+# Server-side path, folder, or remote file URL
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{"files": ["files/guide.pdf", "https://example.com/files/whitepaper.pdf"]}'
+
 curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
   -H "Content-Type: application/json" \
   -d '{"folder": "files/docs/"}'
 
-curl -X POST http://127.0.0.1:8000/v1/ingest/api \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://api.example.com/products", "title": "Products"}'
-
-curl -X POST http://127.0.0.1:8000/v1/ingest/url \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "mode": "full", "max_pages": 50}'
-
-curl -N -X POST http://127.0.0.1:8000/v1/ingest/url/stream \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "mode": "full", "max_pages": 50}'
+# Client upload through multipart
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs/upload \
+  -F "files=@docs/guide.pdf" \
+  -F "frontmatter=false" \
+  -F "title=Guide" \
+  -F "description=Product guide"
 ```
 </CodeGroup>
 
+<Note>Use JSON `/v1/ingest/docs` for files reachable by the server process. Use multipart `/v1/ingest/docs/upload` when a client is uploading file bytes to the API.</Note>
 
+<Warning>File URLs must end in a supported extension such as `.pdf`, `.md`, `.docx`, or `.xlsx`; Ragrails checks the URL path before downloading.</Warning>
+
+## Fetch REST APIs
+
+Use `fetch()` for API responses. Each fetched page becomes a document, so paginated endpoints produce multiple documents.
 
 <CodeGroup>
-```json Response
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails()
+
+# Single GET endpoint
+posts = rag.fetch(url="https://api.example.com/posts", title="Blog posts")
+
+# Headers, params, JSON body, method, timeout
+search = rag.fetch(
+    url="https://api.example.com/search",
+    title="Search results",
+    method="POST",
+    headers={"Authorization": "Bearer token"},
+    params={"locale": "en-US"},
+    body={"query": "refund policy"},
+    timeout=30.0,
+)
+
+# Page-number pagination
+paged = rag.fetch(
+    url="https://api.example.com/posts",
+    title="Posts",
+    pagination={"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+    max_pages=10,
+)
+
+# Offset pagination
+offset = rag.fetch(
+    url="https://api.example.com/events",
+    pagination={"type": "offset", "param": "offset", "size_param": "limit", "size": 100},
+    max_pages=20,
+)
+
+# Cursor pagination
+cursor = rag.fetch(
+    url="https://api.example.com/messages",
+    pagination={"type": "cursor", "param": "cursor", "cursor_path": "meta.next_cursor"},
+    max_pages=20,
+)
+
+# Batch endpoints are SDK-only
+batch = rag.fetch(apis=[
+    "https://api.example.com/posts",
+    {"url": "https://api.example.com/comments", "title": "Comments", "max_pages": 5},
+])
+
+# Save output
+saved = rag.fetch("https://api.example.com/posts", output_format="json", output_dest="file", output_dir="files/output/api/")
+```
+
+```bash CLI
+ragrails fetch https://api.example.com/posts \
+  --title "Blog posts" \
+  --description "Public posts API" \
+  --method GET \
+  --header "Authorization:Bearer TOKEN" \
+  --param locale:en-US \
+  --max-pages 10 \
+  --output-dir files/output/api/
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/ingest/api \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.example.com/posts",
+    "title": "Blog posts",
+    "headers": {"Authorization": "Bearer token"},
+    "params": {"locale": "en-US"},
+    "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+    "max_pages": 10,
+    "timeout": 30.0
+  }'
+```
+</CodeGroup>
+
+<Tip>Always set `max_pages` for paginated APIs. It stops pagination even if the upstream API keeps returning a next page.</Tip>
+
+<Note>The CLI covers common `GET`/header/query-param use. Use SDK or REST for JSON request bodies, cursor/offset pagination details, timeout control, or SDK batch `apis=[...]` ingestion.</Note>
+
+## Direct Markdown
+
+If your content is already Markdown, skip extraction and pass it directly to the high-level `ingest()` workflow.
+
+<CodeGroup>
+```python SDK
+rag.ingest(markdown=[
+    {
+        "text": "# Refunds\n\nRefunds are available within 30 days.",
+        "source": "policy.md",
+        "metadata": {"title": "Refunds"},
+    },
+])
+```
+
+```bash CLI
+ragrails ingest \
+  --markdown $'# Refunds\n\nRefunds are available within 30 days.' \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "markdown": [{"text": "# Refunds\n\nRefunds are available within 30 days.", "source": "policy.md", "metadata": {"title": "Refunds"}}],
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+```
+</CodeGroup>
+
+## Ingest pipeline
+
+Use `ingest()` when extraction should immediately continue into chunking, embedding, and vector storage. The high-level pipeline accepts the same source families: `docs`, `urls`, `api`, and `markdown`.
+
+<CodeGroup>
+```python SDK
+result = rag.ingest(
+    docs={"files": ["files/refund-policy.pdf", "files/pricing.csv"]},
+    urls={"url": "https://example.com/docs", "mode": "full", "max_pages": 50},
+    api={
+        "url": "https://api.example.com/articles",
+        "title": "Articles",
+        "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+        "max_pages": 5,
+    },
+    markdown=[
+        {"text": "# Manual note\n\nEscalations are handled by support.", "source": "manual.md"},
+    ],
+    concurrency="parallel",
+    chunking={"chunk_size": 1200, "chunk_overlap": 120},
+    embedding={"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    storage={"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"},
+)
+```
+
+```bash CLI
+ragrails ingest \
+  --docs files/refund-policy.pdf \
+  --source-url https://example.com/docs \
+  --api-url https://api.example.com/articles \
+  --markdown $'# Manual note\n\nEscalations are handled by support.' \
+  --concurrency parallel \
+  --chunk-size 1200 \
+  --chunk-overlap 120 \
+  --provider voyage \
+  --model voyage-3 \
+  --batch-size 64 \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"files": ["files/refund-policy.pdf", "files/pricing.csv"]},
+    "urls": {"url": "https://example.com/docs", "mode": "full", "max_pages": 50},
+    "api": {
+      "url": "https://api.example.com/articles",
+      "title": "Articles",
+      "pagination": {"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+      "max_pages": 5
+    },
+    "markdown": [{"text": "# Manual note\n\nEscalations are handled by support.", "source": "manual.md"}],
+    "concurrency": "parallel",
+    "chunking": {"chunk_size": 1200, "chunk_overlap": 120},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }'
+```
+</CodeGroup>
+
+`concurrency="parallel"` runs independent extraction sources at the same time before chunking. Use `serial` when source order or upstream rate limits matter more than speed.
+
+<Note>The CLI pipeline exposes common extraction flags. Use SDK or REST when you need full per-source extraction options such as URL `max_pages`, API pagination details, request bodies, or document metadata dictionaries.</Note>
+
+## Output shapes
+
+Each extraction method returns a small summary plus normalized document outputs. `outputs` is the part you pass to `chunk()` or inspect before running the full pipeline.
+
+<CodeGroup>
+```json Parse result
 {
   "documents": 1,
   "failed": 0,
   "outputs": [
     {
       "id": "doc_123",
+      "display_id": "refund_policy",
+      "source": "files/refund-policy.pdf",
+      "title": "refund-policy",
       "text": "# Refund policy\n\nRefunds are available within 30 days.",
-      "source": "files/docs/refund-policy.pdf",
-      "metadata": {"title": "Refund policy"}
+      "metadata": {
+        "source_kind": "docs",
+        "file_type": "pdf",
+        "description": ""
+      }
     }
   ],
   "errors": []
 }
 ```
+
+```json Scrape result
+{
+  "pages": 1,
+  "failed": 0,
+  "outputs": [
+    {
+      "id": "url_123",
+      "source": "https://example.com/docs/refunds",
+      "title": "Refund policy",
+      "text": "# Refund policy\n\nRefunds are available within 30 days.",
+      "metadata": {
+        "source_kind": "url",
+        "mode": "each",
+        "root_url": "https://example.com/docs/refunds"
+      }
+    }
+  ],
+  "errors": [],
+  "dlq": null
+}
+```
+
+```json API fetch result
+{
+  "documents": 1,
+  "failed": 0,
+  "outputs": [
+    {
+      "id": "api_123",
+      "display_id": "001_api_example_com_articles",
+      "source": "https://api.example.com/articles",
+      "title": "Articles — page 1",
+      "text": "# Articles — page 1\n\n{...}",
+      "metadata": {
+        "source_kind": "api",
+        "file_type": "api",
+        "method": "GET",
+        "page": 1,
+        "item_count": 25,
+        "max_pages": 5
+      }
+    }
+  ],
+  "errors": []
+}
+```
+
+```json Ingest pipeline result
+{
+  "sources": 3,
+  "chunks": 12,
+  "embedded": 12,
+  "stored": 12,
+  "source_results": {
+    "docs": {"documents": 1, "failed": 0},
+    "urls": {"pages": 1, "failed": 0},
+    "api": {"documents": 1, "failed": 0}
+  },
+  "failed": 0,
+  "errors": []
+}
+```
 </CodeGroup>
 
-## Possible Errors
+| Key | Meaning |
+| --- | --- |
+| `documents` | Number of document outputs from `parse()` or `fetch()`. |
+| `pages` | Number of page outputs from `scrape()`. |
+| `outputs` | Normalized document dictionaries containing `text`, `source`, `title`, and `metadata`. |
+| `failed` | Number of sources or stage items that failed. |
+| `errors` | Structured validation, fetch, parse, crawl, or provider errors. |
+| `dlq` | Retryable scrape failures when SDK dead-letter queue capture is enabled. |
+| `sources` | Number of extracted documents sent into the high-level ingest pipeline. |
+| `chunks`, `embedded`, `stored` | Downstream counts from chunking, embedding, and storage inside `ingest()`. |
+| `source_results` | Per-source extraction summaries from `docs`, `urls`, `api`, and `markdown`. |
+
+## Possible errors
 
 Most stage-level failures are returned in the result `errors` list instead of raising immediately. REST validation and setup failures may return an exception envelope instead. See [Errors](/reference/errors) for the shared shapes.
 
@@ -98,7 +524,7 @@ Most stage-level failures are returned in the result `errors` list instead of ra
       "source": "files/missing.pdf",
       "source_kind": "path",
       "stage": "validate",
-      "error": "File not found: files/missing.pdf",
+      "error": "document path not found: files/missing.pdf",
       "isRetryable": false,
       "attempts": 1
     }
@@ -110,15 +536,12 @@ Most stage-level failures are returned in the result `errors` list instead of ra
 {
   "pages": 0,
   "failed": 1,
-  "total_kb": 0.0,
-  "page_times": [],
   "outputs": [],
-  "crawled": [],
   "errors": [
     {
       "source": "https://example.com/docs",
       "source_kind": "url",
-      "stage": "fetch",
+      "stage": "crawl",
       "error": "Timeout while loading page",
       "isRetryable": true,
       "mode": "full",
@@ -139,7 +562,7 @@ Most stage-level failures are returned in the result `errors` list instead of ra
     {
       "source": "https://api.example.com/products",
       "source_kind": "api",
-      "stage": "fetch",
+      "stage": "request",
       "error": "HTTP 500 from upstream API",
       "isRetryable": true,
       "attempts": 1,
@@ -159,13 +582,8 @@ Most stage-level failures are returned in the result `errors` list instead of ra
 ```
 </CodeGroup>
 
-<Note>**`parse()` takes more than file paths.** Pass a local path, a file URL (downloaded automatically), or raw bytes, which is ideal for web uploads and object storage where the file never touches disk. See [input forms](/usage/sdk/ingestion#input-forms).</Note>
+## Next steps
 
-## Scrape Website
-
-- `mode="each"` - scrape only the exact URLs you pass.
-- `mode="full"` - crawl the whole site from a starting URL.
-
-<Warning>Always cap `max_pages` on a full crawl. Sites can be huge, and every page costs a fetch.</Warning>
-
-<Note>**Dead-letter queue:** in a large crawl, some pages fail (timeouts, rate limits). Pass `dlq=DLQ("file.json")` to record failures, then retry only those with `scrape(dlq="file.json")`. See [DLQ](/usage/sdk/ingestion#dead-letter-queue-dlq).</Note>
+- Use [Chunking](/features/chunking) to split extracted documents into searchable passages.
+- Use [Ingest](/features/ingest) when you want extraction, chunking, embedding, and storage in one call.
+- Use [Resilient Ingestion](/capabilities/resilient-ingestion) when large crawls or paginated APIs need retry strategy.

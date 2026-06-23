@@ -222,7 +222,7 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
 </CodeGroup>
 
 <Note>HTTP/HTTPS document links must end with a supported file extension, such as `.pdf`, `.md`, `.docx`, or `.xlsx`. REST local file paths are read by the server process.</Note>
-<Tip>For browser/app uploads, use the multipart extraction endpoint first: [REST extraction](/usage/server/ingestion#upload-documents-post-v1ingestdocsupload).</Tip>
+<Tip>For browser/app uploads, use the multipart extraction endpoint first: [REST extraction](/usage/server/extraction#parse-documents).</Tip>
 
 ## Folders
 
@@ -639,4 +639,4 @@ The ingest response summarizes each stage and keeps the detailed nested results 
 
 Use [Extraction](/features/extraction), [Chunking](/features/chunking), [Embedding](/features/embedding), and [Storing](/features/storing) directly when you need to inspect intermediate files, recover from a specific stage, or run custom logic between stages.
 
-<Tip>For a copy-paste flow, start with the [Quickstart](/getting-started/quickstart). For interface-specific details, see [SDK pipeline](/usage/sdk/pipeline), [CLI pipeline](/usage/cli/pipeline), or [REST pipeline](/usage/server/pipeline).</Tip>
+<Tip>For a copy-paste flow, start with the [Quickstart](/getting-started/quickstart). For interface-specific details, see [SDK pipeline](/usage/sdk/pipeline-overview), [CLI pipeline](/usage/cli/pipeline-overview), or [REST pipeline](/usage/server/pipeline-overview).</Tip>

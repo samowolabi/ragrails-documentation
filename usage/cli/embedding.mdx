@@ -1,43 +1,58 @@
 ---
-title: "CLI Embedding"
+title: "Embedding"
 icon: "binary"
-description: "Embed chunk JSON files from the terminal."
+description: "Embed CLI chunk JSON files."
 ---
 
-`embed` reads chunk JSON from `--input-dir`, generates vectors, and writes an `embedded.json` file to `--output-dir`. Embedding is separate from storage; pass the output to `store` next.
+`ragrails embed` reads chunk JSON from `--input-dir`, generates vectors, and writes `embedded.json` to `--output-dir`.
 
 ```bash
 pip install "ragrails[voyage]"
+export VOYAGE_API_KEY="..."
 ```
 
-<CodeGroup>
-```bash Command
+## Command
+
+```bash
 ragrails embed \
-  --input-dir files/chunks/ \
-  --output-dir files/embedded/ \
+  --input-dir files/output/chunks/ \
+  --output-dir files/output/embedded/ \
   --provider voyage \
   --model voyage-3 \
   --batch-size 64
 ```
 
-```text Output
+Output:
+
+```text
 Inputs   : 87
 Embedded : 87
 Failed   : 0
-Saved to : files/embedded/embedded.json
+Saved to : files/output/embedded/embedded.json
 ```
-</CodeGroup>
 
-The CLI embeds with `input_type="document"` (for indexing). Query-time embedding happens inside `retrieve`.
+The CLI embeds with document input type for indexing. Query-time embedding happens inside `query`, `retrieve`, and `chat`.
 
-<Tip>Use the same provider and model for embedding and retrieval. Vectors from different models aren't comparable. Raise `--batch-size` to cut API calls, lower it if you hit rate limits.</Tip>
+<Tip>Use the same embedding provider/model for indexing and retrieval. Vectors from different models are not comparable.</Tip>
 
 ## Options
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--input-dir` | required | Folder of chunk JSON files |
-| `--output-dir` | required | Folder to write `embedded.json` to |
-| `--provider` | `voyage` | Embedding provider |
-| `--model` | `voyage-3` | Embedding model |
-| `--batch-size` | `64` | Chunks per embedding request |
+| `--input-dir` | required | Folder containing chunk JSON files. |
+| `--output-dir` | required | Folder to write `embedded.json`. |
+| `--provider` | `voyage` | Embedding provider. |
+| `--model` | `voyage-3` | Embedding model. |
+| `--batch-size` | `64` | Chunks per embedding request. |
+
+## Next Stage
+
+```bash
+ragrails store --input-dir files/output/embedded/ \
+  --vector-db qdrant --collection support --url http://localhost:6333
+```
+
+<CardGroup cols={2}>
+  <Card title="Chunking" icon="scissors" href="/usage/cli/chunking">Create chunks.</Card>
+  <Card title="Storing" icon="database" href="/usage/cli/storing">Store embedded chunks.</Card>
+</CardGroup>

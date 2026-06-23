@@ -1,0 +1,67 @@
+---
+title: "REST Ingest"
+icon: "package-plus"
+description: "Build a searchable knowledge base in one HTTP request."
+---
+
+`POST /v1/pipelines/ingest` runs extraction, chunking, embedding, and storage together. Use it when your application wants one request to build or refresh a collection.
+
+## Request
+
+<CodeGroup>
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "docs": {"folder": "files/docs/"},
+    "urls": ["https://example.com/docs"],
+    "markdown": [
+      {"id": "refund-policy", "text": "Customers can request a refund within 30 days of purchase."}
+    ],
+    "chunking": {"chunk_size": 1200, "chunk_overlap": 120},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"},
+    "concurrency": "parallel"
+  }'
+```
+
+```json Response
+{
+  "sources": 8,
+  "chunks": 64,
+  "embedded": 64,
+  "stored": 64,
+  "source_results": {},
+  "chunk_result": {},
+  "embed_result": {},
+  "store_result": {},
+  "failed": 0,
+  "errors": []
+}
+```
+</CodeGroup>
+
+## Inputs
+
+| Field | Description |
+| --- | --- |
+| `docs` | File, folder, file URL, or document config passed to document parsing. |
+| `urls` | URL, list of URLs, or URL configs passed to website scraping. |
+| `api` | API endpoint config passed to API fetching. |
+| `markdown` | Raw markdown string, list of strings, or list of document dicts. |
+
+You can combine inputs in one request. Ragrails merges extracted documents before chunking.
+
+## Config Blocks
+
+| Block | Controls |
+| --- | --- |
+| `ingestion` | Extraction options shared across source types. |
+| `chunking` | Chunk size, overlap, and minimum chunk length. |
+| `embedding` | Embedding provider, model, provider options, batch size, and input type. |
+| `storage` | Vector database, collection, URL, batch size, and provider options. |
+| `concurrency` | `"serial"` or `"parallel"` source extraction before chunking. |
+
+## When To Use Stage Endpoints
+
+Use [stage endpoints](/usage/server/pipeline-overview) instead of `/v1/pipelines/ingest` when you need to inspect extracted documents, review chunks before embedding, store artifacts outside the API response, or retry a specific stage.

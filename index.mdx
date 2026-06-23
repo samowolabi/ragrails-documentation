@@ -1,10 +1,22 @@
 ---
 title: "Overview"
 icon: "house"
-description: "Build AI agents, RAG chatbots, and AI search on a knowledge base from your own data."
+description: "Build searchable, chat-ready knowledge bases from websites, documents, APIs, and Markdown."
 ---
 
-Ragrails builds a RAG knowledge base from many source types: websites, documents, REST APIs, or Markdown you already have. Source content is normalized to Markdown internally, then chunked, embedded, stored, and retrieved so your AI agents and LLMs answer from grounded information.
+Ragrails turns source content into a retrieval-ready knowledge base. It extracts content from websites, documents, REST APIs, or Markdown, then chunks, embeds, stores, retrieves, and chats over that content through the SDK, CLI, or REST API.
+
+Use it when you need AI search, grounded chat, support agents, documentation assistants, internal knowledge bases, or API copilots backed by your own data.
+
+## What Ragrails gives you
+
+| Capability | What it means |
+| --- | --- |
+| Multi-source ingestion | Websites, local files, remote files, REST APIs, uploads, and direct Markdown. |
+| End-to-end pipelines | `ingest()` builds the index; `query()` searches it; `chat()` answers with retrieved context. |
+| Three interfaces | Use the Python SDK, terminal CLI, or hosted REST API over the same pipeline. |
+| Structured results | Every stage returns counts, items, errors, metadata, and output shapes you can automate. |
+| Production controls | Reranking, query rewriting, chat quality gates, streaming, resilient ingestion, and maintenance. |
 
 ## Install
 
@@ -12,15 +24,18 @@ Ragrails builds a RAG knowledge base from many source types: websites, documents
 pip install "ragrails[voyage,qdrant]"
 ```
 
-The extras add an embedder (`voyage`) and a vector database (`qdrant`, `pinecone`, or `weaviate`).
+For website crawling, install URL support and set up a browser once:
 
-LLM providers (`openai`, `anthropic`, `google`) are built in, no extra needed.
+```bash
+pip install "ragrails[url,voyage,qdrant]"
+ragrails setup-url --browser chromium
+```
 
-See [installation](/getting-started/installation).
+See [Installation](/getting-started/installation) for provider and vector database extras.
 
-## Quick example
+## Quick Path
 
-Pick the interface you use in production. The example below uses a document source; Ragrails converts documents, websites, and API responses to Markdown internally before chunking and embedding them. If your content is already Markdown, you can pass it directly with `markdown=` / `--markdown` / `"markdown"`.
+This example builds a `support` collection from one document, searches it, then asks a grounded chat question. The sample source says: "Customers can request a refund within 30 days of purchase."
 
 <CodeGroup>
 ```python SDK
@@ -33,52 +48,50 @@ rag = RagRails(
     llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
 
-rag.ingest(docs=["files/refund-policy.pdf"])
+rag.ingest(docs="files/refund-policy.pdf")
 
-# Other source forms use the same pipeline:
-# rag.ingest(urls="https://example.com/help/refunds")
-# rag.ingest(api={"url": "https://api.example.com/refund-policy"})
-# rag.ingest(markdown="# Refund policy\n\nCustomers can request a refund within 30 days of purchase.")
+matches = rag.query("How long do I have to request a refund?", retrieval={"top_k": 5})
+answer = rag.chat("How long do I have to request a refund?", history=[])
 
-print(rag.query("How long do I have to request a refund?", retrieval={"top_k": 5}).items)
-print(rag.chat("How long do I have to request a refund?", history=[]).answer)
+print(matches.items[0].text)
+print(answer.answer)
 ```
 
 ```bash CLI
 ragrails ingest \
   --docs files/refund-policy.pdf \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-
-# Other source forms use the same pipeline:
-# ragrails ingest --source-url https://example.com/help/refunds
-# ragrails ingest --api-url https://api.example.com/refund-policy
-# ragrails ingest --markdown "# Refund policy\n\nCustomers can request a refund within 30 days of purchase."
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
 
 ragrails query "How long do I have to request a refund?" \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
   --top-k 5 \
-  --provider voyage --model voyage-3
+  --provider voyage \
+  --model voyage-3
 
 ragrails chat "How long do I have to request a refund?" \
-  --vector-db qdrant --collection support --url http://localhost:6333 \
-  --embedder-provider voyage --embedder-model voyage-3 \
-  --llm-provider openai --llm-model gpt-4o-mini
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --embedder-provider voyage \
+  --embedder-model voyage-3 \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini
 ```
 
 ```bash REST API
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
   -d '{
-    "docs": ["files/refund-policy.pdf"],
+    "docs": "files/refund-policy.pdf",
     "embedding": {"provider": "voyage", "model": "voyage-3"},
     "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
   }'
-
-# Other source forms use the same pipeline:
-# "urls": "https://example.com/help/refunds"
-# "api": {"url": "https://api.example.com/refund-policy"}
-# "markdown": "# Refund policy\n\nCustomers can request a refund within 30 days of purchase."
 
 curl -X POST http://127.0.0.1:8000/v1/pipelines/query \
   -H "Content-Type: application/json" \
@@ -104,38 +117,54 @@ curl -X POST http://127.0.0.1:8000/v1/chat \
 ```
 </CodeGroup>
 
-Mix any sources in one call, or use them on their own:
+## Source Types
 
-| Source | Method | Usage |
-| --- | --- | --- |
-| Websites | `urls=` | [Website to RAG](/guides/website-to-rag) · [`scrape()`](/usage/sdk/ingestion#url-ingestion-scrape) |
-| Documents | `docs=` | [Documents to RAG](/guides/docs-to-rag) · [`parse()`](/usage/sdk/ingestion#document-ingestion-parse) |
-| REST APIs | `api=` | [API to RAG](/guides/api-to-rag) · [`fetch()`](/usage/sdk/ingestion#api-ingestion-fetch) |
-| Markdown | `markdown=` | Use when your content is already Markdown or already normalized |
+Use one source type or combine several in the same `ingest()` call.
 
-<Note>Config boundaries: SDK defaults live in `RagRails(...)`; CLI defaults live in `.ragrails.toml`; REST examples pass defaults in each request body. Website scraping also needs `pip install "ragrails[url]"` and a one-time `rag.setup_url()` or `ragrails setup-url`.</Note>
+| Source | SDK | CLI | Walkthrough |
+| --- | --- | --- | --- |
+| Website | `urls="https://example.com"` | `--source-url https://example.com` | [Build From a Website](/guides/website-to-rag) |
+| Documents | `docs="files/guide.pdf"` or `docs={"folder": "files/docs/"}` | `--docs`, `--folder` | [Build From Documents](/guides/docs-to-rag) |
+| REST API | `api={"url": "https://api.example.com/items"}` | `--api-url https://api.example.com/items` | [Build From an API](/guides/api-to-rag) |
+| Markdown | `markdown="# Refunds\n..."` | `--markdown "# Refunds..."` | [Pipeline Overview](/features/pipeline-overview) |
 
-## Start here
+<Note>SDK defaults live in `RagRails(...)`; CLI defaults live in `.ragrails.toml`; REST requests pass configuration in each request body.</Note>
+
+## Where To Go Next
 
 <CardGroup cols={2}>
-  <Card title="How RAG works" icon="book" href="/getting-started/concepts">
-    New to RAG? Read this first. The whole pipeline in 5 minutes.
-  </Card>
   <Card title="Quickstart" icon="zap" href="/getting-started/quickstart">
-    A working knowledge base and chat in ~20 lines.
+    Build a working knowledge base and chat flow quickly.
   </Card>
-  <Card title="Features" icon="layers" href="/features/overview">
-    Each stage, what it's for, and how to tune it.
+  <Card title="How RAG Works" icon="book-open" href="/getting-started/concepts">
+    Learn the pipeline terms before tuning them.
   </Card>
-  <Card title="Pick an interface" icon="code" href="/usage/sdk/overview">
-    SDK, CLI, or REST API.
+  <Card title="Pipeline Overview" icon="route" href="/features/pipeline-overview">
+    See extraction, chunking, embedding, storing, retrieval, chat, and maintenance together.
+  </Card>
+  <Card title="Capabilities" icon="sliders-horizontal" href="/capabilities/overview">
+    Turn on reranking, rewriting, quality controls, streaming, resilient ingestion, and tools.
+  </Card>
+  <Card title="Use Cases" icon="sparkles" href="/use-cases/overview">
+    Pick a strong sample: support agent, docs assistant, internal KB, AI search, or API copilot.
+  </Card>
+  <Card title="Walkthroughs" icon="map" href="/guides/website-to-rag">
+    Follow source-specific setup paths for websites, documents, APIs, or REST hosting.
   </Card>
 </CardGroup>
 
-## Pick your interface
+## Interfaces
 
-| Interface | Use it when |
-| --- | --- |
-| [SDK](/usage/sdk/overview) | You build in Python |
-| [CLI](/usage/cli/overview) | You work in the terminal or scripts |
-| [REST API](/usage/server/overview) | Your app isn't Python |
+| Interface | Use it when | Start here |
+| --- | --- | --- |
+| SDK | You are building a Python app or worker. | [SDK Overview](/usage/sdk/overview) |
+| CLI | You want terminal workflows, scripts, or local experiments. | [CLI Overview](/usage/cli/overview) |
+| REST API | Your app is not Python or you want Ragrails as a service. | [REST API Overview](/usage/server/overview) |
+
+## Common Production Steps
+
+1. Add [Reranking](/capabilities/reranking) when search results are relevant but poorly ordered.
+2. Add [Query Rewriting](/capabilities/query-rewriting) for follow-up questions.
+3. Add [Chat Tuning](/capabilities/chat-tuning) before exposing answers to users.
+4. Add [Streaming](/capabilities/streaming) for long crawls or responsive chat UIs.
+5. Add [Knowledge Base Maintenance](/features/knowledge-base-maintenance) so changed and deleted source content stays in sync.

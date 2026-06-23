@@ -1,0 +1,200 @@
+---
+title: "Overview"
+icon: "route"
+description: "How extraction, chunking, embedding, storing, retrieval, chat, and maintenance fit together."
+---
+
+Ragrails has two main pipelines: an ingest pipeline that builds a searchable knowledge base, and a query pipeline that searches it or answers with chat. Maintenance keeps the stored knowledge base aligned with source changes.
+
+## Pipeline map
+
+| Stage | Input | Output | Use it when |
+| --- | --- | --- | --- |
+| [Extraction](/features/extraction) | Files, URLs, APIs, or markdown | Normalized documents | You need source content in a common document shape. |
+| [Chunking](/features/chunking) | Documents or markdown | Chunk dictionaries with stable IDs and metadata | You need retrieval-sized units. |
+| [Embedding](/features/embedding) | Chunks | Chunks plus vector embeddings | You need vectors for semantic search. |
+| [Storing](/features/storing) | Embedded chunks | Stored vector IDs | You need a vector database index. |
+| [Retrieval](/features/retrieval) | User query | Relevant chunks and scores | You need search results without generation. |
+| [Chat](/features/chat) | User query plus optional history | Grounded answer, sources, updated history | You need an answer over retrieved context. |
+| [Maintenance](/features/knowledge-base-maintenance) | Changed or deleted source content | Replaced or removed chunk IDs | You need to keep the index fresh. |
+
+## Ingest pipeline
+
+The ingest pipeline runs extraction, chunking, embedding, and storage in one call. It returns the individual stage results as well as summary counts.
+
+<CodeGroup>
+```python SDK
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="docs",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+
+result = rag.ingest(
+    docs="files/handbook.pdf",
+    urls="https://example.com/docs",
+    markdown=[{"text": "# Refunds
+Refunds are available within 30 days.", "source": "policy.md"}],
+    chunking={"chunk_size": 800, "chunk_overlap": 120},
+    embedding={"batch_size": 64},
+    storage={"collection": "docs", "batch_size": 64},
+)
+```
+
+```bash CLI
+ragrails ingest   --docs files/handbook.pdf   --url https://example.com/docs   --vector-db qdrant   --collection docs   --db-url http://localhost:6333   --provider voyage   --model voyage-3
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest   -H "Content-Type: application/json"   -d '{
+    "docs": "files/handbook.pdf",
+    "urls": "https://example.com/docs",
+    "markdown": [
+      {"text": "# Refunds
+Refunds are available within 30 days.", "source": "policy.md"}
+    ],
+    "chunking": {"chunk_size": 800, "chunk_overlap": 120},
+    "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
+    "storage": {
+      "vector_db": "qdrant",
+      "collection": "docs",
+      "url": "http://localhost:6333",
+      "batch_size": 64
+    }
+  }'
+```
+</CodeGroup>
+
+Result:
+
+```json
+{
+  "sources": 3,
+  "chunks": 24,
+  "embedded": 24,
+  "stored": 24,
+  "source_results": {},
+  "chunk_result": {"inputs": 3, "chunks": 24, "items": [], "failed": 0, "errors": []},
+  "embed_result": {"inputs": 24, "embedded": 24, "items": [], "failed": 0, "errors": []},
+  "store_result": {"inputs": 24, "stored": 24, "items": [], "failed": 0, "provider": "qdrant", "collection": "docs", "errors": []},
+  "failed": 0,
+  "errors": []
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `sources` | Number of normalized documents passed into chunking. |
+| `chunks` | Number of chunks produced. |
+| `embedded` | Number of chunks embedded successfully. |
+| `stored` | Number of embedded chunks stored successfully. |
+| `source_results` | Per-source extraction results for docs, URLs, APIs, and markdown. |
+| `chunk_result` | Full chunking result. |
+| `embed_result` | Full embedding result. |
+| `store_result` | Full storage result. |
+| `failed` | Combined failure count across stages. |
+| `errors` | Stage-tagged pipeline errors. |
+
+## Query pipeline
+
+The query pipeline embeds the query and retrieves chunks. It does not generate an answer.
+
+<CodeGroup>
+```python SDK
+result = rag.query(
+    "How do refunds work?",
+    embedding={"provider": "voyage", "model": "voyage-3"},
+    retrieval={
+        "top_k": 20,
+        "rerank": {"enabled": True, "top_k": 5},
+    },
+)
+```
+
+```bash CLI
+ragrails query "How do refunds work?"   --vector-db qdrant   --collection docs   --url http://localhost:6333   --provider voyage   --model voyage-3   --top-k 20   --rerank   --rerank-top-k 5
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/query   -H "Content-Type: application/json"   -d '{
+    "query": "How do refunds work?",
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "retrieval": {
+      "vector_db": "qdrant",
+      "collection": "docs",
+      "url": "http://localhost:6333",
+      "top_k": 20,
+      "rerank": {"enabled": true, "top_k": 5}
+    }
+  }'
+```
+</CodeGroup>
+
+The result is a [Retrieval](/features/retrieval) result: `query`, `search_query`, `retrieved`, `items`, `failed`, and `errors`.
+
+## Chat pipeline
+
+Chat runs retrieval and generation together. Use it when the product surface needs an answer rather than raw chunks.
+
+<CodeGroup>
+```python SDK
+history = []
+result = rag.chat(
+    "How do refunds work?",
+    history=history,
+    persona="Answer only from the provided support policy context.",
+)
+history = result.history
+```
+
+```bash CLI
+ragrails chat "How do refunds work?"   --vector-db qdrant   --collection docs   --url http://localhost:6333   --llm-provider openai   --llm-model gpt-4o-mini   --history-file files/chat-history.json
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat   -H "Content-Type: application/json"   -d '{
+    "query": "How do refunds work?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "llm_provider": "openai",
+    "llm_model": "gpt-4o-mini",
+    "history": [],
+    "persona": "Answer only from the provided support policy context."
+  }'
+```
+</CodeGroup>
+
+The result is a [Chat](/features/chat) result: `answer`, `sources`, `history`, `retrieval`, `llm`, `errors`, `retrieval_quality`, `answer_confidence`, `compacted`, and `intent`.
+
+## Maintenance loop
+
+After the initial ingest, keep a manifest of source IDs to chunk IDs. On refresh, upsert new chunks and delete the old IDs that are no longer produced.
+
+```python
+old_ids = set(manifest["policy.md"]["chunk_ids"])
+result = rag.ingest(markdown=[{"text": updated_policy, "source": "policy.md"}])
+new_ids = {item["id"] for item in result.store_result.items}
+
+if old_ids - new_ids:
+    rag.delete(ids=sorted(old_ids - new_ids))
+
+manifest["policy.md"] = {"chunk_ids": sorted(new_ids)}
+```
+
+## Choosing the right entry point
+
+| Need | Use |
+| --- | --- |
+| Maximum control over one stage | Individual stage methods: `parse`, `scrape`, `fetch`, `chunk`, `embed`, `store`, `retrieve`, `chat`. |
+| Build or refresh an index quickly | `ingest()`. |
+| Search without generation | `query()` or `retrieve()`. |
+| Answer with citations and history | `chat()` or `chat_stream()`. |
+| Replace or remove stale vectors | `edit()` and `delete()`. |
+
+## Next steps
+
+- Start with [Extraction](/features/extraction) to understand source inputs.
+- Use [Storing](/features/storing) to understand vector database behavior.
+- Use [Knowledge Base Maintenance](/features/knowledge-base-maintenance) before shipping long-lived indexes.

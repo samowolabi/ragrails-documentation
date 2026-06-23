@@ -1,179 +1,127 @@
 ---
-title: "SDK Chat"
+title: "Chat"
 icon: "messages-square"
-description: "RAG chat with stateless history management."
+description: "Run stateless grounded chat and streaming chat with the SDK."
 ---
 
-Chat runs retrieval and answer generation together. With your providers configured on `RagRails`, a turn is one line. Chat is stateless: pass `history` in and persist the `history` you get back.
-
-```bash
-pip install "ragrails[voyage,qdrant]"
-```
+`rag.chat()` runs retrieval and answer generation together. It is stateless: pass `history` in and persist the returned `history` for the next turn.
 
 ```python
 from ragrails import RagRails
 
 rag = RagRails(
-    collection="docs",
+    collection="support",
     vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
     llm={"provider": "openai", "model": "gpt-4o-mini"},
 )
 ```
 
-<CodeGroup>
-```python Request
-history = []
-result = rag.chat("How do I authenticate?", history=history)
-
-print(result.answer)
-history = result.history  # pass to the next turn
-```
-
-```python Response
-result.answer    # "To authenticate, create an API key in your account settings..."
-result.intent    # "rag"
-result.sources   # [{"id": "guide-3", "title": "Authentication", "text": "..."}]
-result.answer_confidence  # {"level": "high", "score": 0.86}
-result.compacted # False
-```
-</CodeGroup>
-
-`chat()` uses the constructor `llm`, `embedding`, and `vector_store` defaults. Pass `llm=`, `embedder=`, `vector_db=`, etc. to override per call.
-
-## Streaming
-
-Use `chat_stream()` for normal RAG chat when you want progress and token events. It yields event dicts and ends with a `final` event whose `data` field contains the full chat result.
-
-<CodeGroup>
-```python Request
-for event in rag.chat_stream("How do I authenticate?", history=[]):
-    if event["type"] == "token":
-        print(event["data"]["text"], end="")
-    elif event["type"] == "final":
-        history = event["data"]["history"]
-```
-
-```python Event
-{
-    "type": "token",
-    "stage": "generation",
-    "message": "",
-    "data": {"text": "Use "},
-    "sequence": 4,
-}
-```
-</CodeGroup>
-
-<Note>`chat_stream()` covers normal RAG chat. It does not stream agentic tool-call execution.</Note>
-
-## Result fields
-
-| Field | Description |
-| --- | --- |
-| `result.answer` | LLM answer string |
-| `result.sources` | Source chunk dicts used for the answer |
-| `result.history` | Updated history list; pass to the next turn |
-| `result.intent` | `"rag"` (retrieved context used) or `"direct"` (answered without retrieval) |
-| `result.answer_confidence` | Confidence assessment dict |
-| `result.retrieval_quality` | Retrieval quality assessment dict |
-| `result.compacted` | `True` if history was summarised this turn |
-| `result.errors` | List of error dicts |
-
-## Config objects
-
-### `QueryRewriteConfig`
-
-Rewrites follow-up questions into self-contained queries before retrieval.
+## Basic Chat
 
 ```python
-from ragrails import QueryRewriteConfig
+history = []
+result = rag.chat("How long do I have to request a refund?", history=history)
+
+print(result.answer)
+history = result.history
+```
+
+Result fields:
+
+```python
+result.answer
+result.sources
+result.history
+result.retrieval
+result.llm
+result.errors
+result.retrieval_quality
+result.answer_confidence
+result.compacted
+result.intent
+```
+
+## Streaming Chat
+
+`chat_stream()` yields structured event dicts and ends with a `final` event.
+
+```python
+for event in rag.chat_stream("How long do I have to request a refund?", history=[]):
+    if event["type"] == "progress":
+        print(event["stage"], event["message"])
+    elif event["type"] == "token":
+        print(event["data"]["text"], end="")
+    elif event["type"] == "final":
+        result = event["data"]
+```
+
+Typical event types are `progress`, `token`, `error`, and `final`.
+
+<Note>`chat_stream()` streams normal RAG chat. It does not stream agentic tool execution.</Note>
+
+## Chat Tuning
+
+```python
+from ragrails import (
+    ChatRetrievalQualityConfig,
+    HistoryCompactionConfig,
+    IntentRoutingConfig,
+    QueryRewriteConfig,
+)
 
 result = rag.chat(
     "What about the second step?",
     history=history,
-    query_rewrite=QueryRewriteConfig(enabled=True, session_context="Onboarding flow"),
+    persona="Answer as a concise support engineer.",
+    query_rewrite=QueryRewriteConfig(enabled=True, session_context="Refund policy flow"),
+    history_compaction=HistoryCompactionConfig(enabled=True, history_limit=15, keep_recent=5),
+    intent_routing=IntentRoutingConfig(enabled=True),
+    retrieval_quality=ChatRetrievalQualityConfig(
+        min_retrieval_score=0.35,
+        min_rerank_score=0.50,
+        low_confidence_mode="answer_with_caution",
+        max_context_chunks=5,
+    ),
 )
 ```
 
-| Field | Default | Description |
-| --- | --- | --- |
-| `enabled` | `False` | Enable query rewriting |
-| `session_context` | `""` | Context hint for the rewriter |
-| `llm` | `None` | Separate LLM for rewriting (falls back to the chat LLM) |
+Low-confidence modes are `answer_with_caution`, `ask_clarifying_question`, `refuse_grounded_answer`, and `return_no_answer`.
 
-### `HistoryCompactionConfig`
-
-Summarises old turns and keeps recent ones, so long conversations stay within the context window.
+## Reranking in Chat
 
 ```python
-from ragrails import HistoryCompactionConfig
+from ragrails.core.stg_05_retriever import RetrieverConfig
 
-result = rag.chat(..., history_compaction=HistoryCompactionConfig(history_limit=15, keep_recent=5))
+result = rag.chat(
+    "How long do refunds take?",
+    history=[],
+    retrieval_config=RetrieverConfig(use_rerank=True, rerank_top_k=5),
+)
 ```
 
-| Field | Default | Description |
-| --- | --- | --- |
-| `enabled` | `True` | Enable automatic summarisation |
-| `history_limit` | `15` | Summarise when history exceeds this many turns |
-| `keep_recent` | `5` | Recent turns kept verbatim |
+Configure `reranker={"provider": "voyage", "model": "rerank-2-lite"}` on `RagRails(...)`, or pass `reranker=rag.reranker(...)` to one call.
 
-### `IntentRoutingConfig`
-
-Skips retrieval for small talk and direct questions.
+## `llm()`
 
 ```python
-from ragrails import IntentRoutingConfig
-
-result = rag.chat(..., intent_routing=IntentRoutingConfig(enabled=True))
+llm = rag.llm(provider="openai", model="gpt-4o-mini", max_tokens=1024)
+result = rag.chat("Summarize the refund policy", llm=llm, history=[])
 ```
-
-| Field | Default | Description |
-| --- | --- | --- |
-| `enabled` | `True` | Route non-RAG queries directly to the LLM |
-
-### `ChatRetrievalQualityConfig`
-
-Confidence thresholds for the retrieved context.
-
-```python
-from ragrails import ChatRetrievalQualityConfig
-
-result = rag.chat(..., retrieval_quality=ChatRetrievalQualityConfig(
-    min_retrieval_score=0.35,
-    low_confidence_mode="answer_with_caution",
-))
-```
-
-| Field | Default | Description |
-| --- | --- | --- |
-| `min_retrieval_score` | `0.35` | Below this, retrieval is low quality |
-| `min_rerank_score` | `0.50` | Below this, reranked results are low quality |
-| `low_confidence_mode` | `"answer_with_caution"` | `"answer_with_caution"`, `"ask_clarifying_question"`, or `"refuse_grounded_answer"` |
-| `max_context_chunks` | `None` | Cap chunks sent to the LLM |
-
-## `chat()` parameters
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `query` | required | User message |
-| `llm` | inherits constructor | LLM object; auto-created when omitted |
-| `embedder` | inherits constructor (`input_type="query"`) | Query embedder; auto-created when omitted |
-| `vector_db` / `collection` / `url` | inherits constructor | Vector store target |
-| `reranker` | inherits constructor | Reranker; auto-created when omitted |
-| `history` | `None` | Previous turns list |
-| `history_compaction` | `None` | `HistoryCompactionConfig` |
-| `query_rewrite` | `None` | `QueryRewriteConfig` |
-| `intent_routing` | `None` | `IntentRoutingConfig` |
-| `retrieval_quality` | `None` | `ChatRetrievalQualityConfig` |
-| `persona` | `""` | System persona injected into the prompt |
+| `provider` | constructor default | `openai`, `anthropic`, or `google`. |
+| `model` | constructor default, else required | Model name. `rag.llm()` does not choose a fallback model. |
+| `max_tokens` | `1024` | Max output tokens. |
 
-## `llm()` parameters
+## Agentic Tools and Tool Calling
 
-| Parameter | Default | Description |
-| --- | --- | --- |
-| `provider` | constructor default, else inferred from `model` | `"openai"`, `"anthropic"`, or `"google"` |
-| `model` | constructor default, else required | Model name, e.g. `"gpt-4o-mini"`, `"claude-sonnet-4-6"`, `"gemini-2.5-flash"` |
-| `max_tokens` | `1024` | Max output tokens |
+`rag.chat()` does not execute tools. Tool execution requires application-owned authorization, confirmation, allowlists, secrets, side-effect policy, and audit logs.
 
-<Note>`rag.llm()` does not choose a fallback model. Configure `llm={"provider": ..., "model": ...}` on `RagRails(...)` or pass `model=` explicitly.</Note>
+For SDK apps, use the lower-level LLM method `complete_with_tools()` and run the tool loop inside your own application boundary. The ready-made `web_fetch` and `api_call` loop is available in the interactive CLI (`ragrails chat` with no query argument), not in `rag.chat()`.
+
+<CardGroup cols={2}>
+  <Card title="Tool Calling" icon="wrench" href="/capabilities/tool-calling">Build your own SDK tool loop.</Card>
+  <Card title="Query" icon="search-check" href="/usage/sdk/query">Use chat in the query workflow.</Card>
+</CardGroup>

@@ -1,0 +1,91 @@
+---
+title: "Query"
+icon: "search-check"
+description: "Search stored chunks and answer with the CLI."
+---
+
+The query side has two CLI entry points.
+
+`ragrails query` embeds a query and prints matching chunks. `ragrails chat` retrieves context and generates an answer.
+
+## Search with `query`
+
+```bash
+ragrails query "How long do I have to request a refund?" \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --top-k 5
+```
+
+Output:
+
+```text
+Query  : How long do I have to request a refund?
+Results: 1
+
+[1] score=0.8400 id=refund-policy-0
+    text : Customers can request a refund within 30 days of purchase...
+```
+
+## Rerank Results
+
+```bash
+ragrails query "How long do refunds take?" \
+  --vector-db qdrant --collection support --url http://localhost:6333 \
+  --top-k 20 \
+  --rerank \
+  --reranker voyage \
+  --reranker-model rerank-2-lite \
+  --rerank-top-k 5
+```
+
+## Generate an Answer with `chat`
+
+```bash
+ragrails chat "How long do I have to request a refund?" \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --embedder-provider voyage \
+  --embedder-model voyage-3 \
+  --llm-provider openai \
+  --llm-model gpt-4o-mini
+```
+
+Use `--history-file` to persist multi-turn history:
+
+```bash
+ragrails chat "How long do I have to request a refund?" \
+  --history-file files/chat/history.json \
+  --vector-db qdrant --collection support --url http://localhost:6333
+
+ragrails chat "What about the payment method?" \
+  --history-file files/chat/history.json \
+  --rewrite-query
+```
+
+## Interactive Chat
+
+```bash
+ragrails chat
+```
+
+The interactive REPL keeps session history, can stream answers, and exposes `/tools`, `/model`, `/stream`, and `/debug` commands.
+
+## Choose the Command
+
+| Need | Use |
+| --- | --- |
+| Raw matching chunks | `ragrails query` or `ragrails retrieve` |
+| Reranked search results | `ragrails query --rerank` |
+| One-shot answer with sources | `ragrails chat "..."` |
+| Multi-turn terminal session | `ragrails chat` |
+| Tool-assisted interactive session | `ragrails chat` then `/tools` |
+
+<CardGroup cols={2}>
+  <Card title="Retrieval" icon="search" href="/usage/cli/retrieval">Tune lower-level retrieval.</Card>
+  <Card title="Chat" icon="messages-square" href="/usage/cli/chat">Use one-shot and interactive chat.</Card>
+</CardGroup>

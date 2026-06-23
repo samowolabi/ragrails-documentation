@@ -1,80 +1,93 @@
 ---
-title: "SDK Storing"
+title: "Storing"
 icon: "database"
-description: "Store, edit, and delete chunks in a vector database."
+description: "Store, edit, and delete SDK chunks in vector databases."
 ---
 
-Storing upserts embedded chunks into a vector database. With a vector store configured on `RagRails`, you don't repeat the connection on every call. The collection is created automatically if it doesn't exist.
+Storing writes embedded chunks to Qdrant, Pinecone, or Weaviate. In the full SDK workflow, `rag.ingest()` stores embedded chunks for you. Use `rag.store()`, `rag.edit()`, and `rag.delete()` directly for manual pipelines and maintenance.
 
 ```python
 from ragrails import RagRails
 
 rag = RagRails(
-    collection="docs",
+    collection="support",
     vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
     embedding={"provider": "voyage", "model": "voyage-3"},
 )
 ```
 
-<Note>The constructor takes `vector_store={"provider": ...}` plus `collection=`. The `store`, `edit`, and `delete` methods take `vector_db=`, `collection=`, and `url=` to override.</Note>
-
 ## Store
 
-<CodeGroup>
-```python Request
-result = rag.store(embedded_chunks=embed_result.items)
+```python
+stored = rag.store(embedded_chunks=embedded.items, batch_size=64)
 ```
 
-```python Response
-result.stored      # 12
-result.failed      # 0
-result.provider    # "qdrant"
-result.collection  # "docs"
+```python
+stored.inputs
+stored.stored
+stored.items
+stored.failed
+stored.provider
+stored.collection
+stored.errors
 ```
-</CodeGroup>
+
+The collection is created automatically by default.
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `embedded_chunks` | required | Chunk dicts with `id`, `text`, `metadata`, `embedding` |
-| `vector_db` | inherits constructor | `"qdrant"`, `"qdrant_cloud"`, `"pinecone"`, `"weaviate"` |
-| `collection` | inherits constructor | Collection, index, or class name |
-| `url` | inherits constructor | Vector DB URL |
-| `batch_size` | `64` | Chunks per upsert request |
-| `ensure_collection` | `True` | Create the collection if missing |
-| `options` | `None` | Provider-specific options |
+| `embedded_chunks` | required | List of chunk dicts with `embedding`. |
+| `vector_db` | constructor default, else `"qdrant"` | `qdrant`, `qdrant_cloud`, `pinecone`, or `weaviate`. |
+| `collection` | constructor default | Collection, index, or class name. |
+| `url` | constructor default | Vector DB URL. |
+| `batch_size` | `64` | Chunks per upsert batch. |
+| `ensure_collection` | `True` | Create the collection if missing. |
+| `options` | `None` | Provider-specific options. |
 
 ## Edit
 
-Re-embed and replace stored chunks by ID. The embedder is created from the constructor `embedding` config when omitted.
+`edit()` re-embeds replacement chunks and replaces stored records by exact ID.
 
-<CodeGroup>
-```python Request
-result = rag.edit(chunks=[
-    {"id": "guide-0", "text": "Refunds now take 3 to 5 business days.", "source": "files/guide.pdf", "metadata": {"title": "Refunds"}},
+```python
+edited = rag.edit(chunks=[
+    {
+        "id": "refund-policy-0",
+        "text": "Refunds are returned to the original payment method within 3 to 5 business days.",
+        "source": "files/refund-policy.pdf",
+        "metadata": {"title": "Refund policy"},
+    }
 ])
 ```
 
-```python Response
-result.requested  # 1
-result.edited     # 1
-result.failed     # 0
-```
-</CodeGroup>
+Pass `embedder=...` to control the re-embedding model for this edit.
 
 ## Delete
 
 ```python
-result = rag.delete(ids=["guide-0", "guide-1"])
-result.deleted  # 2
+deleted = rag.delete(ids=["refund-policy-0", "refund-policy-1"])
 ```
 
-## Supported databases
+Deletes are exact-ID operations. They do not perform semantic matching.
 
-| Database | `vector_db` | Notes |
-| --- | --- | --- |
-| Qdrant (local) | `qdrant` | Needs `url` (default `http://localhost:6333`) |
-| Qdrant Cloud | `qdrant_cloud` | Cloud `url` + `QDRANT_API_KEY` |
-| Pinecone | `pinecone` | Uses `PINECONE_API_KEY` |
-| Weaviate | `weaviate` | Local or cloud, needs `url` |
+## Vector Database Names
 
-<Tip>Give chunks stable IDs at chunk time so `edit` and `delete` can target them. See [keeping your index current](/features/knowledge-base-maintenance).</Tip>
+| Database | `vector_db` | Install | Notes |
+| --- | --- | --- | --- |
+| Qdrant local | `qdrant` | `ragrails[qdrant]` | Use a local or network Qdrant URL. |
+| Qdrant Cloud | `qdrant_cloud` | `ragrails[qdrant]` | Set cloud URL and `QDRANT_API_KEY`. |
+| Pinecone | `pinecone` | `ragrails[pinecone]` | Set `PINECONE_API_KEY`; index names cannot contain underscores. |
+| Weaviate | `weaviate` | `ragrails[weaviate]` | Class names must be alphanumeric and start uppercase. |
+
+## Manual Pipeline
+
+```python
+docs = rag.parse(files="files/refund-policy.pdf")
+chunks = rag.chunk(markdown=docs.outputs)
+embedded = rag.embed(chunks=chunks.items)
+stored = rag.store(embedded_chunks=embedded.items)
+```
+
+<CardGroup cols={2}>
+  <Card title="Embedding" icon="binary" href="/usage/sdk/embedding">Create embedded chunks.</Card>
+  <Card title="Maintenance" icon="refresh-cw" href="/usage/sdk/knowledge-base-maintenance">Update or delete stored chunks.</Card>
+</CardGroup>

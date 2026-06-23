@@ -1,0 +1,123 @@
+---
+title: "Ingest"
+icon: "package-plus"
+description: "Build or refresh a knowledge base with the SDK ingest workflow."
+---
+
+`rag.ingest()` is the SDK workflow for indexing. It extracts source content, chunks it, embeds the chunks, and stores them in your vector database.
+
+Use it when your application wants the full indexing path without manually calling every stage.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails(
+    collection="support",
+    vector_store={"provider": "qdrant", "url": "http://localhost:6333"},
+    embedding={"provider": "voyage", "model": "voyage-3"},
+)
+```
+
+## Source Inputs
+
+`ingest()` accepts documents, websites, REST APIs, direct Markdown, or a mix of them.
+
+<CodeGroup>
+```python Documents
+result = rag.ingest(docs=["files/refund-policy.pdf", "files/terms.docx"])
+result = rag.ingest(docs={"folder": "files/policies"})
+```
+
+```python Websites
+rag.setup_url(browser="chromium")
+result = rag.ingest(urls="https://example.com/help/refunds")
+result = rag.ingest(urls={"url": "https://example.com/docs", "mode": "full", "max_pages": 50})
+```
+
+```python REST APIs
+result = rag.ingest(api={
+    "url": "https://api.example.com/refund-policy",
+    "title": "Refund policy",
+    "headers": {"Authorization": "Bearer token"},
+})
+```
+
+```python Markdown
+result = rag.ingest(markdown="# Refund policy\n\nCustomers can request a refund within 30 days.")
+```
+</CodeGroup>
+
+## Combine Sources
+
+```python
+result = rag.ingest(
+    docs={"folder": "files/policies"},
+    urls={"url": "https://example.com/help", "mode": "full", "max_pages": 25},
+    api={"url": "https://api.example.com/refund-policy", "title": "Refund policy"},
+    markdown=[{"text": "# Manual note\n\nEscalations use the support queue.", "source": "manual.md"}],
+    concurrency="parallel",
+)
+```
+
+`concurrency="parallel"` runs independent document, URL, and API extraction stages in parallel before chunking. Direct Markdown is added after extraction.
+
+## Configure Stages
+
+Stage config dictionaries let you tune the workflow without dropping to manual stage calls.
+
+```python
+result = rag.ingest(
+    docs={"folder": "files/policies"},
+    ingestion={
+        "docs": {"frontmatter": True},
+        "urls": {"mode": "full", "max_pages": 50},
+        "api": {"headers": {"Authorization": "Bearer token"}},
+    },
+    chunking={"chunk_size": 1200, "chunk_overlap": 150, "min_chunk_length": 80},
+    embedding={"model": "voyage-3-large", "batch_size": 64},
+    storage={"collection": "support-v2", "batch_size": 64},
+)
+```
+
+| Config | Passed to |
+| --- | --- |
+| `ingestion["docs"]` | `parse(...)` |
+| `ingestion["urls"]` | `scrape(...)` |
+| `ingestion["api"]` | `fetch(...)` |
+| `chunking` | `chunk(...)` |
+| `embedding` | `embedder(...)` plus `embed(batch_size=...)` |
+| `storage` | `store(...)` |
+
+## Result
+
+```python
+result.sources       # normalized documents passed to chunking
+result.chunks        # chunks created
+result.embedded      # chunks embedded
+result.stored        # chunks stored
+result.failed        # combined failure count
+result.errors        # stage-tagged error dicts
+result.source_results
+result.chunk_result
+result.embed_result
+result.store_result
+```
+
+```json
+{
+  "sources": 1,
+  "chunks": 3,
+  "embedded": 3,
+  "stored": 3,
+  "failed": 0
+}
+```
+
+## When Not to Use `ingest()`
+
+Use individual stage pages when you need to review extracted text before chunking, save stage output to disk, transform chunks, use a custom embedder object, validate vectors before storage, or implement a custom maintenance manifest.
+
+<CardGroup cols={2}>
+  <Card title="Extraction" icon="file-input" href="/usage/sdk/extraction">Run source extraction directly.</Card>
+  <Card title="Pipeline Overview" icon="route" href="/usage/sdk/pipeline-overview">See all stage boundaries.</Card>
+</CardGroup>

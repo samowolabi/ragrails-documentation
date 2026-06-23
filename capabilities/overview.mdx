@@ -1,0 +1,40 @@
+---
+title: "Overview"
+icon: "sliders-horizontal"
+description: "The Ragrails advantages you turn on when basic RAG is not enough."
+---
+
+Capabilities are the Ragrails advantages you turn on when basic RAG is not enough. They cover stronger retrieval, better multi-turn behavior, live progress, recoverable ingestion, provider extension, tool use, and lower operating cost.
+
+| Problem | Start here | Why |
+| --- | --- | --- |
+| Vector search finds the topic but ranks weak chunks first | [Reranking](/capabilities/reranking) | Retrieve a wider candidate set, then reorder by query-specific relevance. |
+| Follow-up questions like "what about the second one?" search poorly | [Query Rewriting](/capabilities/query-rewriting) | Rewrite conversational turns into standalone search queries. |
+| Long chats become costly, slow, or overconfident | [Chat Tuning](/capabilities/chat-tuning) | Tune history compaction, intent routing, retrieval quality, and low-confidence behavior. |
+| A crawl or API pull partly fails | [Resilient Ingestion](/capabilities/resilient-ingestion) | Capture retryable failures and safely page through large APIs. |
+| Users wait too long for crawls or answers | [Streaming](/capabilities/streaming) | Emit progress, token, error, and final result events over SDK or REST. |
+| Interactive chat needs live lookup or side effects | [Agentic Tools](/capabilities/agentic-tools) | Use the built-in CLI tool loop with `web_fetch` and `api_call`. |
+| You want to build your own tool loop | [Tool Calling](/capabilities/tool-calling) | Use provider-neutral message and tool-call dataclasses. |
+| You need an embedding or reranking provider Ragrails does not ship | [Custom Providers](/capabilities/custom-providers) | Register a provider factory at application startup. |
+| Spend is too high | [Cost Optimization](/capabilities/cost-optimization) | Reduce LLM calls, context size, re-embedding, and API reranking. |
+
+## How capabilities attach
+
+| Area | SDK | CLI | REST API |
+| --- | --- | --- | --- |
+| Reranking | `retrieve(..., use_rerank=True)`, `query(retrieval={"rerank": ...})`, `chat(..., retrieval_config=...)` | `retrieve --rerank`, `query --rerank`, `chat --rerank` | `/v1/retrieve`, `/v1/pipelines/query`, `/v1/chat` |
+| Query rewriting | `retrieve(..., use_query_rewrite=True)`, `query(retrieval={"query_rewrite": ...})`, `chat(query_rewrite=...)` | `chat --rewrite-query` | `/v1/retrieve`, `/v1/pipelines/query`, `/v1/chat` |
+| Chat quality | `ChatRetrievalQualityConfig` | Not exposed as flags yet | `retrieval_quality` object on `/v1/chat` |
+| History controls | `HistoryCompactionConfig`, `IntentRoutingConfig` | `--history-compaction`, `--intent-routing` | `history_compaction`, `intent_routing` |
+| Streaming | `scrape_stream(...)`, `chat_stream(...)` | Interactive chat REPL streaming | `/v1/ingest/url/stream`, `/v1/chat/stream` |
+| Resilient ingestion | `DLQ`, `fetch(..., pagination=...)` | Ingestion commands | Ingestion endpoints |
+| Tool use | LLM `complete_with_tools()` | Interactive `ragrails chat` | Not exposed as a server route yet |
+
+## Recommended order
+
+1. Get [extraction through chat](/features/pipeline-overview) working first.
+2. Add [reranking](/capabilities/reranking) when retrieval order is the issue.
+3. Add [query rewriting](/capabilities/query-rewriting) when multi-turn queries are the issue.
+4. Tune [chat quality](/capabilities/chat-tuning) before exposing answers in production.
+5. Add [streaming](/capabilities/streaming) when users need progress or token events.
+6. Add [maintenance](/features/knowledge-base-maintenance) and [resilient ingestion](/capabilities/resilient-ingestion) for long-lived indexes.

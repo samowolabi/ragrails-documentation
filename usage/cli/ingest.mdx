@@ -1,0 +1,92 @@
+---
+title: "Ingest"
+icon: "package-plus"
+description: "Build or refresh a knowledge base with the CLI ingest workflow."
+---
+
+`ragrails ingest` runs extraction, chunking, embedding, and storage in one command.
+
+Use it when you want the normal indexing path without managing intermediate JSON files.
+
+## Sources
+
+<CodeGroup>
+```bash Documents
+ragrails ingest --docs files/refund-policy.pdf \
+  --vector-db qdrant --collection support --url http://localhost:6333
+
+ragrails ingest --folder files/policies \
+  --vector-db qdrant --collection support --url http://localhost:6333
+```
+
+```bash Website
+ragrails setup-url --browser chromium
+ragrails ingest --source-url https://example.com/help/refunds \
+  --vector-db qdrant --collection support --url http://localhost:6333
+```
+
+```bash REST API
+ragrails ingest --api-url https://api.example.com/refund-policy \
+  --vector-db qdrant --collection support --url http://localhost:6333
+```
+
+```bash Markdown
+ragrails ingest \
+  --markdown "# Refund policy\n\nCustomers can request a refund within 30 days." \
+  --vector-db qdrant --collection support --url http://localhost:6333
+```
+</CodeGroup>
+
+## Combine Sources
+
+```bash
+ragrails ingest \
+  --docs files/handbook.pdf \
+  --source-url https://example.com/docs \
+  --api-url https://api.example.com/refund-policy \
+  --markdown "# Manual note\n\nEscalations use the support queue." \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --concurrency parallel
+```
+
+`--concurrency parallel` runs independent document, URL, and API extraction groups in parallel before chunking.
+
+## Output
+
+```text
+Sources  : 3
+Chunks   : 24
+Embedded : 24
+Stored   : 24
+Failed   : 0
+```
+
+## Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--markdown` | none | Markdown text to ingest. Repeatable. |
+| `--docs` | none | Document file to parse. Repeatable. |
+| `--folder` | none | Folder of supported documents. Mutually exclusive with `--docs`. |
+| `--source-url` | none | URL to scrape. Repeatable. |
+| `--api-url` | none | API endpoint to fetch. |
+| `--vector-db` | `qdrant` | `qdrant`, `qdrant_cloud`, `pinecone`, or `weaviate`. |
+| `--collection` | config or none | Collection, index, or class name. |
+| `--url` | config or none | Vector database URL. |
+| `--provider` / `--model` | `voyage` / `voyage-3` | Embedding provider and model. |
+| `--batch-size` | `64` | Embedding and storage batch size. |
+| `--chunk-size` / `--chunk-overlap` / `--min-chunk-length` | `2000` / `200` / `100` | Chunking config. |
+| `--concurrency` | `serial` | `serial` or `parallel`. |
+
+## When to Use Stage Commands
+
+Use stage commands when you need to inspect extraction output, tune chunking before embedding, persist artifacts, or review embedded JSON before storage.
+
+<CardGroup cols={2}>
+  <Card title="Extraction" icon="file-input" href="/usage/cli/extraction">Run source extraction directly.</Card>
+  <Card title="Pipeline Overview" icon="route" href="/usage/cli/pipeline-overview">See all stage boundaries.</Card>
+</CardGroup>

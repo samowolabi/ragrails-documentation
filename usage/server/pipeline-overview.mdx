@@ -1,0 +1,61 @@
+---
+title: "Overview"
+icon: "route"
+description: "Understand the REST API pipeline stages."
+---
+
+The REST API has workflow endpoints for common paths and stage endpoints for explicit control.
+
+```text
+extract -> chunk -> embed -> store -> retrieve -> chat
+```
+
+Use workflows when you want fewer requests. Use stage endpoints when you want to inspect intermediate JSON, retry one step, or move artifacts through another system.
+
+## Workflow Endpoints
+
+| Endpoint | Runs |
+| --- | --- |
+| `POST /v1/pipelines/ingest` | extraction -> chunking -> embedding -> storing |
+| `POST /v1/pipelines/query` | query embedding -> retrieval |
+| `POST /v1/chat` | query embedding -> retrieval -> LLM answer |
+
+## Stage Endpoints
+
+| Stage | Endpoint | Output |
+| --- | --- | --- |
+| [Extraction](/usage/server/extraction) | `/v1/ingest/url`, `/v1/ingest/docs`, `/v1/ingest/api` | Normalized documents in `outputs` |
+| [Chunking](/usage/server/chunking) | `/v1/chunk` | Chunk objects in `items` |
+| [Embedding](/usage/server/embedding) | `/v1/embed` | Embedded chunks in `items` |
+| [Storing](/usage/server/storing) | `/v1/store` | Store summary and stored item IDs |
+| [Retrieval](/usage/server/retrieval) | `/v1/retrieve` | Retrieved chunks in `items` |
+| [Chat](/usage/server/chat) | `/v1/chat` | Answer, sources, updated history, and quality metadata |
+
+## Stage Flow
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
+  -H "Content-Type: application/json" \
+  -d '{"files":["files/refund-policy.pdf"]}'
+
+curl -X POST http://127.0.0.1:8000/v1/chunk \
+  -H "Content-Type: application/json" \
+  -d '{"markdown":[{"id":"refund-policy","text":"..."}]}'
+
+curl -X POST http://127.0.0.1:8000/v1/embed \
+  -H "Content-Type: application/json" \
+  -d '{"chunks":[{"id":"refund-policy-0","text":"..."}],"provider":"voyage","model":"voyage-3"}'
+
+curl -X POST http://127.0.0.1:8000/v1/store \
+  -H "Content-Type: application/json" \
+  -d '{"embedded_chunks":[{"id":"refund-policy-0","text":"...","embedding":[0.1,0.2]}],"vector_db":"qdrant","collection":"support","url":"http://localhost:6333"}'
+```
+
+## Output Handoff
+
+| From | Use |
+| --- | --- |
+| Extraction `outputs` | `markdown` for `/v1/chunk` |
+| Chunking `items` | `chunks` for `/v1/embed` |
+| Embedding `items` | `embedded_chunks` for `/v1/store` |
+| Retrieval `items` | Context for custom answer generation, or use `/v1/chat` |

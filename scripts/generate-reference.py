@@ -26,13 +26,29 @@ def cli_reference() -> str:
     import click
     from ragrails.interfaces.cli.main import cli
 
+    descriptions = {
+        "chat": "Run one SDK chat turn, or start the interactive chat CLI with no query.",
+        "chunk": "Split extraction JSON into chunks.",
+        "delete": "Delete stored chunks by exact chunk ID.",
+        "doctor": "Inspect `.ragrails.toml`, packages, environment variables, and optional vector DB connectivity.",
+        "edit": "Re-embed and replace stored chunks by exact chunk ID.",
+        "embed": "Embed chunk JSON files.",
+        "fetch": "Fetch a REST API endpoint into extraction JSON.",
+        "ingest": "Run extraction, chunking, embedding, and storage in one command.",
+        "parse": "Parse local files, folders, or file URLs into extraction JSON.",
+        "query": "Run query embedding and vector retrieval through the SDK pipeline.",
+        "retrieve": "Retrieve chunks relevant to a query.",
+        "scrape": "Scrape one or more URLs into extraction JSON.",
+        "setup-url": "Install the Playwright browser runtime required for URL extraction.",
+        "store": "Store embedded chunk JSON files in a vector database.",
+    }
     rows = []
     ctx = click.Context(cli, info_name="ragrails")
     for name in cli.list_commands(ctx):
         command = cli.get_command(ctx, name)
         if command is None:
             continue
-        help_text = (command.short_help or command.help or "").strip().splitlines()[0]
+        help_text = descriptions.get(name) or (command.short_help or command.help or "").strip().splitlines()[0]
         rows.append(f"| `ragrails {name}` | {help_text} |")
 
     return """---
@@ -51,6 +67,16 @@ Commands read defaults from [`.ragrails.toml`](/getting-started/configuration); 
 | --- | --- |
 | `ragrails` | Interactive setup wizard (writes `.ragrails.toml`) |
 
+The setup wizard prompts for vector store, embedding, LLM, and reranker defaults. If `.ragrails.toml` already exists, bare `ragrails` shows the current config and lets you `edit`, `reset`, or `exit`.
+
+| Wizard section | Prompts |
+| --- | --- |
+| Vector store | Provider, collection, URL |
+| Embedding | Provider, model |
+| LLM | Provider, model, max tokens |
+| Reranking | Enable flag, provider, model |
+| Advanced defaults | Chunking, batch sizes, retrieval limits, query rewrite, intent routing, history compaction |
+
 ## Commands
 
 | Command | Description |
@@ -63,12 +89,12 @@ def sdk_reference() -> str:
 
     sections = {
         "Constructor": ["__init__"],
-        "Ingestion": ["setup_url", "scrape", "parse", "fetch"],
+        "Ingestion": ["setup_url", "scrape", "scrape_stream", "parse", "fetch"],
         "Chunking": ["chunk"],
         "Embedding": ["embedder", "embed"],
         "Storing": ["store", "edit", "delete"],
         "Retrieval": ["reranker", "retrieve"],
-        "Chat": ["llm", "chat"],
+        "Chat": ["llm", "chat", "chat_stream"],
         "Pipeline": ["ingest", "query"],
     }
     out = ["""---
@@ -80,6 +106,8 @@ description: "All RagRails SDK methods."
 <Note>This page is generated from `inspect.signature(RagRails)`. Run `RAGRAILS_SOURCE=/path/to/ragrails uv run python scripts/generate-reference.py` from the docs repo after SDK signature changes.</Note>
 
 SDK defaults live on each `RagRails(...)` instance. They do not write `.ragrails.toml` and they do not change CLI or REST defaults.
+
+Use [SDK Overview](/usage/sdk/overview) for workflow guidance. Use this page when you need exact method signatures.
 
 """]
     for heading, methods in sections.items():
@@ -119,6 +147,25 @@ SDK defaults live on each `RagRails(...)` instance. They do not write `.ragrails
 def rest_reference() -> str:
     from ragrails.interfaces.server.app import create_app
 
+    descriptions = {
+        "/v1/chat": "Run retrieval and LLM answer generation.",
+        "/v1/chat/stream": "Stream retrieval, generation, token, and final chat events.",
+        "/v1/chunk": "Split normalized documents into chunks.",
+        "/v1/delete": "Delete stored chunks by exact chunk ID.",
+        "/v1/edit": "Re-embed and replace stored chunks by exact chunk ID.",
+        "/v1/embed": "Embed chunk objects.",
+        "/v1/health": "Health check.",
+        "/v1/ingest/api": "Fetch one REST API endpoint into normalized documents.",
+        "/v1/ingest/docs": "Parse server-accessible files, folders, or file URLs.",
+        "/v1/ingest/docs/upload": "Parse multipart file uploads.",
+        "/v1/ingest/url": "Scrape exact URLs or crawl sites.",
+        "/v1/ingest/url/stream": "Stream URL scrape progress and final result.",
+        "/v1/openapi.json": "OpenAPI schema.",
+        "/v1/pipelines/ingest": "Run extraction, chunking, embedding, and storage.",
+        "/v1/pipelines/query": "Run query embedding and retrieval.",
+        "/v1/retrieve": "Retrieve relevant chunks.",
+        "/v1/store": "Store embedded chunks in a vector database.",
+    }
     app = create_app()
     rows = []
     for route in app.routes:
@@ -127,7 +174,7 @@ def rest_reference() -> str:
         if not methods or not path.startswith("/v1"):
             continue
         name = getattr(route, "name", "") or ""
-        rows.append((path, ", ".join(methods), name.replace("_", " ").capitalize()))
+        rows.append((path, ", ".join(methods), descriptions.get(path, name.replace("_", " ").capitalize())))
     rows.sort()
     table = "\n".join(f"| {method} | `{path}` | {desc} |" for path, method, desc in rows)
     return f"""---
@@ -152,6 +199,8 @@ Interactive docs: `http://127.0.0.1:8000/docs`
 OpenAPI schema: `http://127.0.0.1:8000/v1/openapi.json`
 
 REST defaults are request payload fields. REST examples do not inherit SDK constructor defaults or CLI `.ragrails.toml` values.
+
+Use [REST API Overview](/usage/server/overview) for workflows. Use this page when you need the endpoint list and OpenAPI entry point.
 
 ## Endpoints
 

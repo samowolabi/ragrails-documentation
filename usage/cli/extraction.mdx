@@ -1,0 +1,110 @@
+---
+title: "Extraction"
+icon: "file-input"
+description: "Scrape websites, parse documents, and fetch APIs from the terminal."
+---
+
+CLI extraction commands normalize source content into JSON files that later flow into `chunk` or into the one-command `ingest` workflow.
+
+Add `--output-dir` when you want files for the next stage. Without it, commands return summary counts and errors.
+
+## Scrape Websites
+
+Website extraction needs the `url` extra and browser setup.
+
+```bash
+pip install "ragrails[url]"
+ragrails setup-url --browser chromium
+```
+
+<CodeGroup>
+```bash Exact URLs
+ragrails scrape https://example.com/docs https://example.com/blog \
+  --output-dir files/output/web/
+```
+
+```bash Full crawl
+ragrails scrape https://example.com/docs \
+  --mode full \
+  --max-depth 2 \
+  --max-pages 50 \
+  --output-dir files/output/web/
+```
+
+```bash Frontmatter
+ragrails scrape https://example.com/docs \
+  --frontmatter \
+  --output-dir files/output/web/
+```
+</CodeGroup>
+
+<Warning>Always cap `--max-pages` on a full crawl.</Warning>
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `URL` | required | One or more positional URLs. |
+| `--mode` | `each` | `each` exact URLs or `full` crawl. |
+| `--max-depth` | `3` | Crawl depth for `mode=full`. |
+| `--max-pages` | `200` | Max pages per site. |
+| `--frontmatter` | off | Add YAML frontmatter. |
+| `--output-dir` | none | Save output JSON files. |
+
+<Note>Dead-letter queue retry is SDK-only today. Use [SDK extraction](/usage/sdk/extraction#dead-letter-queue-dlq) for `DLQ` capture and retry.</Note>
+
+## Parse Documents
+
+```bash
+# Folder
+ragrails parse --folder files/docs/ --output-dir files/output/docs/
+
+# Specific files or file URLs
+ragrails parse \
+  --files files/guide.pdf \
+  --files https://example.com/files/whitepaper.pdf \
+  --output-dir files/output/docs/
+```
+
+| Option | Description |
+| --- | --- |
+| `--folder` | Directory to parse. Mutually exclusive with `--files`. |
+| `--files` | File path or file URL. Repeatable. |
+| `--frontmatter` | Add YAML frontmatter. |
+| `--output-dir` | Save output JSON files. |
+
+<Note>Raw bytes input is SDK-only. Use [SDK extraction](/usage/sdk/extraction#parse-documents) for upload/object-storage bytes.</Note>
+
+## Fetch REST APIs
+
+```bash
+ragrails fetch https://api.example.com/posts \
+  --title "Blog posts" \
+  --header "Authorization:Bearer TOKEN" \
+  --param limit:100 \
+  --max-pages 10 \
+  --output-dir files/output/api/
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `URL` | required | API endpoint. |
+| `--title` | `API Response` | Document title. |
+| `--description` | `""` | Description metadata. |
+| `--method` | `GET` | `GET`, `POST`, `PUT`, `PATCH`, or `DELETE`. |
+| `--header` | none | `KEY:VALUE`; repeatable. |
+| `--param` | none | `KEY:VALUE`; repeatable. |
+| `--max-pages` | `100` | Max pages to fetch. |
+| `--frontmatter` | off | Add YAML frontmatter. |
+| `--output-dir` | none | Save output JSON files. |
+
+<Note>Cursor/offset pagination strategies and JSON request bodies are configured through [SDK extraction](/usage/sdk/extraction#fetch-rest-apis) or [REST extraction](/usage/server/extraction). The CLI covers headers and query params.</Note>
+
+## Next Stage
+
+```bash
+ragrails chunk --input-dir files/output/docs/ --output-dir files/output/chunks/
+```
+
+<CardGroup cols={2}>
+  <Card title="Ingest" icon="package-plus" href="/usage/cli/ingest">Skip files and run extraction through storage.</Card>
+  <Card title="Chunking" icon="scissors" href="/usage/cli/chunking">Chunk extraction output.</Card>
+</CardGroup>

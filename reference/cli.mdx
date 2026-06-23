@@ -14,21 +14,31 @@ Commands read defaults from [`.ragrails.toml`](/getting-started/configuration); 
 | --- | --- |
 | `ragrails` | Interactive setup wizard (writes `.ragrails.toml`) |
 
+The setup wizard prompts for vector store, embedding, LLM, and reranker defaults. If `.ragrails.toml` already exists, bare `ragrails` shows the current config and lets you `edit`, `reset`, or `exit`.
+
+| Wizard section | Prompts |
+| --- | --- |
+| Vector store | Provider, collection, URL |
+| Embedding | Provider, model |
+| LLM | Provider, model, max tokens |
+| Reranking | Enable flag, provider, model |
+| Advanced defaults | Chunking, batch sizes, retrieval limits, query rewrite, intent routing, history compaction |
+
 ## Commands
 
 | Command | Description |
 | --- | --- |
 | `ragrails chat` | Run one SDK chat turn, or start the interactive chat CLI with no query. |
-| `ragrails chunk` | Chunk ingestion output JSON files into smaller pieces. |
+| `ragrails chunk` | Split extraction JSON into chunks. |
 | `ragrails delete` | Delete stored chunks by exact chunk ID. |
-| `ragrails doctor` | Inspect local Ragrails setup and report missing production prerequisites. |
-| `ragrails edit` | Replace stored chunks by exact chunk ID. |
-| `ragrails embed` | Embed chunk JSON files and write vectors to an output directory. |
-| `ragrails fetch` | Fetch a REST API endpoint into markdown output. |
-| `ragrails ingest` | Run ingestion, chunking, embedding, and storage in one command. |
-| `ragrails parse` | Convert local documents into markdown output. |
+| `ragrails doctor` | Inspect `.ragrails.toml`, packages, environment variables, and optional vector DB connectivity. |
+| `ragrails edit` | Re-embed and replace stored chunks by exact chunk ID. |
+| `ragrails embed` | Embed chunk JSON files. |
+| `ragrails fetch` | Fetch a REST API endpoint into extraction JSON. |
+| `ragrails ingest` | Run extraction, chunking, embedding, and storage in one command. |
+| `ragrails parse` | Parse local files, folders, or file URLs into extraction JSON. |
 | `ragrails query` | Run query embedding and vector retrieval through the SDK pipeline. |
 | `ragrails retrieve` | Retrieve chunks relevant to a query. |
-| `ragrails scrape` | Scrape one or more URLs into markdown output. |
-| `ragrails setup-url` | Install the Playwright browser required for URL ingestion. |
+| `ragrails scrape` | Scrape one or more URLs into extraction JSON. |
+| `ragrails setup-url` | Install the Playwright browser runtime required for URL extraction. |
 | `ragrails store` | Store embedded chunk JSON files in a vector database. |

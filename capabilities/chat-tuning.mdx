@@ -1,0 +1,171 @@
+---
+title: "Chat Tuning"
+icon: "sliders-horizontal"
+description: "Tune conversation state, routing, context quality, and confidence behavior."
+---
+
+`chat()` is stateless, but each turn can use history, intent routing, query rewriting, reranking, and retrieval-quality gates. Tune these controls when the chatbot is too expensive, too eager to search, or too willing to answer from weak context.
+
+## Conversation controls
+
+<CodeGroup>
+```python SDK
+from ragrails import HistoryCompactionConfig, IntentRoutingConfig
+
+result = rag.chat(
+    "How do I authenticate?",
+    history=history,
+    history_compaction=HistoryCompactionConfig(
+        enabled=True,
+        history_limit=15,
+        keep_recent=5,
+    ),
+    intent_routing=IntentRoutingConfig(enabled=True),
+)
+```
+
+```bash CLI
+ragrails chat "How do I authenticate?" \
+  --history-file files/chat-history.json \
+  --history-compaction \
+  --intent-routing \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "How do I authenticate?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": [],
+    "history_compaction": {"enabled": true, "history_limit": 15, "keep_recent": 5},
+    "intent_routing": {"enabled": true}
+  }'
+```
+</CodeGroup>
+
+| Control | Default | Effect |
+| --- | --- | --- |
+| `HistoryCompactionConfig.enabled` | `True` | Summarizes old history when needed. |
+| `history_limit` | `15` | Compaction starts when history grows past this many messages. |
+| `keep_recent` | `5` | Recent messages kept verbatim after compaction. |
+| `IntentRoutingConfig.enabled` | `True` | Bypasses retrieval for simple greetings, thanks, farewells, and acknowledgements. |
+
+<Note>Persist `result.history` after each turn. Ragrails does not store sessions for you.</Note>
+
+## Retrieval quality
+
+Retrieval quality filters weak chunks before generation and records confidence metadata in every chat result.
+
+<CodeGroup>
+```python SDK
+from ragrails import ChatRetrievalQualityConfig
+
+result = rag.chat(
+    "Can I get a refund after 30 days?",
+    history=history,
+    retrieval_quality=ChatRetrievalQualityConfig(
+        min_retrieval_score=0.35,
+        min_rerank_score=0.50,
+        low_confidence_mode="answer_with_caution",
+        max_context_chunks=5,
+    ),
+)
+```
+
+```bash CLI
+# The CLI does not expose retrieval-quality threshold flags yet.
+ragrails chat "Can I get a refund after 30 days?" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "Can I get a refund after 30 days?",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "history": [],
+    "retrieval_quality": {
+      "min_retrieval_score": 0.35,
+      "min_rerank_score": 0.50,
+      "low_confidence_mode": "answer_with_caution",
+      "max_context_chunks": 5
+    }
+  }'
+```
+</CodeGroup>
+
+| Field | Meaning |
+| --- | --- |
+| `min_retrieval_score` | Minimum vector similarity score for non-reranked chunks. |
+| `min_rerank_score` | Minimum reranker score for reranked chunks. |
+| `max_context_chunks` | Optional cap on chunks sent to the LLM after filtering. |
+| `low_confidence_mode` | What to do when no chunks pass the threshold. |
+
+## Low-confidence modes
+
+| Mode | Behavior |
+| --- | --- |
+| `answer_with_caution` | Generate an answer, but mark confidence as low and prompt the model to be cautious. |
+| `ask_clarifying_question` | Ask for a narrower or clearer question. |
+| `refuse_grounded_answer` | Decline to answer from weak context. |
+| `return_no_answer` | Return an empty answer with a `quality` error. |
+
+Result fields to surface in a product UI:
+
+```json
+{
+  "retrieval_quality": {
+    "status": "low_confidence",
+    "mode": "answer_with_caution",
+    "input_chunks": 3,
+    "passed_chunks": 0,
+    "rejected_chunks": 3,
+    "min_retrieval_score": 0.35,
+    "min_rerank_score": 0.5
+  },
+  "answer_confidence": {
+    "level": "low",
+    "reason": "retrieval_quality_low_confidence"
+  }
+}
+```
+
+## Streaming tuned chat
+
+The same controls work with `chat_stream()` and `/v1/chat/stream`. Streaming is useful for tuned chat because callers can see intent, retrieval, quality, generation, token, error, and final events.
+
+```python
+for event in rag.chat_stream(
+    "Can I get a refund after 30 days?",
+    history=history,
+    retrieval_quality=ChatRetrievalQualityConfig(low_confidence_mode="answer_with_caution"),
+):
+    handle_event(event)
+```
+
+## Tuning recipes
+
+| Symptom | Change |
+| --- | --- |
+| Small talk searches the vector database | Keep intent routing enabled. |
+| Follow-ups miss context | Add [query rewriting](/capabilities/query-rewriting). |
+| Correct chunk appears but below weak chunks | Add [reranking](/capabilities/reranking). |
+| Answers include too much background | Lower `max_context_chunks` or `rerank_top_k`. |
+| Bot answers when source coverage is weak | Raise thresholds or use `refuse_grounded_answer` / `return_no_answer`. |
+| Long chats become expensive | Keep history compaction enabled and reduce `keep_recent`. |
+
+## Related pages
+
+- [Chat](/features/chat)
+- [Streaming](/capabilities/streaming)
+- [Query Rewriting](/capabilities/query-rewriting)
+- [Reranking](/capabilities/reranking)

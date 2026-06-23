@@ -1,74 +1,93 @@
 ---
-title: "SDK Chunking"
+title: "Chunking"
 icon: "scissors"
-description: "Split documents into retrieval-ready chunks."
+description: "Split SDK documents into retrieval-ready chunks."
 ---
 
-`chunk()` splits markdown documents into stable, embedding-ready pieces.
+Chunking turns normalized documents into retrieval-sized passages with IDs and metadata. In the full SDK workflow, `rag.ingest()` runs this stage for you. Use `rag.chunk()` directly when you need to inspect or transform chunks before embedding.
 
-<CodeGroup>
-```python Request
+```python
 from ragrails import RagRails
 
 rag = RagRails()
-
-# From ingestion output
-result = rag.chunk(
-    markdown=ingest_result.outputs,  # list of dicts with a "text" key
-    chunk_size=2000,
-    chunk_overlap=200,
-    min_chunk_length=100,
-)
-
-result.inputs  # documents passed in
-result.chunks  # total chunks produced
-result.items   # list of chunk dicts
-result.failed  # documents that failed
-result.errors  # list of error strings
 ```
 
-```python Response
-result.chunks    # 3
-result.items[0]  # {
-                 #   "id": "guide-0",
-                 #   "text": "Ragrails builds modular RAG workflows...",
-                 #   "source": "files/guide.pdf",
-                 #   "metadata": {"title": "Guide", "chunk_index": 0},
-                 # }
-```
-</CodeGroup>
-
-Each chunk dict has:
-
-| Field | Description |
-| --- | --- |
-| `id` | Stable unique chunk ID |
-| `text` | Chunk text |
-| `source` | Source URL or file path |
-| `metadata` | Dict with `title`, `chunk_index`, and other fields |
-
-## Input formats
-
-`markdown` accepts:
+## From Extraction Output
 
 ```python
-# Plain string
+docs = rag.parse(files="files/refund-policy.pdf")
+chunks = rag.chunk(
+    markdown=docs.outputs,
+    chunk_size=1200,
+    chunk_overlap=150,
+    min_chunk_length=80,
+)
+```
+
+## From Direct Markdown
+
+```python
+chunks = rag.chunk(
+    markdown="# Refund policy\n\nCustomers can request a refund within 30 days of purchase.",
+    title="Refund policy",
+    source="policy.md",
+)
+```
+
+## Result
+
+```python
+chunks.inputs
+chunks.chunks
+chunks.items
+chunks.failed
+chunks.errors
+```
+
+A chunk item is a plain dictionary:
+
+```json
+{
+  "id": "refund-policy-0",
+  "text": "Customers can request a refund within 30 days of purchase.",
+  "source": "files/refund-policy.pdf",
+  "metadata": {"title": "Refund policy", "chunk_index": 0}
+}
+```
+
+## Input Forms
+
+```python
+# String
 rag.chunk(markdown="# Guide\n\nContent here.")
 
 # List of strings
 rag.chunk(markdown=["# Doc 1\n\nContent.", "# Doc 2\n\nMore content."])
 
-# List of dicts (ingestion output; uses the "text" key)
-rag.chunk(markdown=ingestion_result.outputs)
+# Document dicts from parse(), scrape(), fetch(), or ingest source results
+rag.chunk(markdown=extraction_result.outputs)
 ```
+
+For dict inputs, `text` is required. `source`, `title`, and `metadata` are preserved when present.
 
 ## Parameters
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `markdown` | required | Markdown string, list of strings, or list of dicts with a `text` key |
-| `title` | `""` | Document title (used when `markdown` is a plain string) |
-| `source` | `""` | Source URL or path (used when `markdown` is a plain string) |
-| `chunk_size` | `2000` | Max characters per chunk |
-| `chunk_overlap` | `200` | Character overlap between adjacent chunks |
-| `min_chunk_length` | `100` | Chunks shorter than this are dropped |
+| `markdown` | required | String, list of strings, or list of dicts with non-empty `text`. |
+| `title` | `""` | Title used for plain string inputs when dict metadata does not set one. |
+| `source` | `""` | Source used for plain string inputs. |
+| `chunk_size` | `2000` | Target max characters per chunk. |
+| `chunk_overlap` | `200` | Character overlap between adjacent chunks. Must be smaller than `chunk_size`. |
+| `min_chunk_length` | `100` | Drop chunks shorter than this. |
+
+## Next Stage
+
+```python
+embedded = rag.embed(chunks=chunks.items)
+```
+
+<CardGroup cols={2}>
+  <Card title="Extraction" icon="file-input" href="/usage/sdk/extraction">Create document inputs.</Card>
+  <Card title="Embedding" icon="binary" href="/usage/sdk/embedding">Embed chunk outputs.</Card>
+</CardGroup>

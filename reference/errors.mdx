@@ -106,4 +106,4 @@ If a REST request fails before the stage returns a result, the server returns an
 
 URL and API failures can include `isRetryable: true` and a `retry_input` payload.
 
-URL scrape failures with `isRetryable: true` are captured in a [dead-letter queue](/usage/sdk/ingestion#dead-letter-queue-dlq) and can be retried by passing `result.dlq` or a saved file path back to `scrape()`.
+URL scrape failures with `isRetryable: true` are captured in a [dead-letter queue](/usage/sdk/extraction#dead-letter-queue-dlq) and can be retried by passing `result.dlq` or a saved file path back to `scrape()`.

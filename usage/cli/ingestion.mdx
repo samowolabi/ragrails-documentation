@@ -1,106 +1,14 @@
 ---
 title: "CLI Ingestion"
 icon: "file-input"
-description: "Ingest URLs, documents, and APIs from the terminal."
+description: "Renamed to CLI Extraction."
 ---
 
-Three commands pull content into normalized documents. Add `--output-dir` to save results as JSON files for the next stage; omit it to print to stdout.
+CLI ingestion is now documented as [CLI Extraction](/usage/cli/extraction), matching the main docs pipeline terminology.
 
-## URL ingestion
+Use [CLI Extraction](/usage/cli/extraction) for `setup-url`, `scrape`, `parse`, and `fetch`.
 
-```bash
-pip install "ragrails[url]"
-ragrails setup-url
-```
-
-<CodeGroup>
-```bash Command
-# Exact URLs
-ragrails scrape https://example.com/docs https://example.com/blog
-
-# Full site crawl, saved as JSON
-ragrails scrape https://example.com --mode full --max-depth 2 --max-pages 50 --output-dir files/output/web/
-
-# With frontmatter
-ragrails scrape https://example.com/docs --frontmatter --output-dir files/output/web/
-```
-
-```text Output
-Pages scraped : 1
-Pages failed  : 0
-Output dir    : files/output/web/
-```
-</CodeGroup>
-
-<Warning>Always cap `--max-pages` on a full crawl. Sites can be huge, and every page costs a fetch.</Warning>
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `URL` | required | One or more URLs (positional, repeatable) |
-| `--mode` | `each` | `each` exact URLs; `full` crawl the site |
-| `--max-depth` | `3` | Crawl depth for `mode=full` |
-| `--max-pages` | `200` | Max pages per URL |
-| `--frontmatter` | off | Prepend YAML frontmatter |
-| `--output-dir` | none | Save output as JSON to this directory |
-
-<Note>Retrying failed pages from a dead-letter queue is SDK-only. See [resilient ingestion](/advanced/resilient-ingestion).</Note>
-
-## Document ingestion
-
-`--files` accepts local paths and file URLs (downloaded automatically). Raw-bytes input is SDK-only.
-
-<CodeGroup>
-```bash Command
-# Parse a folder
-ragrails parse --folder files/docs/ --output-dir files/output/docs/
-
-# Specific files (paths or URLs)
-ragrails parse --files files/guide.pdf --files https://example.com/whitepaper.pdf --output-dir files/output/docs/
-```
-
-```text Output
-Documents parsed : 2
-Documents failed : 0
-Output dir       : files/output/docs/
-```
-</CodeGroup>
-
-| Option | Description |
-| --- | --- |
-| `--folder` | Directory to parse |
-| `--files` | File path or URL (repeatable) |
-| `--frontmatter` | Prepend YAML frontmatter |
-| `--output-dir` | Save output as JSON |
-
-## API ingestion
-
-<CodeGroup>
-```bash Command
-ragrails fetch https://api.example.com/posts \
-  --title "Blog posts" \
-  --header "Authorization:Bearer TOKEN" \
-  --param limit:100 \
-  --max-pages 10 \
-  --output-dir files/output/api/
-```
-
-```text Output
-Documents fetched : 1
-Documents failed  : 0
-Output dir        : files/output/api/
-```
-</CodeGroup>
-
-| Option | Default | Description |
-| --- | --- | --- |
-| `URL` | required | API endpoint (positional) |
-| `--title` | `"API Response"` | Document title |
-| `--description` | `""` | Description metadata |
-| `--method` | `GET` | HTTP method |
-| `--header` | none | `KEY:VALUE` (repeatable) |
-| `--param` | none | `KEY:VALUE` (repeatable) |
-| `--max-pages` | `100` | Max paginated requests |
-| `--frontmatter` | off | Prepend YAML frontmatter |
-| `--output-dir` | none | Save output as JSON |
-
-<Note>Cursor/offset pagination strategies and JSON request bodies are configured through the [SDK `fetch()`](/usage/sdk/ingestion#api-ingestion-fetch) or [REST](/usage/server/ingestion). The CLI covers headers and query params.</Note>
+<CardGroup cols={2}>
+  <Card title="Extraction" icon="file-input" href="/usage/cli/extraction">Open the current CLI extraction page.</Card>
+  <Card title="Ingest" icon="package-plus" href="/usage/cli/ingest">Run extraction through storage in one command.</Card>
+</CardGroup>

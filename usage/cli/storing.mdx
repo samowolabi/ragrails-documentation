@@ -1,81 +1,88 @@
 ---
-title: "CLI Storing"
+title: "Storing"
 icon: "database"
-description: "Store, edit, and delete chunks in a vector database from the terminal."
+description: "Store, edit, and delete CLI chunks in vector databases."
 ---
 
-Three commands manage chunks in a vector database. The collection is created automatically if it doesn't exist.
+CLI storage commands manage embedded chunks in Qdrant, Pinecone, or Weaviate.
 
-## Store (`store`)
+## Store
 
-Reads embedded chunk JSON from `--input-dir` and upserts it.
+`store` reads embedded chunk JSON from `--input-dir` and upserts it.
 
-<CodeGroup>
-```bash Command
+```bash
 ragrails store \
-  --input-dir files/embedded/ \
+  --input-dir files/output/embedded/ \
   --vector-db qdrant \
-  --collection docs \
+  --collection support \
   --url http://localhost:6333 \
   --batch-size 64
 ```
 
-```text Output
+Output:
+
+```text
 Inputs     : 12
 Stored     : 12
 Failed     : 0
 Provider   : qdrant
-Collection : docs
+Collection : support
 ```
-</CodeGroup>
+
+## Edit
+
+`edit` re-embeds and replaces stored chunks by exact ID.
+
+```bash
+ragrails edit \
+  --input-dir files/updated-chunks/ \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3
+```
+
+## Delete
+
+`delete` removes chunks by exact ID.
+
+```bash
+ragrails delete \
+  --id refund-policy-0 \
+  --id refund-policy-1 \
+  --vector-db qdrant \
+  --collection support \
+  --url http://localhost:6333
+```
+
+## Options
+
+### `store`
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--input-dir` | required | Folder of embedded chunk JSON files |
-| `--vector-db` | `qdrant` | `qdrant`, `pinecone`, or `weaviate` |
-| `--collection` | none | Collection name |
-| `--url` | none | Vector DB URL |
-| `--batch-size` | `64` | Chunks per upsert batch |
+| `--input-dir` | required | Folder of embedded chunk JSON files. |
+| `--vector-db` | `qdrant` | `qdrant`, `qdrant_cloud`, `pinecone`, or `weaviate`. |
+| `--collection` | config or none | Collection, index, or class name. |
+| `--url` | config or none | Vector DB URL. |
+| `--batch-size` | `64` | Chunks per upsert batch. |
 
-## Edit (`edit`)
+### `edit`
 
-Re-embeds and replaces stored chunks. Files must contain chunk dicts with matching IDs.
+| Option | Default | Description |
+| --- | --- | --- |
+| `--input-dir` | required | Folder of edited chunk JSON files. |
+| `--provider` / `--model` | `voyage` / `voyage-3` | Embedding provider/model for re-embedding. |
+| `--batch-size` | `64` | Chunks per edit batch. |
 
-<CodeGroup>
-```bash Command
-ragrails edit \
-  --input-dir files/updated/ \
-  --vector-db qdrant --collection docs --url http://localhost:6333 \
-  --provider voyage --model voyage-3
-```
+### `delete`
 
-```text Output
-Requested  : 1
-Edited     : 1
-Failed     : 0
-Provider   : qdrant
-Collection : docs
-```
-</CodeGroup>
+| Option | Default | Description |
+| --- | --- | --- |
+| `--id` | required | Chunk ID to delete. Repeatable. |
 
-## Delete (`delete`)
-
-Removes chunks by ID.
-
-<CodeGroup>
-```bash Command
-ragrails delete \
-  --id guide-0 --id guide-1 \
-  --vector-db qdrant --collection docs --url http://localhost:6333
-```
-
-```text Output
-Requested  : 2
-Deleted    : 2
-Failed     : 0
-Provider   : qdrant
-Collection : docs
-```
-</CodeGroup>
-
-<Tip>Give chunks stable IDs at chunk time so `edit` and `delete` can target them. See [keeping your index current](/features/knowledge-base-maintenance).</Tip>
+<CardGroup cols={2}>
+  <Card title="Embedding" icon="binary" href="/usage/cli/embedding">Create embedded JSON.</Card>
+  <Card title="Maintenance" icon="refresh-cw" href="/usage/cli/knowledge-base-maintenance">Refresh stale chunks.</Card>
+</CardGroup>

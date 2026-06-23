@@ -4,6 +4,8 @@ icon: "list"
 description: "Use Ragrails over HTTP."
 ---
 
+The Ragrails REST API exposes the same pipeline as the SDK through HTTP. Use it when your application is not Python, when you want a service boundary around indexing and chat, or when clients need to upload documents directly.
+
 ```bash
 pip install "ragrails[server-qdrant]"
 ragrails-api
@@ -11,35 +13,49 @@ ragrails-api
 
 The server starts on `http://127.0.0.1:8000`.
 
-- **Swagger UI**: `http://127.0.0.1:8000/docs`
-- **OpenAPI schema**: `http://127.0.0.1:8000/v1/openapi.json`
+| Tool | URL |
+| --- | --- |
+| Swagger UI | `http://127.0.0.1:8000/docs` |
+| ReDoc | `http://127.0.0.1:8000/redoc` |
+| OpenAPI schema | `http://127.0.0.1:8000/v1/openapi.json` |
+| Health check | `GET /v1/health` |
 
-## Endpoints
+## Workflows
 
-| Method | Endpoint | Description |
+| Workflow | Endpoint | Use it for |
 | --- | --- | --- |
-| GET | `/v1/health` | Health check |
-| POST | `/v1/ingest/url` | Scrape URLs |
-| POST | `/v1/ingest/url/stream` | Stream URL scrape events |
-| POST | `/v1/ingest/docs` | Parse documents |
-| POST | `/v1/ingest/api` | Fetch REST APIs |
-| POST | `/v1/chunk` | Chunk documents |
-| POST | `/v1/embed` | Embed chunks |
-| POST | `/v1/store` | Store embedded chunks |
-| POST | `/v1/edit` | Edit stored chunks |
-| POST | `/v1/delete` | Delete stored chunks |
-| POST | `/v1/retrieve` | Retrieve chunks |
-| POST | `/v1/pipelines/ingest` | Full ingest pipeline |
-| POST | `/v1/pipelines/query` | Query pipeline |
-| POST | `/v1/chat` | RAG chat turn |
-| POST | `/v1/chat/stream` | Stream RAG chat events |
+| [Ingest](/usage/server/ingest) | `POST /v1/pipelines/ingest` | Extract, chunk, embed, and store content in one request. |
+| [Query](/usage/server/query) | `POST /v1/pipelines/query` | Embed a search query and retrieve matching chunks. |
+| [Chat](/usage/server/chat) | `POST /v1/chat` | Retrieve context and generate a grounded answer. |
 
-Most request and response bodies are JSON. Streaming endpoints return `text/event-stream`. See the Swagger UI for full request schemas.
+## Pipeline
 
-## Server extras
+Start with the [pipeline overview](/usage/server/pipeline-overview), or call individual stages when you want to inspect or persist each intermediate JSON result.
+
+| Stage | Endpoints | Details |
+| --- | --- | --- |
+| [Extraction](/usage/server/extraction) | `/v1/ingest/url`, `/v1/ingest/docs`, `/v1/ingest/api` | Turn websites, files, uploads, and API responses into normalized documents. |
+| [Chunking](/usage/server/chunking) | `/v1/chunk` | Split documents into retrievable chunks. |
+| [Embedding](/usage/server/embedding) | `/v1/embed` | Generate vectors for chunks. |
+| [Storing](/usage/server/storing) | `/v1/store`, `/v1/edit`, `/v1/delete` | Upsert, replace, and remove stored chunks. |
+| [Retrieval](/usage/server/retrieval) | `/v1/retrieve` | Search and optionally rerank stored chunks. |
+| [Chat](/usage/server/chat) | `/v1/chat`, `/v1/chat/stream` | Run one-shot or streaming chat. |
+
+## Streaming
+
+Streaming endpoints return `text/event-stream`:
+
+| Endpoint | Streams |
+| --- | --- |
+| `POST /v1/ingest/url/stream` | URL crawl progress and final scrape result |
+| `POST /v1/chat/stream` | Retrieval/generation progress, tokens, and final chat result |
+
+## Server Extras
 
 | Stack | Install |
 | --- | --- |
 | Qdrant | `pip install "ragrails[server-qdrant]"` |
 | Pinecone | `pip install "ragrails[server-pinecone]"` |
 | Weaviate | `pip install "ragrails[server-weaviate]"` |
+
+Most request and response bodies are JSON. Document uploads use multipart form data. Use the OpenAPI schema when generating clients.

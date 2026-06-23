@@ -1,0 +1,88 @@
+---
+title: "Agentic Tools"
+icon: "bot"
+description: "Let the interactive CLI chat fetch live pages and call APIs."
+---
+
+Agentic tools are available in the interactive CLI chat session: run `ragrails chat` with no query argument. This is separate from the stateless `rag.chat()` SDK method, which does not execute tools. The SDK exposes the lower-level tool-calling API, but your application owns tool execution and approval.
+
+<Warning>`api_call` can make real HTTP requests. The interactive CLI validates tool calls first and asks for confirmation before side-effecting API calls.</Warning>
+
+## Start the interactive chat
+
+```bash CLI
+ragrails chat
+```
+
+Inside the REPL:
+
+```text
+> /tools
+> Look up the current docs page at https://example.com/docs and compare it to our stored answer.
+> Call the staging API to create a test ticket with this payload: ...
+```
+
+
+## Why this is CLI-only today
+
+`rag.chat()` is a stateless RAG turn: it retrieves context, calls the LLM, and returns a `ChatResult`. It does not own a user session, approval UI, authorization policy, request allowlist, or audit log.
+
+The interactive CLI can safely provide built-in tools because it has a human in the loop. Before a side-effecting `api_call` runs, the CLI validates the arguments and asks the user to confirm the exact request.
+
+For SDK apps, those decisions are application-specific. Use [Tool Calling](/capabilities/tool-calling) to build a tool loop where your app controls validation, permissions, confirmation, execution, and logging.
+
+## Built-in tools
+
+| Tool | Confirmation | What it does |
+| --- | --- | --- |
+| `web_fetch` | No | Fetches a URL and returns readable markdown text, trimmed to 8,000 characters. |
+| `api_call` | Yes | Makes a live HTTP request with explicit `method`, `url`, `headers`, `params`, and `body`. |
+
+The `/tools` command lists registered tools, required fields, and confirmation policy.
+
+## Tool safety model
+
+1. The model proposes a provider-neutral tool call.
+2. Ragrails validates required arguments and schema-specific rules.
+3. Tools requiring confirmation pause for user approval.
+4. Declined or invalid calls are not executed; the model receives a tool result explaining why.
+5. The loop stops when the model returns final text or reaches the maximum tool iterations.
+
+`api_call` validation requires:
+
+| Requirement | Detail |
+| --- | --- |
+| Required keys | `method`, `url`, `headers`, `params`, and `body`. |
+| Allowed methods | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`. |
+| Body requirement | `POST`, `PUT`, and `PATCH` require a non-empty `body`. |
+| Headers/params/body | Each must be an object. Use `{}` only when genuinely empty. |
+| Authorization | Placeholder values such as `<token>` are rejected. |
+
+## When agentic tools help
+
+| Need | Tool |
+| --- | --- |
+| Check a live web page that was not indexed | `web_fetch` |
+| Compare stored docs with a current external page | `web_fetch` |
+| Fetch account details from an API after the user gives credentials | `api_call` |
+| Create or update a resource through an HTTP API | `api_call` |
+
+## Boundaries
+
+| Boundary | Current behavior |
+| --- | --- |
+| SDK `rag.chat()` | Does not call tools. Use [Tool Calling](/capabilities/tool-calling) and execute tools inside your own application boundary. |
+| REST chat | Does not expose the CLI agentic tool loop. |
+| Tool set | Built-in CLI tools are `web_fetch` and `api_call`. |
+| Iterations | The tool loop stops after a bounded number of tool iterations. |
+| Streaming | Interactive chat can stream plain answers, but `chat_stream()` does not stream agentic tool execution. |
+
+Reference: [CLI chat](/usage/cli/chat) and [Tool Calling](/capabilities/tool-calling).
+
+## Related pages
+
+- [Tool Calling](/capabilities/tool-calling)
+- [Streaming](/capabilities/streaming)
+- [CLI chat](/usage/cli/chat)
+- [Chat](/features/chat)
+

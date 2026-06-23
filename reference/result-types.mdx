@@ -124,6 +124,7 @@ Returned by `rag.retrieve()` and `rag.query()`.
 | Field | Type | Description |
 | --- | --- | --- |
 | `id` | `str` | Chunk ID |
+| `chunk_id` | `str` | Original chunk ID from metadata when available |
 | `score` | `float` | Vector similarity score |
 | `text` | `str` | Chunk text |
 | `metadata` | `dict` | Chunk metadata |
@@ -170,7 +171,7 @@ All `errors` lists contain dicts with these fields:
 | Field | Description |
 | --- | --- |
 | `source` | Source identifier (URL, file path, chunk ID) |
-| `source_kind` | `"url"`, `"file"`, `"chunk"`, etc. |
+| `source_kind` | `"url"`, `"path"`, `"bytes"`, `"api"`, `"markdown"`, `"chunk"`, etc. |
 | `stage` | Pipeline stage where the error occurred |
 | `error` | Error message string |
 | `isRetryable` | Whether the error is safe to retry |

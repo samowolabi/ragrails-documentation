@@ -1,0 +1,177 @@
+---
+title: "Extraction"
+icon: "file-input"
+description: "Load documents, websites, APIs, or Markdown with the SDK before indexing."
+---
+
+Extraction normalizes source content into document dicts that `chunk()` and `ingest()` can use.
+
+```python
+from ragrails import RagRails
+
+rag = RagRails()
+```
+
+## Common Shape
+
+All extraction methods return documents with the same core shape.
+
+```json
+{
+  "id": "doc_123",
+  "text": "# Refund policy\n\nRefunds are available within 30 days.",
+  "source": "files/refund-policy.pdf",
+  "title": "Refund policy",
+  "metadata": {"source_kind": "path", "file_type": "pdf"}
+}
+```
+
+## Parse Documents
+
+Use `parse()` for local files, folders, remote file URLs, path dictionaries, or bytes from uploads/object storage.
+
+<CodeGroup>
+```python Files
+result = rag.parse(files=["files/guide.pdf", "files/pricing.csv"])
+```
+
+```python Folder
+result = rag.parse(folder="files/docs")
+```
+
+```python File URL
+result = rag.parse(files="https://example.com/files/whitepaper.pdf")
+```
+
+```python Bytes
+with open("files/guide.pdf", "rb") as f:
+    result = rag.parse(files=[{"content": f.read(), "filename": "guide.pdf", "title": "Guide"}])
+```
+</CodeGroup>
+
+Supported extensions include `.pdf`, `.docx`, `.pptx`, `.xlsx`, `.csv`, `.md`, `.txt`, `.html`, `.json`, `.xml`, `.ipynb`, `.epub`, `.msg`, `.rss`, `.tsv`, `.xls`, and `.zip`.
+
+<Warning>File URLs must end in a supported extension. Ragrails checks the URL path before downloading.</Warning>
+
+## Scrape Websites
+
+Website extraction needs the `url` extra and a browser runtime.
+
+```bash
+pip install "ragrails[url]"
+ragrails setup-url --browser chromium
+```
+
+<CodeGroup>
+```python Exact URL
+result = rag.scrape("https://example.com/help/refunds")
+```
+
+```python Full crawl
+result = rag.scrape("https://example.com/docs", mode="full", max_depth=2, max_pages=50)
+```
+
+```python Mixed inputs
+result = rag.scrape([
+    "https://example.com/help/refunds",
+    {"url": "https://example.com/docs", "mode": "full", "max_depth": 1, "max_pages": 25},
+])
+```
+</CodeGroup>
+
+<Warning>Always cap `max_pages` on full crawls.</Warning>
+
+## Stream Website Extraction
+
+```python
+for event in rag.scrape_stream("https://example.com/docs", mode="full", max_pages=50):
+    if event["type"] == "page":
+        print("scraped", event["data"]["url"])
+    elif event["type"] == "error":
+        print("error", event["message"])
+    elif event["type"] == "final":
+        result = event["data"]
+```
+
+`scrape_stream()` emits `progress`, `page`, `error`, and `final` events.
+
+## Dead-letter queue (DLQ)
+
+Capture retryable scrape failures and retry only failed pages.
+
+```python
+from ragrails import DLQ
+
+first = rag.scrape("https://example.com/docs", mode="full", dlq=DLQ("files/dlq/web.json"))
+retry = rag.scrape(dlq=first.dlq)
+retry_from_file = rag.scrape(dlq="files/dlq/web.json")
+```
+
+Use non-streaming `scrape(..., dlq=...)` when you need DLQ capture.
+
+## Fetch REST APIs
+
+`fetch()` turns API responses into document dicts. It supports headers, query params, JSON bodies, pagination config, timeouts, and batches of endpoints.
+
+<CodeGroup>
+```python Single endpoint
+result = rag.fetch(
+    url="https://api.example.com/refund-policy",
+    title="Refund policy",
+    headers={"Authorization": "Bearer token"},
+)
+```
+
+```python Pagination
+result = rag.fetch(
+    url="https://api.example.com/posts",
+    pagination={"type": "page", "param": "page", "size_param": "per_page", "size": 100},
+    max_pages=10,
+)
+```
+
+```python Batch
+result = rag.fetch(apis=[
+    {"url": "https://api.example.com/posts", "title": "Posts"},
+    {"url": "https://api.example.com/comments", "title": "Comments"},
+])
+```
+</CodeGroup>
+
+## Direct Markdown in `ingest()`
+
+If your content is already Markdown, skip extraction methods and pass it directly to `rag.ingest()`.
+
+```python
+result = rag.ingest(markdown=[
+    {"text": "# Refund policy\n\nCustomers can request a refund within 30 days.", "source": "policy.md"}
+])
+```
+
+## Save Outputs
+
+All extraction methods can return in memory or save Markdown/JSON files.
+
+```python
+result = rag.parse(
+    files="files/refund-policy.pdf",
+    output_format="json",
+    output_dest="file",
+    output_dir="files/output/docs",
+)
+
+result.outputs[0]["output_path"]
+```
+
+## Result Fields
+
+| Result | Count fields | Data fields |
+| --- | --- | --- |
+| `ScrapeResult` | `pages`, `failed` | `outputs`, `errors`, `dlq` |
+| `ParseResult` | `documents`, `failed` | `outputs`, `errors` |
+| `ApiIngestResult` | `documents`, `failed` | `outputs`, `errors` |
+
+<CardGroup cols={2}>
+  <Card title="Ingest" icon="package-plus" href="/usage/sdk/ingest">Run extraction through storage in one call.</Card>
+  <Card title="Chunking" icon="scissors" href="/usage/sdk/chunking">Split extracted documents into chunks.</Card>
+</CardGroup>

@@ -6,15 +6,20 @@ description: "Semantic search that understands meaning, not just keywords."
 
 ## The problem
 
-Keyword search misses results that use different words for the same idea. *"How do I get my money back"* won't match a page titled *"Refund policy."*
+Keyword search misses results that use different words for the same idea. "How do I get my money back" may not match a page titled "Refund policy."
 
-## How Ragrails solves it
+## Why Ragrails fits
 
-Embeddings match by meaning. Add reranking to push the most relevant results to the top.
+Ragrails can run retrieval without answer generation. That means you can build semantic search with no LLM generation cost, then add reranking when result order matters.
 
-1. **Ingest** your corpus.
-2. **Retrieve** by meaning, retrieving wide.
-3. **Rerank** down to the few best results.
+| Need | Ragrails capability |
+| --- | --- |
+| Meaning-based search | [Embedding](/features/embedding) and [Retrieval](/features/retrieval) |
+| Better ordering | [Reranking](/capabilities/reranking) |
+| No generated answer | Use `retrieve()` or `query()` instead of `chat()` |
+| Structured result cards | Use `items[].text`, `items[].metadata`, `score`, and `rerank_score` |
+
+## Sample
 
 <CodeGroup>
 ```python SDK
@@ -24,21 +29,50 @@ result = rag.retrieve(
     use_rerank=True,
     rerank_top_k=5,
 )
+
 for hit in result.items:
-    print(hit.score, hit.metadata.get("title"), hit.text[:120])
+    print(hit.rerank_score, hit.metadata.get("title"), hit.text[:120])
 ```
 
 ```bash CLI
-ragrails retrieve "how do I get my money back"   --vector-db qdrant --collection docs --url http://localhost:6333   --provider voyage --model voyage-3   --top-k 20 --rerank --rerank-top-k 5
+ragrails retrieve "how do I get my money back" \
+  --vector-db qdrant \
+  --collection docs \
+  --url http://localhost:6333 \
+  --provider voyage \
+  --model voyage-3 \
+  --top-k 20 \
+  --rerank \
+  --rerank-top-k 5
 ```
 
 ```bash REST API
-curl -X POST http://127.0.0.1:8000/v1/retrieve   -H "Content-Type: application/json"   -d '{"query": "how do I get my money back", "provider": "voyage", "model": "voyage-3", "vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333", "top_k": 20, "use_rerank": true, "rerank_top_k": 5}'
+curl -X POST http://127.0.0.1:8000/v1/retrieve \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "how do I get my money back",
+    "provider": "voyage",
+    "model": "voyage-3",
+    "vector_db": "qdrant",
+    "collection": "docs",
+    "url": "http://localhost:6333",
+    "top_k": 20,
+    "use_rerank": true,
+    "rerank_top_k": 5
+  }'
 ```
 </CodeGroup>
 
-<Tip>No answer generation and no LLM cost; this is pure retrieval. Add [chat](/features/chat) on top if you want generated answers.</Tip>
+## Result card shape
 
-## Features used
+```json
+{
+  "title": "Refund policy",
+  "snippet": "Refunds are available within 30 days...",
+  "score": 0.76,
+  "rerank_score": 0.93,
+  "source": "policy/refunds.md"
+}
+```
 
-[Retrieval](/features/retrieval) · [Reranking](/advanced/reranking) · [Embedding](/features/embedding)
+<Tip>Add [Chat](/features/chat) later when you want generated answers over the same index.</Tip>
