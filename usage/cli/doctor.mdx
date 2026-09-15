@@ -4,7 +4,7 @@ icon: "stethoscope"
 description: "Diagnose your Ragrails setup before you run anything."
 ---
 
-`ragrails doctor` is a production-readiness check. It validates your `.ragrails.toml`, the provider packages you've installed, your API keys, and (optionally) vector database connectivity, then reports what's wrong and how to fix it.
+`ragrails doctor` is a setup-readiness check. It validates the workflow you plan to use, then reports what's wrong and how to fix it.
 
 ## Start with the Setup Wizard
 
@@ -12,10 +12,20 @@ description: "Diagnose your Ragrails setup before you run anything."
 
 ```bash
 ragrails
-ragrails doctor
+ragrails doctor --cli
 ```
 
 There is no `ragrails setup` subcommand. The setup wizard is the bare `ragrails` command.
+
+## Choose a Mode
+
+| Mode | Use it for | What it expects |
+| --- | --- | --- |
+| `ragrails doctor` / `ragrails doctor --cli` | CLI commands like `ragrails ingest`, `ragrails query`, and `ragrails chat` | `.ragrails.toml`, provider packages, API keys |
+| `ragrails doctor --sdk` | Python apps using `from ragrails import RagRails` | Importable package, provider packages, API keys; no `.ragrails.toml` required |
+| `ragrails doctor --rest` | Swagger or HTTP clients using `ragrails-api` | REST env defaults, provider packages, API keys, vector DB URL mistakes |
+
+Choose only one mode at a time.
 
 ## What it checks
 
@@ -34,7 +44,10 @@ Each check reports `OK`, `WARN`, or `FAIL` with a one-line fix.
 | Flag | Description |
 | --- | --- |
 | `--config PATH` | Check a `.ragrails.toml` at a custom path |
-| `--connections` | Also test vector database reachability (live network check) |
+| `--sdk` | Check SDK prerequisites without requiring `.ragrails.toml` |
+| `--cli` | Check CLI project config; this is the default |
+| `--rest` | Check REST API environment defaults and prerequisites |
+| `--connections` | Also test vector database reachability in CLI mode (live network check) |
 | `--json` | Machine-readable JSON output for CI |
 
 ## In CI

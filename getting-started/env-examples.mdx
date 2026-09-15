@@ -14,6 +14,8 @@ Set only the ones for the providers you use.
 ```bash Environment
 # Embedding
 export VOYAGE_API_KEY=your-voyage-key
+export EMBEDDING_PROVIDER=voyage
+export EMBEDDING_MODEL=voyage-3
 
 # LLM (chat) - set one or more
 export OPENAI_API_KEY=your-openai-key
@@ -23,9 +25,16 @@ export GEMINI_API_KEY=your-gemini-key
 # Vector database - set one
 export QDRANT_URL=http://localhost:6333
 export QDRANT_API_KEY=your-qdrant-cloud-key    # only for Qdrant Cloud
+export VECTOR_DB_PROVIDER=qdrant
+export VECTOR_DB_URL=http://localhost:6333
+export VECTOR_DB_COLLECTION=rag_chunks
 export PINECONE_API_KEY=your-pinecone-key
 export WEAVIATE_URL=https://your-cluster.weaviate.network
 export WEAVIATE_API_KEY=your-weaviate-key
+
+# REST upload limits
+export RAGRAILS_MAX_UPLOAD_FILES=20
+export RAGRAILS_MAX_UPLOAD_BYTES=52428800
 ```
 </CodeGroup>
 
@@ -63,12 +72,19 @@ export WEAVIATE_API_KEY=your-weaviate-key
 | Variable | Provider | Notes |
 | --- | --- | --- |
 | `VOYAGE_API_KEY` | Voyage | Embedding and Voyage reranking |
+| `EMBEDDING_PROVIDER` | REST API | Default embedding provider when REST requests omit provider |
+| `EMBEDDING_MODEL` | REST API | Default embedding model when REST requests omit model |
 | `OPENAI_API_KEY` | OpenAI | Chat LLM |
 | `ANTHROPIC_API_KEY` | Anthropic | Chat LLM |
 | `GEMINI_API_KEY` | Google Gemini | Chat LLM |
 | `QDRANT_URL` | Qdrant | `http://localhost:6333` for local |
 | `QDRANT_API_KEY` | Qdrant Cloud | Only for hosted Qdrant |
+| `VECTOR_DB_PROVIDER` | REST API | Default vector database provider |
+| `VECTOR_DB_URL` | REST API | Default vector database URL |
+| `VECTOR_DB_COLLECTION` | REST API | Default vector database collection/index |
 | `PINECONE_API_KEY` | Pinecone | Cloud vector DB |
 | `WEAVIATE_URL` / `WEAVIATE_API_KEY` | Weaviate | Local or cloud |
+| `RAGRAILS_MAX_UPLOAD_FILES` | REST API | Max files for `/v1/ingest/docs/upload` and `/v1/pipelines/ingest/mixed`; default `20` |
+| `RAGRAILS_MAX_UPLOAD_BYTES` | REST API | Max bytes per uploaded file; default `52428800` |
 
 See [configuration](/getting-started/configuration) for how these map to providers, and [installation](/getting-started/installation) for the matching install extras.

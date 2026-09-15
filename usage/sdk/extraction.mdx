@@ -45,9 +45,21 @@ result = rag.parse(files="https://example.com/files/whitepaper.pdf")
 
 ```python Bytes
 with open("files/guide.pdf", "rb") as f:
-    result = rag.parse(files=[{"content": f.read(), "filename": "guide.pdf", "title": "Guide"}])
+    result = rag.parse(files=[{"kind": "upload", "content": f.read(), "filename": "guide.pdf", "title": "Guide"}])
+```
+
+```python Mixed document items
+with open("files/refund.pdf", "rb") as f:
+    result = rag.parse(files=[
+        {"kind": "upload", "content": f.read(), "filename": "refund.pdf", "metadata": {"team": "support"}},
+        {"kind": "path", "path": "files/handbook.pdf", "title": "Handbook"},
+        {"kind": "url", "url": "https://example.com/files/guide.pdf", "title": "Hosted guide"},
+        {"kind": "folder", "folder": "files/policies/", "metadata": {"source_group": "policies"}},
+    ])
 ```
 </CodeGroup>
+
+Promote the explicit item schema for new code: `kind="upload"` for bytes, `kind="path"` for server/local paths, `kind="url"` for remote file URLs, and `kind="folder"` for folders. Shorthand strings still work for paths and file URLs.
 
 Supported extensions include `.pdf`, `.docx`, `.pptx`, `.xlsx`, `.csv`, `.md`, `.txt`, `.html`, `.json`, `.xml`, `.ipynb`, `.epub`, `.msg`, `.rss`, `.tsv`, `.xls`, and `.zip`.
 

@@ -34,6 +34,7 @@ Use [REST API Overview](/usage/server/overview) for workflows. Use this page whe
 | POST | `/v1/edit` | Re-embed and replace stored chunks by exact chunk ID. |
 | POST | `/v1/embed` | Embed chunk objects. |
 | GET | `/v1/health` | Health check. |
+| GET | `/v1/health/deps` | Check REST dependencies, provider keys, and common setup mistakes. |
 | POST | `/v1/ingest/api` | Fetch one REST API endpoint into normalized documents. |
 | POST | `/v1/ingest/docs` | Parse server-accessible files, folders, or file URLs. |
 | POST | `/v1/ingest/docs/upload` | Parse multipart file uploads. |
@@ -41,8 +42,13 @@ Use [REST API Overview](/usage/server/overview) for workflows. Use this page whe
 | POST | `/v1/ingest/url/stream` | Stream URL scrape progress and final result. |
 | GET | `/v1/openapi.json` | OpenAPI schema. |
 | POST | `/v1/pipelines/ingest` | Run extraction, chunking, embedding, and storage. |
+| POST | `/v1/pipelines/ingest/mixed` | Run ingest with a multipart manifest and uploaded files. |
 | POST | `/v1/pipelines/query` | Run query embedding and retrieval. |
 | POST | `/v1/retrieve` | Retrieve relevant chunks. |
 | POST | `/v1/store` | Store embedded chunks in a vector database. |
 
 See the Swagger UI at `/docs` for full request and response schemas.
+
+`POST /v1/ingest/docs/upload` and `POST /v1/pipelines/ingest/mixed` are limited by `RAGRAILS_MAX_UPLOAD_FILES` and `RAGRAILS_MAX_UPLOAD_BYTES` in the server environment. Requests above either limit return HTTP `413`.
+
+Use `/v1/pipelines/ingest/mixed` when browser uploads must be indexed in the same pipeline request as path, folder, URL, website, API, or Markdown sources.

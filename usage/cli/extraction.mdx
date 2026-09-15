@@ -31,9 +31,9 @@ ragrails scrape https://example.com/docs \
   --output-dir files/output/web/
 ```
 
-```bash Frontmatter
+```bash Disable frontmatter
 ragrails scrape https://example.com/docs \
-  --frontmatter \
+  --no-frontmatter \
   --output-dir files/output/web/
 ```
 </CodeGroup>
@@ -46,7 +46,7 @@ ragrails scrape https://example.com/docs \
 | `--mode` | `each` | `each` exact URLs or `full` crawl. |
 | `--max-depth` | `3` | Crawl depth for `mode=full`. |
 | `--max-pages` | `200` | Max pages per site. |
-| `--frontmatter` | off | Add YAML frontmatter. |
+| `--frontmatter`, `--no-frontmatter` | `true` | YAML frontmatter is enabled by default; pass `--no-frontmatter` to disable it. |
 | `--output-dir` | none | Save output JSON files. |
 
 <Note>Dead-letter queue retry is SDK-only today. Use [SDK extraction](/usage/sdk/extraction#dead-letter-queue-dlq) for `DLQ` capture and retry.</Note>
@@ -68,7 +68,7 @@ ragrails parse \
 | --- | --- |
 | `--folder` | Directory to parse. Mutually exclusive with `--files`. |
 | `--files` | File path or file URL. Repeatable. |
-| `--frontmatter` | Add YAML frontmatter. |
+| `--frontmatter`, `--no-frontmatter` | YAML frontmatter is enabled by default; pass `--no-frontmatter` to disable it. |
 | `--output-dir` | Save output JSON files. |
 
 <Note>Raw bytes input is SDK-only. Use [SDK extraction](/usage/sdk/extraction#parse-documents) for upload/object-storage bytes.</Note>
@@ -93,7 +93,7 @@ ragrails fetch https://api.example.com/posts \
 | `--header` | none | `KEY:VALUE`; repeatable. |
 | `--param` | none | `KEY:VALUE`; repeatable. |
 | `--max-pages` | `100` | Max pages to fetch. |
-| `--frontmatter` | off | Add YAML frontmatter. |
+| `--frontmatter`, `--no-frontmatter` | `true` | YAML frontmatter is enabled by default; pass `--no-frontmatter` to disable it. |
 | `--output-dir` | none | Save output JSON files. |
 
 <Note>Cursor/offset pagination strategies and JSON request bodies are configured through [SDK extraction](/usage/sdk/extraction#fetch-rest-apis) or [REST extraction](/usage/server/extraction). The CLI covers headers and query params.</Note>

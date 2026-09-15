@@ -4,7 +4,9 @@ icon: "package-plus"
 description: "Build a searchable knowledge base in one HTTP request."
 ---
 
-`POST /v1/pipelines/ingest` runs extraction, chunking, embedding, and storage together. Use it when your application wants one request to build or refresh a collection.
+`POST /v1/pipelines/ingest` runs extraction, chunking, embedding, and storage together with a JSON request body. Use it when your application wants one request to build or refresh a collection from server-accessible paths, document URLs, websites, APIs, or Markdown.
+
+Use `POST /v1/pipelines/ingest/mixed` when the same document pipeline includes browser uploads plus JSON-addressable sources such as file paths, folders, or remote document URLs.
 
 ## Request
 
@@ -41,14 +43,39 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
 ```
 </CodeGroup>
 
+## Mixed Document Uploads
+
+`POST /v1/pipelines/ingest/mixed` uses multipart form data with a JSON `manifest`, uploaded `files`, and optional `file_refs`. The manifest keeps the pipeline shape identical to JSON ingest while allowing uploaded bytes to join path, URL, and folder documents in one request.
+
+```bash Request
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest/mixed \
+  -F 'manifest={
+    "docs": [
+      {"kind": "upload", "file_ref": "refund_pdf", "title": "Refund policy"},
+      {"kind": "path", "path": "files/handbook.pdf"},
+      {"kind": "url", "url": "https://example.com/files/guide.pdf"},
+      {"kind": "folder", "folder": "files/policies/"}
+    ],
+    "chunking": {"chunk_size": 1200, "chunk_overlap": 120},
+    "embedding": {"provider": "voyage", "model": "voyage-3"},
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }' \
+  -F 'file_refs=refund_pdf' \
+  -F 'files=@refund.pdf'
+```
+
+`file_refs` is optional when `file_ref` matches the uploaded filename. When you provide it, repeat `file_refs` once per uploaded file in the same order as `files`.
+
 ## Inputs
 
 | Field | Description |
 | --- | --- |
-| `docs` | File, folder, file URL, or document config passed to document parsing. |
+| `docs` | File path, folder, file URL, upload item, or document config passed to document parsing. |
 | `urls` | URL, list of URLs, or URL configs passed to website scraping. |
 | `api` | API endpoint config passed to API fetching. |
 | `markdown` | Raw markdown string, list of strings, or list of document dicts. |
+
+Document items can use `kind: "path"`, `kind: "folder"`, `kind: "url"`, or `kind: "upload"`. JSON ingest cannot carry upload bytes; use `/v1/pipelines/ingest/mixed` for upload items.
 
 You can combine inputs in one request. Ragrails merges extracted documents before chunking.
 

@@ -25,9 +25,10 @@ docker run -p 6333:6333 qdrant/qdrant
 | --- | --- | --- | --- |
 | One file | `docs="files/guide.pdf"` | `--docs files/guide.pdf` | `/v1/ingest/docs` with `files` |
 | Many files | `docs=["a.pdf", "b.docx"]` | repeat `--docs` | `/v1/ingest/docs` with `files` list |
-| Folder | `docs={"folder": "files/docs/"}` | `--folder files/docs/` | `/v1/ingest/docs` or pipeline `docs.folder` |
-| Remote file URL | `docs="https://example.com/guide.pdf"` | `--docs https://example.com/guide.pdf` | `/v1/ingest/docs` with `files` |
-| Browser upload | `docs=[{"content": bytes, "filename": "guide.pdf"}]` | Not supported | `/v1/ingest/docs/upload` |
+| Folder | `docs={"folder": "files/docs/"}` or `{"kind": "folder", "folder": "files/docs/"}` | `--folder files/docs/` | `/v1/ingest/docs`, JSON pipeline, or mixed pipeline |
+| Remote file URL | `docs="https://example.com/guide.pdf"` or `{"kind": "url", "url": "https://example.com/guide.pdf"}` | `--docs https://example.com/guide.pdf` | `/v1/ingest/docs` with `files`, JSON pipeline, or mixed pipeline |
+| Browser upload | `docs=[{"kind": "upload", "content": bytes, "filename": "guide.pdf"}]` | Not supported | `/v1/ingest/docs/upload` or `/v1/pipelines/ingest/mixed` |
+| Mixed documents | upload + path + URL + folder items | Not supported | `/v1/pipelines/ingest/mixed` |
 
 ## 2. Ingest the folder
 
@@ -121,14 +122,31 @@ curl -X POST http://127.0.0.1:8000/v1/chat \
 
 ## Uploads over REST
 
-Use multipart upload when the client sends file bytes to the server.
+Use `/v1/ingest/docs/upload` when you only need to parse uploaded files.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/ingest/docs/upload \
   -F "files=@files/guide.pdf" \
-  -F "frontmatter=false" \
+  -F "frontmatter=true" \
   -F "title=Guide" \
   -F "description=Product guide"
+```
+
+Use `/v1/pipelines/ingest/mixed` when uploaded files must be indexed together with paths, folders, remote document URLs, websites, APIs, or Markdown.
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest/mixed \
+  -F 'manifest={
+    "docs": [
+      {"kind": "upload", "file_ref": "guide_pdf", "title": "Guide"},
+      {"kind": "folder", "folder": "files/docs/"},
+      {"kind": "url", "url": "https://example.com/files/whitepaper.pdf"}
+    ],
+    "chunking": {"chunk_size": 900, "chunk_overlap": 120},
+    "storage": {"vector_db": "qdrant", "collection": "docs", "url": "http://localhost:6333"}
+  }' \
+  -F 'file_refs=guide_pdf' \
+  -F 'files=@files/guide.pdf'
 ```
 
 ## Next steps

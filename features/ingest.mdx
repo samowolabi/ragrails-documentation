@@ -136,7 +136,7 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
 
 ## Files
 
-Use files when you know the exact documents to index. File entries can be local paths, HTTP/HTTPS file links, or dictionaries with `path`, `title`, and `description`.
+Use files when you know the exact documents to index. File entries can be local paths, HTTP/HTTPS file links, upload bytes in the SDK, or explicit dictionaries with `kind`, `path`, `url`, `folder`, `title`, `description`, and `metadata`.
 
 <CodeGroup>
 ```python title="SDK" highlight={22}
@@ -151,9 +151,11 @@ rag = RagRails(
 result = rag.ingest(
     docs=[
         {
+            "kind": "path",
             "path": "files/refund-policy.pdf",
             "title": "Refund policy",
             "description": "Customer refund rules",
+            "metadata": {"team": "support"},
         },
         {
             "path": "files/shipping.md",
@@ -161,12 +163,13 @@ result = rag.ingest(
             "description": "Shipping timelines and carriers",
         },
         {
-            "path": "https://example.com/files/product-guide.pdf",
+            "kind": "url",
+            "url": "https://example.com/files/product-guide.pdf",
             "title": "Product guide",
             "description": "Hosted PDF guide",
         },
     ],
-    ingestion={"docs": {"frontmatter": False}},
+    ingestion={"docs": {"frontmatter": True}},
     chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
     embedding={"batch_size": 64},
     storage={"batch_size": 64, "ensure_collection": True},
@@ -207,7 +210,7 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
         "description": "Hosted PDF guide"
       }
     ],
-    "ingestion": {"docs": {"frontmatter": false}},
+    "ingestion": {"docs": {"frontmatter": true}},
     "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
     "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
     "storage": {
@@ -222,7 +225,37 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
 </CodeGroup>
 
 <Note>HTTP/HTTPS document links must end with a supported file extension, such as `.pdf`, `.md`, `.docx`, or `.xlsx`. REST local file paths are read by the server process.</Note>
-<Tip>For browser/app uploads, use the multipart extraction endpoint first: [REST extraction](/usage/server/extraction#parse-documents).</Tip>
+<Tip>For browser/app uploads that belong in the same indexing run as paths, folders, URLs, websites, APIs, or Markdown, use [`POST /v1/pipelines/ingest/mixed`](/usage/server/ingest#mixed-document-uploads).</Tip>
+
+## Mixed Document Items
+
+The canonical document item schema uses explicit `kind` values. SDK calls can mix upload bytes, paths, remote file URLs, and folders in one `docs` list. REST JSON ingest supports path, URL, and folder items; REST multipart mixed ingest adds upload items.
+
+```python SDK
+from pathlib import Path
+
+result = rag.ingest(docs=[
+    {"kind": "upload", "content": Path("files/refund.pdf").read_bytes(), "filename": "refund.pdf"},
+    {"kind": "path", "path": "files/handbook.pdf"},
+    {"kind": "url", "url": "https://example.com/files/guide.pdf"},
+    {"kind": "folder", "folder": "files/policies/"},
+])
+```
+
+```bash REST API
+curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest/mixed \
+  -F 'manifest={
+    "docs": [
+      {"kind": "upload", "file_ref": "refund_pdf", "title": "Refund policy"},
+      {"kind": "path", "path": "files/handbook.pdf"},
+      {"kind": "url", "url": "https://example.com/files/guide.pdf"},
+      {"kind": "folder", "folder": "files/policies/"}
+    ],
+    "storage": {"vector_db": "qdrant", "collection": "support", "url": "http://localhost:6333"}
+  }' \
+  -F 'file_refs=refund_pdf' \
+  -F 'files=@files/refund.pdf'
+```
 
 ## Folders
 
@@ -240,7 +273,7 @@ rag = RagRails(
 
 result = rag.ingest(
     docs={"folder": "files/policies/"},
-    ingestion={"docs": {"frontmatter": False}},
+    ingestion={"docs": {"frontmatter": True}},
     chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
     embedding={"batch_size": 64},
     storage={"batch_size": 64, "ensure_collection": True},
@@ -262,7 +295,7 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "docs": {"folder": "files/policies/"},
-    "ingestion": {"docs": {"frontmatter": false}},
+    "ingestion": {"docs": {"frontmatter": true}},
     "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
     "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
     "storage": {
@@ -301,7 +334,7 @@ result = rag.ingest(
         "max_depth": 2,
         "max_pages": 50,
     },
-    ingestion={"urls": {"verbose": False, "frontmatter": False}},
+    ingestion={"urls": {"verbose": False, "frontmatter": True}},
     chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
     embedding={"batch_size": 64},
     storage={"batch_size": 64, "ensure_collection": True},
@@ -332,7 +365,7 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
       "max_depth": 2,
       "max_pages": 50
     },
-    "ingestion": {"urls": {"verbose": false, "frontmatter": false}},
+    "ingestion": {"urls": {"verbose": false, "frontmatter": true}},
     "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
     "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
     "storage": {
@@ -374,7 +407,7 @@ result = rag.ingest(
             "timeout": 30.0,
         }
     ],
-    ingestion={"api": {"frontmatter": False}},
+    ingestion={"api": {"frontmatter": True}},
     chunking={"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
     embedding={"batch_size": 64},
     storage={"batch_size": 64, "ensure_collection": True},
@@ -409,7 +442,7 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
         "timeout": 30.0
       }
     ],
-    "ingestion": {"api": {"frontmatter": false}},
+    "ingestion": {"api": {"frontmatter": true}},
     "chunking": {"chunk_size": 2000, "chunk_overlap": 200, "min_chunk_length": 100},
     "embedding": {"provider": "voyage", "model": "voyage-3", "batch_size": 64},
     "storage": {
@@ -516,7 +549,7 @@ Use config blocks when you need to tune a specific part of ingest.
 ```python SDK
 result = rag.ingest(
     docs={"folder": "files/policies/"},
-    ingestion={"docs": {"frontmatter": False}},
+    ingestion={"docs": {"frontmatter": True}},
     chunking={"chunk_size": 1000, "chunk_overlap": 100},
     embedding={"provider": "voyage", "model": "voyage-3-large", "batch_size": 32, "options": {}},
     storage={
@@ -545,7 +578,7 @@ curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
   -d '{
     "docs": {"folder": "files/policies/"},
-    "ingestion": {"docs": {"frontmatter": false}},
+    "ingestion": {"docs": {"frontmatter": true}},
     "chunking": {"chunk_size": 1000, "chunk_overlap": 100, "min_chunk_length": 80},
     "embedding": {"provider": "voyage", "model": "voyage-3-large", "batch_size": 32, "options": {}},
     "storage": {

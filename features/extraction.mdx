@@ -93,9 +93,9 @@ ragrails scrape https://example.com/docs \
   --max-pages 50 \
   --output-dir files/output/web/
 
-# Add YAML frontmatter to saved markdown output
+# Disable YAML frontmatter on saved markdown output
 ragrails scrape https://example.com/docs \
-  --frontmatter \
+  --no-frontmatter \
   --output-dir files/output/web/
 ```
 
@@ -166,17 +166,18 @@ with_metadata = rag.parse(files=[
 # Raw bytes, useful for web uploads or object storage
 with open("files/guide.pdf", "rb") as f:
     data = f.read()
-bytes_result = rag.parse(files=[{"content": data, "filename": "guide.pdf", "title": "Guide"}])
+bytes_result = rag.parse(files=[{"kind": "upload", "content": data, "filename": "guide.pdf", "title": "Guide"}])
 
 # Mixed inputs in one call
 mixed = rag.parse(files=[
-    "files/local.pdf",
-    "https://example.com/files/remote.docx",
-    {"content": data, "filename": "upload.pdf", "source": "s3://bucket/upload.pdf"},
+    {"kind": "path", "path": "files/local.pdf"},
+    {"kind": "url", "url": "https://example.com/files/remote.docx"},
+    {"kind": "upload", "content": data, "filename": "upload.pdf", "source": "s3://bucket/upload.pdf"},
+    {"kind": "folder", "folder": "files/policies/"},
 ])
 
-# Return markdown with YAML frontmatter, or save JSON/markdown files
-frontmatter = rag.parse(files="files/guide.pdf", frontmatter=True)
+# Frontmatter is enabled by default for markdown output; disable it only when needed
+plain = rag.parse(files="files/guide.pdf", frontmatter=False)
 saved = rag.parse(files="files/guide.pdf", output_format="json", output_dest="file", output_dir="files/output/docs/")
 ```
 
@@ -190,8 +191,8 @@ ragrails parse \
   --files https://example.com/files/whitepaper.pdf \
   --output-dir files/output/docs/
 
-# Add frontmatter to saved markdown output
-ragrails parse --files files/guide.pdf --frontmatter --output-dir files/output/docs/
+# Disable frontmatter on saved markdown output
+ragrails parse --files files/guide.pdf --no-frontmatter --output-dir files/output/docs/
 ```
 
 ```bash REST API
@@ -207,13 +208,13 @@ curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
 # Client upload through multipart
 curl -X POST http://127.0.0.1:8000/v1/ingest/docs/upload \
   -F "files=@docs/guide.pdf" \
-  -F "frontmatter=false" \
+  -F "frontmatter=true" \
   -F "title=Guide" \
   -F "description=Product guide"
 ```
 </CodeGroup>
 
-<Note>Use JSON `/v1/ingest/docs` for files reachable by the server process. Use multipart `/v1/ingest/docs/upload` when a client is uploading file bytes to the API.</Note>
+<Note>Use JSON `/v1/ingest/docs` for files reachable by the server process. Use multipart `/v1/ingest/docs/upload` when a client is only uploading file bytes for parsing. Use `/v1/pipelines/ingest/mixed` when uploads must be indexed together with paths, folders, URLs, websites, APIs, or Markdown.</Note>
 
 <Warning>File URLs must end in a supported extension such as `.pdf`, `.md`, `.docx`, or `.xlsx`; Ragrails checks the URL path before downloading.</Warning>
 

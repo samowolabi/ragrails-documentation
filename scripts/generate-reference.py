@@ -162,6 +162,7 @@ def rest_reference() -> str:
         "/v1/ingest/url/stream": "Stream URL scrape progress and final result.",
         "/v1/openapi.json": "OpenAPI schema.",
         "/v1/pipelines/ingest": "Run extraction, chunking, embedding, and storage.",
+        "/v1/pipelines/ingest/mixed": "Run ingest with a multipart manifest and uploaded files.",
         "/v1/pipelines/query": "Run query embedding and retrieval.",
         "/v1/retrieve": "Retrieve relevant chunks.",
         "/v1/store": "Store embedded chunks in a vector database.",

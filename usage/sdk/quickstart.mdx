@@ -63,6 +63,11 @@ Use the same ingest workflow with other source types:
 ```python Documents
 rag.ingest(docs=["files/refund-policy.pdf"])
 rag.ingest(docs={"folder": "files/policies"})
+rag.ingest(docs=[
+    {"kind": "path", "path": "files/refund-policy.pdf"},
+    {"kind": "url", "url": "https://example.com/files/guide.pdf"},
+    {"kind": "folder", "folder": "files/policies/"},
+])
 ```
 
 ```python Website

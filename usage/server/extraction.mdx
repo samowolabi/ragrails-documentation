@@ -59,12 +59,16 @@ curl -X POST http://127.0.0.1:8000/v1/ingest/docs \
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/ingest/docs/upload \
   -F "files=@docs/guide.pdf" \
-  -F "frontmatter=false" \
+  -F "frontmatter=true" \
   -F "title=Guide" \
   -F "description=Product guide"
 ```
 
 Upload multiple files by repeating `files`.
+
+<Note>Multipart uploads are limited by server config. By default, `/v1/ingest/docs/upload` and `/v1/pipelines/ingest/mixed` accept up to 20 files and 50 MB per file. Set `RAGRAILS_MAX_UPLOAD_FILES` and `RAGRAILS_MAX_UPLOAD_BYTES` in the server environment to change those limits. Requests over either limit return HTTP `413`.</Note>
+
+<Tip>Use [`/v1/pipelines/ingest/mixed`](/usage/server/ingest#mixed-document-uploads) when uploaded files must be indexed in the same pipeline request as server paths, folders, remote document URLs, websites, APIs, or Markdown.</Tip>
 
 ## Fetch APIs
 
@@ -91,6 +95,7 @@ curl -X POST http://127.0.0.1:8000/v1/ingest/api \
 | `/v1/ingest/url` | `url`, `mode`, `max_depth`, `max_pages`, `frontmatter`, `verbose` |
 | `/v1/ingest/docs` | `files`, `folder`, `frontmatter` |
 | `/v1/ingest/docs/upload` | `files`, `frontmatter`, `title`, `description` |
+| `/v1/pipelines/ingest/mixed` | multipart `manifest`, `files`, optional `file_refs` |
 | `/v1/ingest/api` | `url`, `method`, `headers`, `params`, `body`, `pagination`, `max_pages`, `timeout` |
 
 ## Output Shape

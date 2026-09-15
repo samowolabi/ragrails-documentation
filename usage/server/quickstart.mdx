@@ -20,7 +20,7 @@ REST defaults live in request payloads. These examples pass the vector database,
 
 ## 2. Ingest
 
-`POST /v1/pipelines/ingest` extracts, chunks, embeds, and stores content.
+`POST /v1/pipelines/ingest` extracts, chunks, embeds, and stores JSON-addressable content. Use `POST /v1/pipelines/ingest/mixed` when browser uploads must be indexed in the same request as paths, folders, URLs, APIs, or Markdown.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \

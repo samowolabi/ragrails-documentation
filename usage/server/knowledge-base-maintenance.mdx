@@ -8,7 +8,7 @@ Use maintenance endpoints when source content changes and you do not want to reb
 
 | Operation | Endpoint | Use it for |
 | --- | --- | --- |
-| Re-ingest | `POST /v1/pipelines/ingest` | Refresh a whole source or collection slice. |
+| Re-ingest | `POST /v1/pipelines/ingest` or `POST /v1/pipelines/ingest/mixed` | Refresh a whole source or collection slice. Use mixed ingest when uploads are part of the refresh. |
 | Edit | `POST /v1/edit` | Replace known chunk IDs after text changes. |
 | Delete | `POST /v1/delete` | Remove stale chunk IDs. |
 

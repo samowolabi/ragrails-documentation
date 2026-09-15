@@ -4,7 +4,7 @@ icon: "file-input"
 description: "Compatibility page for REST extraction."
 ---
 
-This page is kept for existing links. The REST documentation now uses [REST Extraction](/usage/server/extraction) for `POST /v1/ingest/url`, `POST /v1/ingest/docs`, document uploads, and `POST /v1/ingest/api`.
+This page is kept for existing links. The REST documentation now uses [REST Extraction](/usage/server/extraction) for `POST /v1/ingest/url`, `POST /v1/ingest/docs`, document uploads, and `POST /v1/ingest/api`. Use [REST Ingest](/usage/server/ingest#mixed-document-uploads) for `POST /v1/pipelines/ingest/mixed` when uploads should be indexed with other pipeline sources.
 
 Batch API ingestion with `apis` is SDK-only for now. The REST schema currently requires `url`, so `/v1/ingest/api` examples use one endpoint per request.
 

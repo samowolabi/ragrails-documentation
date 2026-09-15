@@ -16,7 +16,8 @@ Use workflows when you want fewer requests. Use stage endpoints when you want to
 
 | Endpoint | Runs |
 | --- | --- |
-| `POST /v1/pipelines/ingest` | extraction -> chunking -> embedding -> storing |
+| `POST /v1/pipelines/ingest` | extraction -> chunking -> embedding -> storing from JSON sources |
+| `POST /v1/pipelines/ingest/mixed` | multipart upload manifest -> extraction -> chunking -> embedding -> storing |
 | `POST /v1/pipelines/query` | query embedding -> retrieval |
 | `POST /v1/chat` | query embedding -> retrieval -> LLM answer |
 
@@ -24,7 +25,7 @@ Use workflows when you want fewer requests. Use stage endpoints when you want to
 
 | Stage | Endpoint | Output |
 | --- | --- | --- |
-| [Extraction](/usage/server/extraction) | `/v1/ingest/url`, `/v1/ingest/docs`, `/v1/ingest/api` | Normalized documents in `outputs` |
+| [Extraction](/usage/server/extraction) | `/v1/ingest/url`, `/v1/ingest/docs`, `/v1/ingest/docs/upload`, `/v1/ingest/api` | Normalized documents in `outputs` |
 | [Chunking](/usage/server/chunking) | `/v1/chunk` | Chunk objects in `items` |
 | [Embedding](/usage/server/embedding) | `/v1/embed` | Embedded chunks in `items` |
 | [Storing](/usage/server/storing) | `/v1/store` | Store summary and stored item IDs |

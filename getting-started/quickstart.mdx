@@ -93,9 +93,14 @@ You can swap the source input without changing the rest of the pipeline. Documen
 
 <CodeGroup>
 ```python SDK sources
-# Documents: parse local files or folders.
+# Documents: parse local files, folders, remote file URLs, or upload bytes.
 rag.ingest(docs=["files/refund-policy.pdf"])
 rag.ingest(docs={"folder": "files/policies"})
+rag.ingest(docs=[
+    {"kind": "path", "path": "files/refund-policy.pdf"},
+    {"kind": "url", "url": "https://example.com/files/guide.pdf"},
+    {"kind": "folder", "folder": "files/policies/"},
+])
 
 # Websites: scrape one page or crawl a site.
 rag.setup_url(browser="chromium")
@@ -126,7 +131,8 @@ ragrails ingest --api-url https://api.example.com/refund-policy \
 ```
 
 ```bash REST API sources
-# Documents must be readable by the server process. For browser uploads, use /v1/ingest/docs/upload.
+# JSON ingest can use server-readable files, folders, and remote file URLs.
+# For browser uploads in the same pipeline, use /v1/pipelines/ingest/mixed.
 curl -X POST http://127.0.0.1:8000/v1/pipelines/ingest \
   -H "Content-Type: application/json" \
   -d '{

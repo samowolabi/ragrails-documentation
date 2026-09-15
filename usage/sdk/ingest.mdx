@@ -26,6 +26,14 @@ rag = RagRails(
 ```python Documents
 result = rag.ingest(docs=["files/refund-policy.pdf", "files/terms.docx"])
 result = rag.ingest(docs={"folder": "files/policies"})
+
+with open("files/refund.pdf", "rb") as f:
+    result = rag.ingest(docs=[
+        {"kind": "upload", "content": f.read(), "filename": "refund.pdf", "metadata": {"team": "support"}},
+        {"kind": "path", "path": "files/handbook.pdf"},
+        {"kind": "url", "url": "https://example.com/files/guide.pdf"},
+        {"kind": "folder", "folder": "files/policies/"},
+    ])
 ```
 
 ```python Websites

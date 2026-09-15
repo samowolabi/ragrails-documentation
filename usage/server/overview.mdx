@@ -19,12 +19,19 @@ The server starts on `http://127.0.0.1:8000`.
 | ReDoc | `http://127.0.0.1:8000/redoc` |
 | OpenAPI schema | `http://127.0.0.1:8000/v1/openapi.json` |
 | Health check | `GET /v1/health` |
+| Dependency preflight | `GET /v1/health/deps` |
+
+Run the dependency preflight before your first pipeline request. It reports missing optional packages, provider keys, and common local-vs-Docker vector database URL mistakes.
+
+```bash
+curl http://127.0.0.1:8000/v1/health/deps
+```
 
 ## Workflows
 
 | Workflow | Endpoint | Use it for |
 | --- | --- | --- |
-| [Ingest](/usage/server/ingest) | `POST /v1/pipelines/ingest` | Extract, chunk, embed, and store content in one request. |
+| [Ingest](/usage/server/ingest) | `POST /v1/pipelines/ingest`, `POST /v1/pipelines/ingest/mixed` | Extract, chunk, embed, and store content in one request. Use the mixed endpoint when browser uploads and JSON document sources belong in the same pipeline. |
 | [Query](/usage/server/query) | `POST /v1/pipelines/query` | Embed a search query and retrieve matching chunks. |
 | [Chat](/usage/server/chat) | `POST /v1/chat` | Retrieve context and generate a grounded answer. |
 
@@ -58,4 +65,4 @@ Streaming endpoints return `text/event-stream`:
 | Pinecone | `pip install "ragrails[server-pinecone]"` |
 | Weaviate | `pip install "ragrails[server-weaviate]"` |
 
-Most request and response bodies are JSON. Document uploads use multipart form data. Use the OpenAPI schema when generating clients.
+Most request and response bodies are JSON. Document uploads use multipart form data. Use `/v1/pipelines/ingest/mixed` when a single ingest request must combine uploaded files with server paths, folders, remote document URLs, websites, APIs, or Markdown. Use the OpenAPI schema when generating clients.
